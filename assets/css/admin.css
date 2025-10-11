@@ -1,0 +1,111 @@
+/**
+ * Orders Jet - Admin Styles
+ * Styles for admin interface
+ */
+
+/* Admin Table List Styles */
+.oj-status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.oj-status-available {
+    background: #d4edda;
+    color: #155724;
+}
+
+.oj-status-occupied {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.oj-status-reserved {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.oj-status-maintenance {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.oj-status-unknown {
+    background: #e2e3e5;
+    color: #383d41;
+}
+
+/* QR Code Meta Box */
+.oj-qr-code-container {
+    text-align: center;
+}
+
+.oj-qr-code-image {
+    margin-bottom: 15px;
+}
+
+.oj-qr-code-image img {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 10px;
+    background: #fff;
+}
+
+.oj-qr-code-actions {
+    margin-bottom: 15px;
+}
+
+.oj-qr-code-actions .button {
+    margin: 0 5px;
+}
+
+.oj-qr-code-url {
+    margin-top: 15px;
+}
+
+.oj-qr-code-url label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.oj-qr-code-url input {
+    font-family: monospace;
+    font-size: 12px;
+}
+
+/* Table Details Meta Box */
+.oj-table-details .form-table th {
+    width: 150px;
+}
+
+.oj-table-details .form-table td {
+    padding: 10px 0;
+}
+
+/* Admin Notices */
+.oj-admin-notice {
+    background: #fff;
+    border-left: 4px solid #c41e3a;
+    box-shadow: 0 1px 1px 0 rgba(0,0,0,.1);
+    margin: 5px 15px 2px;
+    padding: 1px 12px;
+}
+
+.oj-admin-notice p {
+    margin: .5em 0;
+    padding: 2px;
+}
+
+/* Responsive */
+@media (max-width: 782px) {
+    .oj-qr-code-actions .button {
+        display: block;
+        width: 100%;
+        margin: 5px 0;
+    }
+}
+
