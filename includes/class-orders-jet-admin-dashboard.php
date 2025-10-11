@@ -79,38 +79,32 @@ class Orders_Jet_Admin_Dashboard {
             return;
         }
         
-        // Enqueue dashboard CSS
-        wp_enqueue_style(
-            'orders-jet-admin-dashboard',
-            ORDERS_JET_PLUGIN_URL . 'assets/css/admin-dashboard.css',
-            array(),
-            ORDERS_JET_VERSION
-        );
-        
-        // Enqueue dashboard JavaScript
+        // Enqueue React app assets
         wp_enqueue_script(
-            'orders-jet-admin-dashboard',
-            ORDERS_JET_PLUGIN_URL . 'assets/js/admin-dashboard.js',
-            array('jquery'),
+            'orders-jet-react-app',
+            ORDERS_JET_PLUGIN_URL . 'dashboard/build/static/js/main.js',
+            array(),
             ORDERS_JET_VERSION,
             true
         );
         
-        // Localize script with data
-        wp_localize_script('orders-jet-admin-dashboard', 'OrdersJetDashboard', array(
-            'ajaxUrl' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('oj_dashboard_nonce'),
-            'userId' => get_current_user_id(),
+        wp_enqueue_style(
+            'orders-jet-react-app',
+            ORDERS_JET_PLUGIN_URL . 'dashboard/build/static/css/main.css',
+            array(),
+            ORDERS_JET_VERSION
+        );
+        
+        // Localize script with WordPress configuration
+        wp_localize_script('orders-jet-react-app', 'OrdersJetConfig', array(
+            'apiUrl' => rest_url('orders-jet/v1/'),
+            'nonce' => wp_create_nonce('wp_rest'),
             'userRole' => oj_get_user_role(),
-            'pollInterval' => 5000, // 5 seconds
-            'soundEnabled' => get_user_meta(get_current_user_id(), '_oj_sound_alerts_enabled', true) !== 'no',
-            'strings' => array(
-                'newOrder' => __('New Order!', 'orders-jet'),
-                'orderReady' => __('Order Ready!', 'orders-jet'),
-                'paymentDue' => __('Payment Required', 'orders-jet'),
-                'connectionLost' => __('Connection lost. Trying to reconnect...', 'orders-jet'),
-                'connected' => __('Connected', 'orders-jet'),
-            )
+            'userId' => get_current_user_id(),
+            'userName' => wp_get_current_user()->display_name,
+            'siteUrl' => home_url(),
+            'pluginUrl' => ORDERS_JET_PLUGIN_URL,
+            'websocketUrl' => 'ws://localhost:8080', // TODO: Configure WebSocket URL
         ));
     }
     
@@ -122,7 +116,7 @@ class Orders_Jet_Admin_Dashboard {
             wp_die(__('You do not have permission to access this page.', 'orders-jet'));
         }
         
-        include ORDERS_JET_PLUGIN_DIR . 'templates/admin/dashboard-manager.php';
+        $this->render_react_dashboard('manager');
     }
     
     /**
@@ -133,7 +127,7 @@ class Orders_Jet_Admin_Dashboard {
             wp_die(__('You do not have permission to access this page.', 'orders-jet'));
         }
         
-        include ORDERS_JET_PLUGIN_DIR . 'templates/admin/dashboard-kitchen.php';
+        $this->render_react_dashboard('kitchen');
     }
     
     /**
@@ -144,7 +138,26 @@ class Orders_Jet_Admin_Dashboard {
             wp_die(__('You do not have permission to access this page.', 'orders-jet'));
         }
         
-        include ORDERS_JET_PLUGIN_DIR . 'templates/admin/dashboard-waiter.php';
+        $this->render_react_dashboard('waiter');
+    }
+    
+    /**
+     * Render React dashboard
+     */
+    private function render_react_dashboard($dashboard_type) {
+        ?>
+        <div class="wrap">
+            <div id="orders-jet-<?php echo esc_attr($dashboard_type); ?>-dashboard"></div>
+        </div>
+        
+        <script>
+        // Initialize React app when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            // The React app will automatically detect the dashboard type from the container ID
+            console.log('Orders Jet Dashboard initialized for:', '<?php echo esc_js($dashboard_type); ?>');
+        });
+        </script>
+        <?php
     }
     
     /**

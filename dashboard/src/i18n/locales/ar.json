@@ -1,0 +1,140 @@
+{
+  "dashboard": {
+    "title": "لوحة التحكم",
+    "manager": "لوحة التحكم - المدير",
+    "kitchen": "لوحة التحكم - المطبخ",
+    "waiter": "لوحة التحكم - النادل"
+  },
+  "navigation": {
+    "overview": "نظرة عامة",
+    "tables": "الطاولات",
+    "orders": "الطلبات",
+    "staff": "الموظفين",
+    "analytics": "التحليلات",
+    "settings": "الإعدادات",
+    "help": "المساعدة"
+  },
+  "metrics": {
+    "todayOrders": "طلبات اليوم",
+    "todayRevenue": "إيرادات اليوم",
+    "occupiedTables": "الطاولات المشغولة",
+    "staffActivity": "نشاط الموظفين",
+    "avgOrderTime": "متوسط وقت الطلب",
+    "totalCustomers": "إجمالي العملاء",
+    "completedOrders": "الطلبات المكتملة",
+    "pendingOrders": "الطلبات المعلقة"
+  },
+  "tables": {
+    "title": "إدارة الطاولات",
+    "tableNumber": "رقم الطاولة",
+    "status": "الحالة",
+    "capacity": "السعة",
+    "assignedWaiter": "النادل المسؤول",
+    "sessionStart": "بداية الجلسة",
+    "sessionTotal": "إجمالي الجلسة",
+    "actions": "الإجراءات",
+    "available": "متاحة",
+    "occupied": "مشغولة",
+    "cleaning": "تنظيف",
+    "maintenance": "صيانة",
+    "claim": "استلام",
+    "release": "تحرير",
+    "viewDetails": "عرض التفاصيل"
+  },
+  "orders": {
+    "title": "إدارة الطلبات",
+    "orderNumber": "رقم الطلب",
+    "tableNumber": "رقم الطاولة",
+    "status": "الحالة",
+    "total": "الإجمالي",
+    "date": "التاريخ",
+    "items": "المنتجات",
+    "actions": "الإجراءات",
+    "placed": "تم الطلب",
+    "received": "تم الاستلام",
+    "preparing": "قيد التحضير",
+    "ready": "جاهز",
+    "delivered": "تم التوصيل",
+    "completed": "مكتمل",
+    "cancelled": "ملغي",
+    "viewDetails": "عرض التفاصيل",
+    "updateStatus": "تحديث الحالة"
+  },
+  "staff": {
+    "title": "إدارة الموظفين",
+    "name": "الاسم",
+    "role": "الدور",
+    "assignedTables": "الطاولات المسؤول عنها",
+    "status": "الحالة",
+    "manager": "مدير",
+    "kitchen": "مطبخ",
+    "waiter": "نادل",
+    "active": "نشط",
+    "inactive": "غير نشط",
+    "assignRole": "تعيين دور",
+    "viewActivity": "عرض النشاط"
+  },
+  "payments": {
+    "title": "طرق الدفع",
+    "fawateerak": "فواتيرك",
+    "instapay": "إنستاباي",
+    "walled": "والد",
+    "cash": "نقدي",
+    "bankTransfer": "تحويل بنكي",
+    "total": "الإجمالي",
+    "successRate": "معدل النجاح"
+  },
+  "delivery": {
+    "title": "التوصيل",
+    "uberEats": "أوبر إيتس",
+    "talabat": "طلبات",
+    "selfDelivery": "توصيل ذاتي",
+    "pickup": "استلام",
+    "dineIn": "جلوس",
+    "total": "الإجمالي",
+    "avgDeliveryTime": "متوسط وقت التوصيل"
+  },
+  "notifications": {
+    "newOrder": "طلب جديد!",
+    "orderReady": "الطلب جاهز!",
+    "paymentRequired": "مطلوب دفع",
+    "tableClaimed": "تم استلام الطاولة",
+    "tableReleased": "تم تحرير الطاولة",
+    "connectionLost": "فقدان الاتصال. محاولة إعادة الاتصال...",
+    "connected": "متصل"
+  },
+  "common": {
+    "loading": "جاري التحميل...",
+    "error": "خطأ",
+    "success": "نجح",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "refresh": "تحديث",
+    "search": "بحث",
+    "filter": "تصفية",
+    "export": "تصدير",
+    "import": "استيراد",
+    "yes": "نعم",
+    "no": "لا",
+    "confirm": "تأكيد",
+    "close": "إغلاق",
+    "view": "عرض",
+    "update": "تحديث",
+    "create": "إنشاء",
+    "back": "رجوع",
+    "next": "التالي",
+    "previous": "السابق"
+  },
+  "currency": {
+    "symbol": "ج.م",
+    "format": "{{amount}} ج.م"
+  },
+  "time": {
+    "now": "الآن",
+    "minutesAgo": "منذ {{count}} دقيقة",
+    "hoursAgo": "منذ {{count}} ساعة",
+    "daysAgo": "منذ {{count}} يوم"
+  }
+}

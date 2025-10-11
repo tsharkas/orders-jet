@@ -109,6 +109,7 @@ class Orders_Jet_Integration {
         // Core classes
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-user-roles.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-admin-dashboard.php';
+        include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-rest-api.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-table-management.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-ajax-handlers.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-shortcodes.php';
