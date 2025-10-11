@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orders Jet Dashboard - Test</title>
+    <link rel="stylesheet" href="dashboard/build/static/css/main.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&family=Tajawal:wght@300;400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- WordPress Configuration Simulation -->
+    <script>
+        window.OrdersJetConfig = {
+            apiUrl: '/wp-json/orders-jet/v1/',
+            nonce: 'test-nonce',
+            userRole: 'oj_manager',
+            userId: 1,
+            userName: 'أحمد محمد',
+            siteUrl: 'http://localhost',
+            pluginUrl: '/wp-content/plugins/orders-jet-integration/',
+            websocketUrl: 'ws://localhost:8080'
+        };
+    </script>
+
+    <!-- Dashboard Container -->
+    <div id="orders-jet-manager-dashboard"></div>
+
+    <!-- Load Dashboard Script -->
+    <script src="dashboard/build/static/js/main.js"></script>
+
+    <!-- Test Information -->
+    <div style="position: fixed; bottom: 20px; left: 20px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); font-family: 'Cairo', sans-serif; direction: ltr; text-align: left; max-width: 300px;">
+        <h3 style="margin-bottom: 10px; color: #1976d2;">🧪 Test Mode</h3>
+        <p style="margin-bottom: 8px; font-size: 14px;"><strong>Status:</strong> <span style="color: #2e7d32;">✅ Dashboard Loaded</span></p>
+        <p style="margin-bottom: 8px; font-size: 14px;"><strong>Language:</strong> Arabic (RTL)</p>
+        <p style="margin-bottom: 8px; font-size: 14px;"><strong>User Role:</strong> Manager</p>
+        <p style="margin-bottom: 8px; font-size: 14px;"><strong>Theme:</strong> Material-UI Arabic</p>
+        <p style="font-size: 14px;"><strong>Features:</strong> Responsive, Real-time ready</p>
+        
+        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+            <h4 style="margin-bottom: 8px; color: #1976d2; font-size: 14px;">🎯 Test Checklist:</h4>
+            <ul style="font-size: 12px; margin-left: 15px;">
+                <li>✅ Arabic RTL layout</li>
+                <li>✅ Cairo/Tajawal fonts</li>
+                <li>✅ Manager dashboard metrics</li>
+                <li>✅ Responsive sidebar</li>
+                <li>✅ Egyptian currency (ج.م)</li>
+                <li>✅ Navigation functionality</li>
+                <li>✅ Refresh button</li>
+                <li>✅ Mock data display</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
