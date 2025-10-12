@@ -33,8 +33,19 @@ $debug_orders = $wpdb->get_results("
 ", ARRAY_A);
 error_log('Orders Jet Dashboard: Found ' . count($debug_orders) . ' orders with table numbers: ' . print_r($debug_orders, true));
 
+// DEBUG: Let's specifically look for order #75
+$specific_order = $wpdb->get_results("
+    SELECT p.ID, p.post_status, pm.meta_key, pm.meta_value
+    FROM {$wpdb->posts} p
+    LEFT JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+    WHERE p.post_type = 'shop_order'
+    AND p.ID = 75
+", ARRAY_A);
+error_log('Orders Jet Dashboard: Order #75 details: ' . print_r($specific_order, true));
+
 // Active orders for kitchen (matching actual workflow: orders start as wc-processing)
-$active_orders = $wpdb->get_results($wpdb->prepare("
+error_log('Orders Jet Kitchen: Searching for active orders...');
+$active_orders = $wpdb->get_results("
     SELECT p.ID, p.post_date, p.post_status, 
            pm_total.meta_value as order_total,
            pm_customer.meta_value as customer_name,
@@ -55,7 +66,8 @@ $active_orders = $wpdb->get_results($wpdb->prepare("
             WHEN 'wc-on-hold' THEN 3
         END,
         p.post_date ASC
-"), ARRAY_A);
+", ARRAY_A);
+error_log('Orders Jet Kitchen: Found ' . count($active_orders) . ' active orders: ' . print_r($active_orders, true));
 
 // Get order items for each order
 foreach ($active_orders as &$order) {

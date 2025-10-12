@@ -63,8 +63,9 @@ $active_tables = $wpdb->get_var("
 $currency_symbol = get_woocommerce_currency_symbol();
 $formatted_revenue = $currency_symbol . number_format($today_revenue ?: 0, 2);
 
-// Get recent orders (matching actual workflow)
-$recent_orders = $wpdb->get_results($wpdb->prepare("
+// Get recent orders (matching actual workflow) - DEBUG VERSION
+error_log('Orders Jet Manager: Searching for recent orders...');
+$recent_orders = $wpdb->get_results("
     SELECT p.ID, p.post_date, p.post_status, pm_total.meta_value as order_total,
            pm_table.meta_value as table_number, pm_customer.meta_value as customer_name
     FROM {$wpdb->posts} p
@@ -76,7 +77,8 @@ $recent_orders = $wpdb->get_results($wpdb->prepare("
     AND pm_table.meta_value IS NOT NULL
     ORDER BY p.post_date DESC
     LIMIT 5
-"), ARRAY_A);
+", ARRAY_A);
+error_log('Orders Jet Manager: Found ' . count($recent_orders) . ' recent orders: ' . print_r($recent_orders, true));
 
 // Get table status with active order information
 $table_status = $wpdb->get_results("
@@ -160,6 +162,7 @@ $table_status = $wpdb->get_results("
                         <th><?php _e('Date', 'orders-jet'); ?></th>
                         <th><?php _e('Status', 'orders-jet'); ?></th>
                         <th><?php _e('Total', 'orders-jet'); ?></th>
+                        <th><?php _e('Customer/Table', 'orders-jet'); ?></th>
                         <th><?php _e('Actions', 'orders-jet'); ?></th>
                     </tr>
                 </thead>
@@ -174,6 +177,16 @@ $table_status = $wpdb->get_results("
                                 </span>
                             </td>
                             <td><?php echo esc_html($currency_symbol . number_format($order['order_total'] ?: 0, 2)); ?></td>
+                            <td>
+                                <?php if ($order['table_number']) : ?>
+                                    <strong>Table <?php echo esc_html($order['table_number']); ?></strong><br>
+                                <?php endif; ?>
+                                <?php if ($order['customer_name']) : ?>
+                                    <?php echo esc_html($order['customer_name']); ?>
+                                <?php else : ?>
+                                    Guest
+                                <?php endif; ?>
+                            </td>
                             <td>
                                 <a href="<?php echo admin_url('post.php?post=' . $order['ID'] . '&action=edit'); ?>" class="button button-small">
                                     <?php _e('View', 'orders-jet'); ?>
