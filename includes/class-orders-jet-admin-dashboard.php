@@ -28,14 +28,12 @@ class Orders_Jet_Admin_Dashboard {
      * Register admin menu pages based on user role
      */
     public function register_admin_pages() {
-        $user_role = oj_get_user_role();
-        
-        // Manager Dashboard
-        if (current_user_can('access_oj_manager_dashboard')) {
+        // Add Manager Dashboard (available to managers and admins)
+        if (current_user_can('access_oj_manager_dashboard') || current_user_can('manage_options')) {
             add_menu_page(
                 __('Manager Dashboard', 'orders-jet'),
                 __('Manager Dashboard', 'orders-jet'),
-                'access_oj_manager_dashboard',
+                'manage_options', // Use WordPress admin capability as fallback
                 'orders-jet-manager',
                 array($this, 'render_manager_dashboard'),
                 'dashicons-businessman',
@@ -43,12 +41,12 @@ class Orders_Jet_Admin_Dashboard {
             );
         }
         
-        // Kitchen Dashboard
-        if (current_user_can('access_oj_kitchen_dashboard')) {
+        // Add Kitchen Dashboard (available to kitchen staff and admins)
+        if (current_user_can('access_oj_kitchen_dashboard') || current_user_can('manage_options')) {
             add_menu_page(
                 __('Kitchen Display', 'orders-jet'),
                 __('Kitchen Display', 'orders-jet'),
-                'access_oj_kitchen_dashboard',
+                'manage_options', // Use WordPress admin capability as fallback
                 'orders-jet-kitchen',
                 array($this, 'render_kitchen_dashboard'),
                 'dashicons-food',
@@ -56,12 +54,12 @@ class Orders_Jet_Admin_Dashboard {
             );
         }
         
-        // Waiter Dashboard
-        if (current_user_can('access_oj_waiter_dashboard')) {
+        // Add Waiter Dashboard (available to waiters and admins)
+        if (current_user_can('access_oj_waiter_dashboard') || current_user_can('manage_options')) {
             add_menu_page(
                 __('My Tables', 'orders-jet'),
                 __('My Tables', 'orders-jet'),
-                'access_oj_waiter_dashboard',
+                'manage_options', // Use WordPress admin capability as fallback
                 'orders-jet-waiter',
                 array($this, 'render_waiter_dashboard'),
                 'dashicons-tickets-alt',
@@ -112,33 +110,54 @@ class Orders_Jet_Admin_Dashboard {
      * Render manager dashboard
      */
     public function render_manager_dashboard() {
-        if (!current_user_can('access_oj_manager_dashboard')) {
+        // Check permissions with fallback to admin
+        if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_options')) {
             wp_die(__('You do not have permission to access this page.', 'orders-jet'));
         }
         
-        $this->render_react_dashboard('manager');
+        // Load the simple dashboard template
+        $template_path = ORDERS_JET_PLUGIN_DIR . 'templates/admin/dashboard-manager.php';
+        if (file_exists($template_path)) {
+            include $template_path;
+        } else {
+            wp_die(__('Dashboard template not found.', 'orders-jet'));
+        }
     }
     
     /**
      * Render kitchen dashboard
      */
     public function render_kitchen_dashboard() {
-        if (!current_user_can('access_oj_kitchen_dashboard')) {
+        // Check permissions with fallback to admin
+        if (!current_user_can('access_oj_kitchen_dashboard') && !current_user_can('manage_options')) {
             wp_die(__('You do not have permission to access this page.', 'orders-jet'));
         }
         
-        $this->render_react_dashboard('kitchen');
+        // Load the simple dashboard template
+        $template_path = ORDERS_JET_PLUGIN_DIR . 'templates/admin/dashboard-kitchen.php';
+        if (file_exists($template_path)) {
+            include $template_path;
+        } else {
+            wp_die(__('Dashboard template not found.', 'orders-jet'));
+        }
     }
     
     /**
      * Render waiter dashboard
      */
     public function render_waiter_dashboard() {
-        if (!current_user_can('access_oj_waiter_dashboard')) {
+        // Check permissions with fallback to admin
+        if (!current_user_can('access_oj_waiter_dashboard') && !current_user_can('manage_options')) {
             wp_die(__('You do not have permission to access this page.', 'orders-jet'));
         }
         
-        $this->render_react_dashboard('waiter');
+        // Load the simple dashboard template
+        $template_path = ORDERS_JET_PLUGIN_DIR . 'templates/admin/dashboard-waiter.php';
+        if (file_exists($template_path)) {
+            include $template_path;
+        } else {
+            wp_die(__('Dashboard template not found.', 'orders-jet'));
+        }
     }
     
     /**
