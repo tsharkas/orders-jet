@@ -2497,14 +2497,6 @@ $products = wc_get_products(array(
             const addonTotalPerItem = selectedAddons.reduce((sum, addon) => sum + (addon.price * (addon.quantity || 1)), 0);
             const pricePerItem = basePrice + addonTotalPerItem;
             
-            console.log('Price calculation debug:');
-            console.log('- Variation price:', variationPrice);
-            console.log('- Base price (final):', basePrice);
-            console.log('- Selected add-ons:', selectedAddons);
-            console.log('- Add-on total per item:', addonTotalPerItem);
-            console.log('- Final price per item:', pricePerItem);
-            console.log('- Quantity:', quantity);
-            
             // Create simple cart item (WooFood style) with calculated price for display
             const cartItem = {
                 product_id: currentProduct.id,
@@ -2556,7 +2548,6 @@ $products = wc_get_products(array(
             if (!checkedRadio) return 0;
             
             const price = parseFloat(checkedRadio.dataset.price || 0);
-            console.log('Selected variation price:', price, 'from element:', checkedRadio);
             return price;
         }
         
@@ -2676,7 +2667,7 @@ $products = wc_get_products(array(
                 cart.forEach((item, index) => {
                     let addonDetails = '';
                     
-                    // Show add-ons if any (with proper quantity calculation)
+                    // Show add-ons with detailed breakdown
                     if (item.add_ons && item.add_ons.length > 0) {
                         addonDetails += '<div class="cart-addon-details">';
                         item.add_ons.forEach(addon => {
@@ -2685,11 +2676,11 @@ $products = wc_get_products(array(
                             const addonTotalForAllItems = addonPricePerUnit * addonQty * item.quantity;
                             
                             if (addonQty > 1) {
-                                addonDetails += `<div class="cart-addon-item">+ ${addon.name} × ${addonQty} × ${item.quantity} (+${addonTotalForAllItems.toFixed(2)} EGP)</div>`;
+                                addonDetails += `<div class="cart-addon-item">+ ${addon.name} [Add-on total per item: ${addonPricePerUnit.toFixed(2)}] × ${addonQty} × ${item.quantity} (+${addonTotalForAllItems.toFixed(2)} EGP)</div>`;
                             } else if (addon.value) {
                                 addonDetails += `<div class="cart-addon-item">+ ${addon.name}: ${addon.value}</div>`;
                             } else {
-                                addonDetails += `<div class="cart-addon-item">+ ${addon.name} × ${item.quantity} (+${addonTotalForAllItems.toFixed(2)} EGP)</div>`;
+                                addonDetails += `<div class="cart-addon-item">+ ${addon.name} [Add-on total per item: ${addonPricePerUnit.toFixed(2)}] × ${item.quantity} (+${addonTotalForAllItems.toFixed(2)} EGP)</div>`;
                             }
                         });
                         addonDetails += '</div>';
@@ -2709,11 +2700,15 @@ $products = wc_get_products(array(
                     const itemPricePerUnit = item.display_price || item.base_price || 0;
                     const itemTotal = itemPricePerUnit * item.quantity;
                     
+                    // Calculate base price breakdown
+                    const basePrice = item.base_price || 0;
+                    const basePriceTotal = basePrice * item.quantity;
+                    
                     html += `
                         <div class="cart-item">
                             <div class="cart-item-info">
                                 <div class="cart-item-name">${item.display_name || item.name}</div>
-                                <div class="cart-item-price">${itemPricePerUnit.toFixed(2)} EGP × ${item.quantity}</div>
+                                <div class="cart-item-price">[Variation price: ${basePrice.toFixed(2)}] × ${item.quantity} (${basePriceTotal.toFixed(2)} EGP)</div>
                                 ${addonDetails}
                                 ${item.notes ? `<div class="cart-item-notes">${item.notes}</div>` : ''}
                                 <div class="cart-item-total"><strong>Total: ${itemTotal.toFixed(2)} EGP</strong></div>
@@ -2729,13 +2724,6 @@ $products = wc_get_products(array(
             const total = cart.reduce((sum, item) => {
                 const itemPrice = item.display_price || item.base_price || 0;
                 const itemTotal = itemPrice * item.quantity;
-                console.log(`Cart calculation for ${item.name}:`, {
-                    display_price: item.display_price,
-                    base_price: item.base_price, 
-                    addon_total: item.addon_total,
-                    quantity: item.quantity,
-                    itemTotal: itemTotal
-                });
                 return sum + itemTotal;
             }, 0);
             
