@@ -21,76 +21,78 @@ $today_formatted = date('F j, Y');
 // Get real data from WooCommerce orders
 global $wpdb;
 
-// DEBUG: Let's see what's actually in the database
-error_log('Orders Jet Dashboard: Checking for ALL shop_order posts...');
-$all_orders = $wpdb->get_results("
-    SELECT p.ID, p.post_status, p.post_date, p.post_title
-    FROM {$wpdb->posts} p
-    WHERE p.post_type = 'shop_order'
-    ORDER BY p.post_date DESC
-    LIMIT 10
-", ARRAY_A);
-error_log('Orders Jet Dashboard: Found ' . count($all_orders) . ' total orders: ' . print_r($all_orders, true));
+// Get active orders using the SAME logic as frontend order history
+$active_orders_posts = get_posts(array(
+    'post_type' => 'shop_order',
+    'post_status' => array('wc-pending', 'wc-processing', 'wc-on-hold'),
+    'meta_query' => array(
+        array(
+            'key' => '_oj_table_number',
+            'compare' => 'EXISTS'
+        )
+    ),
+    'posts_per_page' => -1,
+    'orderby' => 'date',
+    'order' => 'ASC'
+));
 
-// DEBUG: Let's see what meta keys exist for recent orders
-if (!empty($all_orders)) {
-    $recent_order_id = $all_orders[0]['ID'];
-    $order_meta = $wpdb->get_results($wpdb->prepare("
-        SELECT meta_key, meta_value
-        FROM {$wpdb->postmeta}
-        WHERE post_id = %d
-        ORDER BY meta_key
-    ", $recent_order_id), ARRAY_A);
-    error_log('Orders Jet Dashboard: Meta for order #' . $recent_order_id . ': ' . print_r($order_meta, true));
+// If no orders found with get_posts, try WooCommerce's native method
+if (count($active_orders_posts) == 0 && function_exists('wc_get_orders')) {
+    error_log('Orders Jet Kitchen: Trying WooCommerce native method...');
+    
+    $wc_orders = wc_get_orders(array(
+        'status' => array('pending', 'processing', 'on-hold'),
+        'meta_key' => '_oj_table_number',
+        'limit' => -1,
+        'orderby' => 'date',
+        'order' => 'ASC'
+    ));
+    
+    // Convert WC_Order objects to the format we need
+    $active_orders = array();
+    foreach ($wc_orders as $wc_order) {
+        $active_orders[] = array(
+            'ID' => $wc_order->get_id(),
+            'post_date' => $wc_order->get_date_created()->format('Y-m-d H:i:s'),
+            'post_status' => 'wc-' . $wc_order->get_status(),
+            'order_total' => $wc_order->get_total(),
+            'table_number' => $wc_order->get_meta('_oj_table_number'),
+            'customer_name' => $wc_order->get_billing_first_name(),
+            'session_id' => $wc_order->get_meta('_oj_session_id')
+        );
+    }
+} else {
+    // Convert posts to the format we need
+    $active_orders = array();
+    foreach ($active_orders_posts as $order_post) {
+        $order = wc_get_order($order_post->ID);
+        if ($order) {
+            $active_orders[] = array(
+                'ID' => $order->get_id(),
+                'post_date' => $order_post->post_date,
+                'post_status' => 'wc-' . $order->get_status(),
+                'order_total' => $order->get_total(),
+                'table_number' => $order->get_meta('_oj_table_number'),
+                'customer_name' => $order->get_billing_first_name(),
+                'session_id' => $order->get_meta('_oj_session_id')
+            );
+        }
+    }
 }
 
-// DEBUG: Let's see what's actually in the database
-error_log('Orders Jet Dashboard: Checking for orders with table numbers...');
-$debug_orders = $wpdb->get_results("
-    SELECT p.ID, p.post_status, pm.meta_value as table_number, p.post_date
-    FROM {$wpdb->posts} p
-    INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id AND pm.meta_key = '_oj_table_number'
-    WHERE p.post_type = 'shop_order'
-    ORDER BY p.post_date DESC
-    LIMIT 10
-", ARRAY_A);
-error_log('Orders Jet Dashboard: Found ' . count($debug_orders) . ' orders with table numbers: ' . print_r($debug_orders, true));
+// Sort by priority: processing first, then pending, then on-hold
+usort($active_orders, function($a, $b) {
+    $priority = array('wc-processing' => 1, 'wc-pending' => 2, 'wc-on-hold' => 3);
+    $a_priority = $priority[$a['post_status']] ?? 4;
+    $b_priority = $priority[$b['post_status']] ?? 4;
+    
+    if ($a_priority === $b_priority) {
+        return strtotime($a['post_date']) - strtotime($b['post_date']);
+    }
+    return $a_priority - $b_priority;
+});
 
-// DEBUG: Let's specifically look for order #75
-$specific_order = $wpdb->get_results("
-    SELECT p.ID, p.post_status, pm.meta_key, pm.meta_value
-    FROM {$wpdb->posts} p
-    LEFT JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
-    WHERE p.post_type = 'shop_order'
-    AND p.ID = 75
-", ARRAY_A);
-error_log('Orders Jet Dashboard: Order #75 details: ' . print_r($specific_order, true));
-
-// Active orders for kitchen (matching actual workflow: orders start as wc-processing)
-error_log('Orders Jet Kitchen: Searching for active orders...');
-$active_orders = $wpdb->get_results("
-    SELECT p.ID, p.post_date, p.post_status, 
-           pm_total.meta_value as order_total,
-           pm_customer.meta_value as customer_name,
-           pm_table.meta_value as table_number,
-           pm_session.meta_value as session_id
-    FROM {$wpdb->posts} p
-    LEFT JOIN {$wpdb->postmeta} pm_total ON p.ID = pm_total.post_id AND pm_total.meta_key = '_order_total'
-    LEFT JOIN {$wpdb->postmeta} pm_customer ON p.ID = pm_customer.post_id AND pm_customer.meta_key = '_billing_first_name'
-    LEFT JOIN {$wpdb->postmeta} pm_table ON p.ID = pm_table.post_id AND pm_table.meta_key = '_oj_table_number'
-    LEFT JOIN {$wpdb->postmeta} pm_session ON p.ID = pm_session.post_id AND pm_session.meta_key = '_oj_session_id'
-    WHERE p.post_type = 'shop_order'
-    AND p.post_status IN ('wc-processing', 'wc-pending', 'wc-on-hold')
-    AND pm_table.meta_value IS NOT NULL
-    ORDER BY 
-        CASE p.post_status 
-            WHEN 'wc-processing' THEN 1
-            WHEN 'wc-pending' THEN 2
-            WHEN 'wc-on-hold' THEN 3
-        END,
-        p.post_date ASC
-", ARRAY_A);
-error_log('Orders Jet Kitchen: Found ' . count($active_orders) . ' active orders: ' . print_r($active_orders, true));
+error_log('Orders Jet Kitchen: Found ' . count($active_orders) . ' active orders using frontend logic');
 
 // Get order items for each order
 foreach ($active_orders as &$order) {

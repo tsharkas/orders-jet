@@ -49,47 +49,95 @@ $total_tables = $wpdb->get_var("
     AND post_status = 'publish'
 ");
 
-// Active tables (tables with active orders)
-$active_tables = $wpdb->get_var("
-    SELECT COUNT(DISTINCT pm_table.meta_value)
-    FROM {$wpdb->posts} p
-    INNER JOIN {$wpdb->postmeta} pm_table ON p.ID = pm_table.post_id AND pm_table.meta_key = '_oj_table_number'
-    WHERE p.post_type = 'shop_order'
-    AND p.post_status IN ('wc-pending', 'wc-processing', 'wc-on-hold')
-    AND pm_table.meta_value IS NOT NULL
-");
+// Active tables (tables with active orders) - using same logic as frontend
+$active_tables_posts = get_posts(array(
+    'post_type' => 'shop_order',
+    'post_status' => array('wc-pending', 'wc-processing', 'wc-on-hold'),
+    'meta_query' => array(
+        array(
+            'key' => '_oj_table_number',
+            'compare' => 'EXISTS'
+        )
+    ),
+    'posts_per_page' => -1
+));
+
+// Get unique table numbers from active orders
+$active_table_numbers = array();
+foreach ($active_tables_posts as $order_post) {
+    $order = wc_get_order($order_post->ID);
+    if ($order) {
+        $table_number = $order->get_meta('_oj_table_number');
+        if ($table_number && !in_array($table_number, $active_table_numbers)) {
+            $active_table_numbers[] = $table_number;
+        }
+    }
+}
+
+$active_tables = count($active_table_numbers);
 
 // Format revenue
 $currency_symbol = get_woocommerce_currency_symbol();
 $formatted_revenue = $currency_symbol . number_format($today_revenue ?: 0, 2);
 
-// DEBUG: Check what orders actually exist
-error_log('Orders Jet Manager: Checking for ALL shop_order posts...');
-$all_orders_debug = $wpdb->get_results("
-    SELECT p.ID, p.post_status, p.post_date, p.post_title
-    FROM {$wpdb->posts} p
-    WHERE p.post_type = 'shop_order'
-    ORDER BY p.post_date DESC
-    LIMIT 5
-", ARRAY_A);
-error_log('Orders Jet Manager: Found ' . count($all_orders_debug) . ' total orders: ' . print_r($all_orders_debug, true));
+// Get recent orders using the SAME logic as frontend order history
+$recent_orders_posts = get_posts(array(
+    'post_type' => 'shop_order',
+    'post_status' => array('wc-pending', 'wc-processing', 'wc-on-hold'),
+    'meta_query' => array(
+        array(
+            'key' => '_oj_table_number',
+            'compare' => 'EXISTS'
+        )
+    ),
+    'posts_per_page' => 5,
+    'orderby' => 'date',
+    'order' => 'DESC'
+));
 
-// Get recent orders (matching actual workflow) - DEBUG VERSION
-error_log('Orders Jet Manager: Searching for recent orders...');
-$recent_orders = $wpdb->get_results("
-    SELECT p.ID, p.post_date, p.post_status, pm_total.meta_value as order_total,
-           pm_table.meta_value as table_number, pm_customer.meta_value as customer_name
-    FROM {$wpdb->posts} p
-    LEFT JOIN {$wpdb->postmeta} pm_total ON p.ID = pm_total.post_id AND pm_total.meta_key = '_order_total'
-    LEFT JOIN {$wpdb->postmeta} pm_table ON p.ID = pm_table.post_id AND pm_table.meta_key = '_oj_table_number'
-    LEFT JOIN {$wpdb->postmeta} pm_customer ON p.ID = pm_customer.post_id AND pm_customer.meta_key = '_billing_first_name'
-    WHERE p.post_type = 'shop_order'
-    AND p.post_status IN ('wc-pending', 'wc-processing', 'wc-on-hold')
-    AND pm_table.meta_value IS NOT NULL
-    ORDER BY p.post_date DESC
-    LIMIT 5
-", ARRAY_A);
-error_log('Orders Jet Manager: Found ' . count($recent_orders) . ' recent orders: ' . print_r($recent_orders, true));
+// If no orders found with get_posts, try WooCommerce's native method
+if (count($recent_orders_posts) == 0 && function_exists('wc_get_orders')) {
+    error_log('Orders Jet Manager: Trying WooCommerce native method...');
+    
+    $wc_orders = wc_get_orders(array(
+        'status' => array('pending', 'processing', 'on-hold'),
+        'meta_key' => '_oj_table_number',
+        'limit' => 5,
+        'orderby' => 'date',
+        'order' => 'DESC'
+    ));
+    
+    // Convert WC_Order objects to the format we need
+    $recent_orders = array();
+    foreach ($wc_orders as $wc_order) {
+        $recent_orders[] = array(
+            'ID' => $wc_order->get_id(),
+            'post_date' => $wc_order->get_date_created()->format('Y-m-d H:i:s'),
+            'post_status' => 'wc-' . $wc_order->get_status(),
+            'order_total' => $wc_order->get_total(),
+            'table_number' => $wc_order->get_meta('_oj_table_number'),
+            'customer_name' => $wc_order->get_billing_first_name()
+        );
+    }
+} else {
+    // Convert posts to the format we need
+    $recent_orders = array();
+    foreach ($recent_orders_posts as $order_post) {
+        $order = wc_get_order($order_post->ID);
+        if ($order) {
+            $recent_orders[] = array(
+                'ID' => $order->get_id(),
+                'post_date' => $order_post->post_date,
+                'post_status' => 'wc-' . $order->get_status(),
+                'order_total' => $order->get_total(),
+                'table_number' => $order->get_meta('_oj_table_number'),
+                'customer_name' => $order->get_billing_first_name()
+            );
+        }
+    }
+}
+
+error_log('Orders Jet Manager: Found ' . count($recent_orders) . ' recent orders using frontend logic');
 
 // Get table status with active order information
 $table_status = $wpdb->get_results("
