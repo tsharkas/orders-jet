@@ -94,6 +94,20 @@ usort($active_orders, function($a, $b) {
 
 error_log('Orders Jet Kitchen: Found ' . count($active_orders) . ' active orders using frontend logic');
 
+// Remove any duplicate orders by ID
+$unique_orders = array();
+$seen_ids = array();
+foreach ($active_orders as $order) {
+    if (!in_array($order['ID'], $seen_ids)) {
+        $unique_orders[] = $order;
+        $seen_ids[] = $order['ID'];
+    }
+}
+$active_orders = $unique_orders;
+
+error_log('Orders Jet Kitchen: After deduplication: ' . count($active_orders) . ' unique orders');
+error_log('Orders Jet Kitchen: Order IDs: ' . implode(', ', array_column($active_orders, 'ID')));
+
 // Get order items for each order
 foreach ($active_orders as &$order) {
     $order_items = $wpdb->get_results($wpdb->prepare("

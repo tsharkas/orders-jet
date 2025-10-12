@@ -21,35 +21,53 @@ $today_formatted = date('F j, Y');
 // Get real data from tables and orders
 global $wpdb;
 
-// Get all tables with their status and current orders
+// Get all tables with their status and current orders using correct meta keys
 $tables = $wpdb->get_results("
     SELECT p.ID, p.post_title, p.post_status,
            pm_status.meta_value as table_status,
            pm_capacity.meta_value as table_capacity,
            pm_location.meta_value as table_location
     FROM {$wpdb->posts} p
-    LEFT JOIN {$wpdb->postmeta} pm_status ON p.ID = pm_status.post_id AND pm_status.meta_key = '_table_status'
-    LEFT JOIN {$wpdb->postmeta} pm_capacity ON p.ID = pm_capacity.post_id AND pm_capacity.meta_key = '_table_capacity'
-    LEFT JOIN {$wpdb->postmeta} pm_location ON p.ID = pm_location.post_id AND pm_location.meta_key = '_table_location'
+    LEFT JOIN {$wpdb->postmeta} pm_status ON p.ID = pm_status.post_id AND pm_status.meta_key = '_oj_table_status'
+    LEFT JOIN {$wpdb->postmeta} pm_capacity ON p.ID = pm_capacity.post_id AND pm_capacity.meta_key = '_oj_table_capacity'
+    LEFT JOIN {$wpdb->postmeta} pm_location ON p.ID = pm_location.post_id AND pm_location.meta_key = '_oj_table_location'
     WHERE p.post_type = 'oj_table'
     AND p.post_status = 'publish'
     ORDER BY p.post_title ASC
 ", ARRAY_A);
 
-// Get active orders for each table (matching actual workflow)
+// Get active orders for each table using the same logic as other dashboards
 foreach ($tables as &$table) {
-    $table_orders = $wpdb->get_results($wpdb->prepare("
-        SELECT p.ID, p.post_date, p.post_status, pm_total.meta_value as order_total,
-               pm_session.meta_value as session_id
-        FROM {$wpdb->posts} p
-        LEFT JOIN {$wpdb->postmeta} pm_total ON p.ID = pm_total.post_id AND pm_total.meta_key = '_order_total'
-        LEFT JOIN {$wpdb->postmeta} pm_table ON p.ID = pm_table.post_id AND pm_table.meta_key = '_oj_table_number'
-        LEFT JOIN {$wpdb->postmeta} pm_session ON p.ID = pm_session.post_id AND pm_session.meta_key = '_oj_session_id'
-        WHERE p.post_type = 'shop_order'
-        AND p.post_status IN ('wc-pending', 'wc-processing', 'wc-on-hold')
-        AND pm_table.meta_value = %s
-        ORDER BY p.post_date DESC
-    ", $table['post_title']), ARRAY_A);
+    // Use the same approach as Manager/Kitchen dashboards
+    $table_orders_posts = get_posts(array(
+        'post_type' => 'shop_order',
+        'post_status' => array('wc-pending', 'wc-processing', 'wc-on-hold'),
+        'meta_query' => array(
+            array(
+                'key' => '_oj_table_number',
+                'value' => $table['post_title'],
+                'compare' => '='
+            )
+        ),
+        'posts_per_page' => -1,
+        'orderby' => 'date',
+        'order' => 'DESC'
+    ));
+    
+    // Convert to the format we need
+    $table_orders = array();
+    foreach ($table_orders_posts as $order_post) {
+        $order = wc_get_order($order_post->ID);
+        if ($order) {
+            $table_orders[] = array(
+                'ID' => $order->get_id(),
+                'post_date' => $order_post->post_date,
+                'post_status' => 'wc-' . $order->get_status(),
+                'order_total' => $order->get_total(),
+                'session_id' => $order->get_meta('_oj_session_id')
+            );
+        }
+    }
     
     $table['orders'] = $table_orders;
     $table['has_orders'] = !empty($table_orders);
