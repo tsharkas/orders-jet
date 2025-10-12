@@ -84,6 +84,12 @@ class Orders_Jet_AJAX_Handlers {
             $total = array_sum(array_map(function($item) { return $item['price'] * $item['quantity']; }, $items));
         }
         
+        // CRITICAL FIX: Get table ID from table number
+        if (empty($table_id) || $table_id == 0) {
+            $table_id = oj_get_table_id_by_number($table_number);
+            error_log('Orders Jet: Retrieved table ID from table number: ' . $table_id);
+        }
+        
         // Validate required fields
         if (empty($table_number) || empty($items)) {
             wp_send_json_error(array('message' => __('Table number and cart items are required', 'orders-jet')));
@@ -246,10 +252,20 @@ class Orders_Jet_AJAX_Handlers {
         error_log('Orders Jet: Final order total: ' . $order->get_total());
         error_log('Orders Jet: Final order subtotal: ' . $order->get_subtotal());
         
-        // Update table status to occupied (only if table_id is valid)
+        // Update table status to occupied (CRITICAL FIX: Always try to update)
         if ($table_id > 0) {
             update_post_meta($table_id, '_oj_table_status', 'occupied');
-            error_log('Orders Jet: Table ' . $table_number . ' status updated to occupied');
+            error_log('Orders Jet: Table ' . $table_number . ' (ID: ' . $table_id . ') status updated to occupied');
+        } else {
+            // If we still don't have table_id, try to get it again and create if needed
+            error_log('Orders Jet: WARNING - Table ID still 0, attempting to find/create table: ' . $table_number);
+            $table_id = oj_get_table_id_by_number($table_number);
+            if ($table_id > 0) {
+                update_post_meta($table_id, '_oj_table_status', 'occupied');
+                error_log('Orders Jet: Table ' . $table_number . ' (ID: ' . $table_id . ') status updated to occupied (second attempt)');
+            } else {
+                error_log('Orders Jet: ERROR - Could not find table with number: ' . $table_number);
+            }
         }
         
         // Send notification to staff (only if method exists)

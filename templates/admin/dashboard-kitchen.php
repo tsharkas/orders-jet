@@ -21,6 +21,18 @@ $today_formatted = date('F j, Y');
 // Get real data from WooCommerce orders
 global $wpdb;
 
+// DEBUG: Let's see what's actually in the database
+error_log('Orders Jet Dashboard: Checking for orders with table numbers...');
+$debug_orders = $wpdb->get_results("
+    SELECT p.ID, p.post_status, pm.meta_value as table_number, p.post_date
+    FROM {$wpdb->posts} p
+    INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id AND pm.meta_key = '_oj_table_number'
+    WHERE p.post_type = 'shop_order'
+    ORDER BY p.post_date DESC
+    LIMIT 10
+", ARRAY_A);
+error_log('Orders Jet Dashboard: Found ' . count($debug_orders) . ' orders with table numbers: ' . print_r($debug_orders, true));
+
 // Active orders for kitchen (matching actual workflow: orders start as wc-processing)
 $active_orders = $wpdb->get_results($wpdb->prepare("
     SELECT p.ID, p.post_date, p.post_status, 
