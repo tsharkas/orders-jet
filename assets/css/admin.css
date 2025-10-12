@@ -348,3 +348,169 @@
     font-style: italic;
 }
 
+/* Kitchen Dashboard Mobile Responsive Design */
+@media (max-width: 1024px) {
+    .oj-kitchen-items {
+        font-size: 13px;
+    }
+    
+    .oj-kitchen-item {
+        padding: 8px;
+        margin-bottom: 6px;
+    }
+}
+
+@media (max-width: 782px) {
+    /* Stack table cells vertically on mobile */
+    .wp-list-table.widefat {
+        border: none;
+    }
+    
+    .wp-list-table.widefat thead {
+        display: none;
+    }
+    
+    .wp-list-table.widefat tbody tr {
+        display: block;
+        border: 2px solid #e1e5e9;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        padding: 15px;
+        background: white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .wp-list-table.widefat tbody td {
+        display: block;
+        border: none;
+        padding: 8px 0;
+        text-align: left;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .wp-list-table.widefat tbody td:last-child {
+        border-bottom: none;
+        padding-top: 15px;
+    }
+    
+    /* Add labels for mobile */
+    .wp-list-table.widefat tbody td:before {
+        content: attr(data-label) ": ";
+        font-weight: 600;
+        color: #666;
+        display: inline-block;
+        min-width: 80px;
+    }
+    
+    .wp-list-table.widefat tbody td:first-child:before {
+        content: "Order: ";
+    }
+    
+    .wp-list-table.widefat tbody td:nth-child(2):before {
+        content: "Date: ";
+    }
+    
+    .wp-list-table.widefat tbody td:nth-child(3):before {
+        content: "Status: ";
+    }
+    
+    .wp-list-table.widefat tbody td:nth-child(4):before {
+        content: "Table: ";
+    }
+    
+    .wp-list-table.widefat tbody td:nth-child(5):before {
+        content: "Items: ";
+        display: block;
+        margin-bottom: 8px;
+    }
+    
+    .wp-list-table.widefat tbody td:nth-child(6):before {
+        content: "";
+    }
+    
+    /* Kitchen items mobile layout */
+    .oj-kitchen-items {
+        padding: 0;
+    }
+    
+    .oj-kitchen-item {
+        margin-bottom: 10px;
+        padding: 12px;
+        border-radius: 6px;
+    }
+    
+    .oj-item-main {
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 8px;
+    }
+    
+    .oj-item-qty {
+        font-size: 14px;
+        padding: 4px 8px;
+        min-width: 30px;
+    }
+    
+    .oj-item-name {
+        font-size: 16px;
+        flex: 1;
+        min-width: 200px;
+    }
+    
+    .oj-item-variations,
+    .oj-item-addons {
+        margin: 8px 0;
+        font-size: 13px;
+    }
+    
+    .oj-variation,
+    .oj-addon {
+        padding: 3px 8px;
+        margin-right: 6px;
+        margin-bottom: 4px;
+        font-size: 12px;
+    }
+    
+    .oj-item-notes {
+        margin: 8px 0;
+        padding: 8px;
+        font-size: 13px;
+    }
+    
+    /* Action buttons mobile */
+    .oj-start-cooking,
+    .oj-complete-order,
+    .oj-resume-order {
+        width: 100%;
+        padding: 12px 20px;
+        font-size: 16px;
+        margin-top: 10px;
+    }
+    
+    .oj-start-cooking .dashicons,
+    .oj-complete-order .dashicons,
+    .oj-resume-order .dashicons {
+        font-size: 20px;
+        margin-right: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .oj-stats-row {
+        flex-direction: column;
+    }
+    
+    .oj-stat-box {
+        margin-bottom: 15px;
+    }
+    
+    .oj-item-name {
+        font-size: 15px;
+        min-width: 150px;
+    }
+    
+    .oj-kitchen-item {
+        padding: 10px;
+    }
+}
+

@@ -131,21 +131,6 @@ foreach ($active_orders as $order) {
                     }
                 }
                 
-                // Also check for variation data in order item meta (fallback)
-                $item_meta = $item->get_meta_data();
-                foreach ($item_meta as $meta) {
-                    $meta_key = $meta->key;
-                    $meta_value = $meta->value;
-                    
-                    // Check for variation attributes in meta
-                    if (strpos($meta_key, 'pa_') === 0 || strpos($meta_key, 'attribute_') === 0) {
-                        $attribute_name = str_replace(array('pa_', 'attribute_'), '', $meta_key);
-                        $attribute_label = wc_attribute_label($attribute_name);
-                        if (!isset($item_data['variations'][$attribute_label])) {
-                            $item_data['variations'][$attribute_label] = $meta_value;
-                        }
-                    }
-                }
             } else {
                 // For non-variation products, still check meta for any variation info
                 $item_meta = $item->get_meta_data();
@@ -278,8 +263,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
                         <th><?php _e('Date', 'orders-jet'); ?></th>
                         <th><?php _e('Status', 'orders-jet'); ?></th>
                         <th><?php _e('Customer/Table', 'orders-jet'); ?></th>
-                        <th style="width: 40%;"><?php _e('Items & Add-ons', 'orders-jet'); ?></th>
-                        <th><?php _e('Total', 'orders-jet'); ?></th>
+                        <th style="width: 50%;"><?php _e('Items & Add-ons', 'orders-jet'); ?></th>
                         <th><?php _e('Actions', 'orders-jet'); ?></th>
                     </tr>
                 </thead>
@@ -341,24 +325,23 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                     <span class="oj-no-items"><?php _e('No items found', 'orders-jet'); ?></span>
                                 <?php endif; ?>
                             </td>
-                            <td><strong><?php echo esc_html($currency_symbol . number_format($order['order_total'] ?: 0, 2)); ?></strong></td>
                             <td>
                                 <?php if ($order['post_status'] === 'wc-pending') : ?>
-                                    <button class="button button-primary oj-start-cooking" data-order-id="<?php echo esc_attr($order['ID']); ?>">
+                                    <button class="button button-primary oj-start-cooking" data-order-id="<?php echo esc_attr($order['ID']); ?>" style="background: #00a32a; border-color: #00a32a; color: white; font-weight: 600;">
+                                        <span class="dashicons dashicons-controls-play" style="font-size: 16px; vertical-align: middle; margin-right: 5px;"></span>
                                         <?php _e('Start Cooking', 'orders-jet'); ?>
                                     </button>
                                 <?php elseif ($order['post_status'] === 'wc-processing') : ?>
-                                    <button class="button button-secondary oj-complete-order" data-order-id="<?php echo esc_attr($order['ID']); ?>">
+                                    <button class="button button-secondary oj-complete-order" data-order-id="<?php echo esc_attr($order['ID']); ?>" style="background: #2271b1; border-color: #2271b1; color: white; font-weight: 600; padding: 8px 16px;">
+                                        <span class="dashicons dashicons-yes-alt" style="font-size: 18px; vertical-align: middle; margin-right: 5px;"></span>
                                         <?php _e('Mark Ready', 'orders-jet'); ?>
                                     </button>
                                 <?php else : ?>
-                                    <button class="button oj-resume-order" data-order-id="<?php echo esc_attr($order['ID']); ?>">
+                                    <button class="button oj-resume-order" data-order-id="<?php echo esc_attr($order['ID']); ?>" style="background: #dba617; border-color: #dba617; color: white; font-weight: 600;">
+                                        <span class="dashicons dashicons-controls-repeat" style="font-size: 16px; vertical-align: middle; margin-right: 5px;"></span>
                                         <?php _e('Resume', 'orders-jet'); ?>
                                     </button>
                                 <?php endif; ?>
-                                <a href="<?php echo admin_url('post.php?post=' . $order['ID'] . '&action=edit'); ?>" class="button button-small">
-                                    <?php _e('View Details', 'orders-jet'); ?>
-                                </a>
                             </td>
                         </tr>
                     <?php endforeach; ?>
