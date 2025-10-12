@@ -101,7 +101,8 @@ error_log('Orders Jet Kitchen: Final order count: ' . count($active_orders));
 error_log('Orders Jet Kitchen: Order IDs: ' . implode(', ', array_column($active_orders, 'ID')));
 
 // Get order items for each order using WooCommerce methods (same as frontend)
-foreach ($active_orders as &$order) {
+$orders_with_items = array();
+foreach ($active_orders as $order) {
     $wc_order = wc_get_order($order['ID']);
     if ($wc_order) {
         $order_items = array();
@@ -145,11 +146,21 @@ foreach ($active_orders as &$order) {
             
             $order_items[] = $item_data;
         }
-        $order['items'] = $order_items;
+        
+        // Create a new order array with items (avoid reference issues)
+        $order_with_items = $order;
+        $order_with_items['items'] = $order_items;
+        $orders_with_items[] = $order_with_items;
     } else {
-        $order['items'] = array();
+        // Create order with empty items if WC order not found
+        $order_with_items = $order;
+        $order_with_items['items'] = array();
+        $orders_with_items[] = $order_with_items;
     }
 }
+
+// Replace the original array with the new one
+$active_orders = $orders_with_items;
 
 // Kitchen stats (matching actual workflow)
 $pending_orders = $wpdb->get_var($wpdb->prepare("
