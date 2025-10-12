@@ -77,32 +77,29 @@ class Orders_Jet_Admin_Dashboard {
             return;
         }
         
-        // Enqueue React app assets
-        wp_enqueue_script(
-            'orders-jet-react-app',
-            ORDERS_JET_PLUGIN_URL . 'dashboard/build/static/js/main.js',
-            array(),
-            ORDERS_JET_VERSION,
-            true
-        );
-        
+        // Enqueue admin CSS and JS for classic WordPress admin pages
         wp_enqueue_style(
-            'orders-jet-react-app',
-            ORDERS_JET_PLUGIN_URL . 'dashboard/build/static/css/main.css',
+            'orders-jet-admin',
+            ORDERS_JET_PLUGIN_URL . 'assets/css/admin.css',
             array(),
             ORDERS_JET_VERSION
         );
         
-        // Localize script with WordPress configuration
-        wp_localize_script('orders-jet-react-app', 'OrdersJetConfig', array(
-            'apiUrl' => rest_url('orders-jet/v1/'),
-            'nonce' => wp_create_nonce('wp_rest'),
+        wp_enqueue_script(
+            'orders-jet-admin',
+            ORDERS_JET_PLUGIN_URL . 'assets/js/admin.js',
+            array('jquery'),
+            ORDERS_JET_VERSION,
+            true
+        );
+        
+        // Localize script with AJAX data
+        wp_localize_script('orders-jet-admin', 'OrdersJetAdmin', array(
+            'ajaxUrl' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('oj_dashboard_nonce'),
             'userRole' => oj_get_user_role(),
             'userId' => get_current_user_id(),
             'userName' => wp_get_current_user()->display_name,
-            'siteUrl' => home_url(),
-            'pluginUrl' => ORDERS_JET_PLUGIN_URL,
-            'websocketUrl' => 'ws://localhost:8080', // TODO: Configure WebSocket URL
         ));
     }
     
