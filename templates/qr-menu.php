@@ -2472,9 +2472,12 @@ $products = wc_get_products(array(
             return isValid;
         }
         
-        // Cart management - WooCommerce native implementation
+        // Cart management - WooCommerce native with proper validation
         function addToCart() {
             if (!currentProduct) return;
+            
+            // Validate required variations
+            if (!validateRequiredVariations()) return;
             
             // Validate required add-ons
             if (!validateRequiredAddons()) return;
@@ -2482,13 +2485,19 @@ $products = wc_get_products(array(
             const quantity = parseInt(elements.quantityInput.value);
             const notes = elements.popupNotes.value.trim();
             
-            // Get selected variation ID (simplified)
+            // Get selected variation ID and calculate price
             const variationId = getSelectedVariationId();
+            const variationPrice = getSelectedVariationPrice();
             
             // Collect selected add-ons (simplified)
             const selectedAddons = collectSelectedAddons();
             
-            // Create simple cart item (WooFood style)
+            // Calculate total price for display purposes
+            const basePrice = variationPrice || parseProductPrice(currentProduct.price);
+            const addonTotal = selectedAddons.reduce((sum, addon) => sum + (addon.price * (addon.quantity || 1)), 0);
+            const totalPrice = basePrice + addonTotal;
+            
+            // Create simple cart item (WooFood style) with calculated price for display
             const cartItem = {
                 product_id: currentProduct.id,
                 variation_id: variationId,
@@ -2496,8 +2505,10 @@ $products = wc_get_products(array(
                 quantity: quantity,
                 notes: notes,
                 add_ons: selectedAddons,
-                // Let backend calculate pricing
-                display_name: createDisplayName(variationId, selectedAddons)
+                display_name: createDisplayName(variationId, selectedAddons),
+                display_price: totalPrice,  // For frontend display only
+                base_price: basePrice,      // For frontend display only
+                addon_total: addonTotal     // For frontend display only
             };
             
             // Add to cart
@@ -2509,10 +2520,45 @@ $products = wc_get_products(array(
             showAppNotification(`Added to cart: ${cartItem.display_name} (Qty: ${quantity})`, 'success');
         }
         
+        // Validate required variations
+        function validateRequiredVariations() {
+            const variationInputs = document.querySelectorAll('input[name^="variation-"]');
+            if (variationInputs.length === 0) {
+                return true; // No variations required
+            }
+            
+            const selectedVariation = document.querySelector('input[name^="variation-"]:checked');
+            if (!selectedVariation) {
+                showAppNotification('Please select a variation', 'error');
+                return false;
+            }
+            
+            return true;
+        }
+        
         // Get selected variation ID (simplified)
         function getSelectedVariationId() {
             const checkedRadio = document.querySelector('input[name^="variation-"]:checked');
             return checkedRadio ? parseInt(checkedRadio.dataset.variationId || 0) : 0;
+        }
+        
+        // Get selected variation price
+        function getSelectedVariationPrice() {
+            const checkedRadio = document.querySelector('input[name^="variation-"]:checked');
+            return checkedRadio ? parseFloat(checkedRadio.dataset.price || 0) : 0;
+        }
+        
+        // Parse product price from text
+        function parseProductPrice(priceText) {
+            if (!priceText) return 0;
+            
+            if (priceText.includes('Current price is:')) {
+                const match = priceText.match(/Current price is:\s*([\d,]+)/);
+                return match ? parseFloat(match[1].replace(',', '.')) : 0;
+            }
+            
+            const match = priceText.match(/[\d,]+\.?\d*/);
+            return match ? parseFloat(match[0].replace(',', '.')) : 0;
         }
         
         // Collect selected add-ons (simplified)
@@ -2623,11 +2669,11 @@ $products = wc_get_products(array(
                         addonDetails += '<div class="cart-addon-details">';
                         item.add_ons.forEach(addon => {
                             if (addon.quantity && addon.quantity > 1) {
-                                addonDetails += `<div class="cart-addon-item">+ ${addon.name} × ${addon.quantity}</div>`;
+                                addonDetails += `<div class="cart-addon-item">+ ${addon.name} × ${addon.quantity} (+${(addon.price * addon.quantity).toFixed(2)} EGP)</div>`;
                             } else if (addon.value) {
                                 addonDetails += `<div class="cart-addon-item">+ ${addon.name}: ${addon.value}</div>`;
                             } else {
-                                addonDetails += `<div class="cart-addon-item">+ ${addon.name}</div>`;
+                                addonDetails += `<div class="cart-addon-item">+ ${addon.name} (+${addon.price.toFixed(2)} EGP)</div>`;
                             }
                         });
                         addonDetails += '</div>';
@@ -2637,19 +2683,23 @@ $products = wc_get_products(array(
                     if (!addonDetails && item.addons && item.addons.length > 0) {
                         addonDetails += '<div class="cart-addon-details">';
                         item.addons.forEach(addon => {
-                            addonDetails += `<div class="cart-addon-item">+ ${addon.name}</div>`;
+                            addonDetails += `<div class="cart-addon-item">+ ${addon.name} (+${addon.price.toFixed(2)} EGP)</div>`;
                         });
                         addonDetails += '</div>';
                     }
+                    
+                    // Calculate item total for display
+                    const itemPrice = item.display_price || item.base_price || 0;
+                    const itemTotal = itemPrice * item.quantity;
                     
                     html += `
                         <div class="cart-item">
                             <div class="cart-item-info">
                                 <div class="cart-item-name">${item.display_name || item.name}</div>
-                                <div class="cart-item-quantity">Qty: ${item.quantity}</div>
+                                <div class="cart-item-price">${itemPrice.toFixed(2)} EGP × ${item.quantity}</div>
                                 ${addonDetails}
                                 ${item.notes ? `<div class="cart-item-notes">${item.notes}</div>` : ''}
-                                <div class="cart-item-price-note"><?php _e('Price calculated at checkout', 'orders-jet'); ?></div>
+                                <div class="cart-item-total"><strong>Total: ${itemTotal.toFixed(2)} EGP</strong></div>
                             </div>
                             <button class="cart-item-remove" onclick="removeFromCart(${index})"><?php _e('Remove', 'orders-jet'); ?></button>
                         </div>
@@ -2658,10 +2708,17 @@ $products = wc_get_products(array(
                 elements.cartItems.innerHTML = html;
             }
             
-            // Update totals - show item count instead of complex price calculations
+            // Update totals - calculate proper cart total
+            const total = cart.reduce((sum, item) => {
+                const itemPrice = item.display_price || item.base_price || 0;
+                return sum + (itemPrice * item.quantity);
+            }, 0);
+            
             const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-            elements.cartTotal.textContent = `${itemCount} <?php _e('items', 'orders-jet'); ?>`;
-            elements.floatingCartTotal.textContent = `${itemCount}`;
+            const currencySymbol = '<?php echo get_woocommerce_currency_symbol(); ?>';
+            
+            elements.cartTotal.textContent = `${total.toFixed(2)} ${currencySymbol}`;
+            elements.floatingCartTotal.textContent = `${total.toFixed(2)} ${currencySymbol}`;
             
             // Show/hide floating cart
             if (cart.length > 0) {
@@ -2691,7 +2748,7 @@ $products = wc_get_products(array(
                 // Migrate old cart format to new simplified format
                 cart = cart.map(item => {
                     // If already in new format, return as is
-                    if (item.product_id && item.add_ons !== undefined) {
+                    if (item.product_id && item.add_ons !== undefined && item.display_price !== undefined) {
                         return item;
                     }
                     
@@ -2703,7 +2760,10 @@ $products = wc_get_products(array(
                         quantity: item.quantity,
                         notes: item.notes || '',
                         add_ons: [],
-                        display_name: item.display_name || item.name
+                        display_name: item.display_name || item.name,
+                        display_price: 0,
+                        base_price: 0,
+                        addon_total: 0
                     };
                     
                     // Convert old addons format
@@ -2714,6 +2774,7 @@ $products = wc_get_products(array(
                             price: addon.price || 0,
                             quantity: addon.quantity || 1
                         }));
+                        newItem.addon_total = newItem.add_ons.reduce((sum, addon) => sum + (addon.price * (addon.quantity || 1)), 0);
                     }
                     
                     // Handle old variations format (extract variation_id)
@@ -2721,7 +2782,25 @@ $products = wc_get_products(array(
                         const firstVariation = Object.values(item.variations)[0];
                         if (firstVariation && firstVariation.variation_id) {
                             newItem.variation_id = firstVariation.variation_id;
+                            newItem.base_price = firstVariation.price || 0;
                         }
+                    }
+                    
+                    // Calculate display price from old numericPrice or parse from price text
+                    if (item.numericPrice) {
+                        newItem.display_price = item.numericPrice;
+                        newItem.base_price = newItem.display_price - newItem.addon_total;
+                    } else if (item.price) {
+                        // Parse price from text
+                        let priceText = item.price;
+                        if (priceText.includes('Current price is:')) {
+                            const match = priceText.match(/Current price is:\s*([\d,]+)/);
+                            newItem.display_price = match ? parseFloat(match[1].replace(',', '.')) : 0;
+                        } else {
+                            const match = priceText.match(/[\d,]+\.?\d*/);
+                            newItem.display_price = match ? parseFloat(match[0].replace(',', '.')) : 0;
+                        }
+                        newItem.base_price = newItem.display_price - newItem.addon_total;
                     }
                     
                     return newItem;
