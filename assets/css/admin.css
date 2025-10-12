@@ -109,3 +109,242 @@
     }
 }
 
+/* Dashboard Styles */
+.oj-dashboard-stats {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+}
+
+.oj-stat-card {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 20px;
+    flex: 1;
+    min-width: 200px;
+    text-align: center;
+}
+
+.oj-stat-number {
+    font-size: 2em;
+    font-weight: bold;
+    color: #1d2327;
+    margin-bottom: 5px;
+}
+
+.oj-stat-label {
+    color: #646970;
+    font-size: 14px;
+}
+
+/* Order Status Badges */
+.status-pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-processing {
+    background: #cce5ff;
+    color: #0073aa;
+}
+
+.status-on-hold {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.status-completed {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-cancelled {
+    background: #e2e3e5;
+    color: #383d41;
+}
+
+/* Kitchen-specific styles for order items */
+.oj-kitchen-items {
+    padding: 10px 0;
+}
+
+.oj-kitchen-item {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 8px;
+}
+
+.oj-kitchen-item:last-child {
+    margin-bottom: 0;
+}
+
+.oj-item-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+}
+
+.oj-item-qty {
+    background: #007cba;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: bold;
+    min-width: 24px;
+    text-align: center;
+}
+
+.oj-item-name {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.oj-item-variations {
+    margin: 5px 0;
+    font-size: 12px;
+}
+
+.oj-variation {
+    background: #e3f2fd;
+    color: #1976d2;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-right: 5px;
+    display: inline-block;
+    margin-bottom: 2px;
+}
+
+.oj-item-addons {
+    margin: 5px 0;
+    font-size: 12px;
+}
+
+.oj-addons-label {
+    font-weight: 600;
+    color: #e67e22;
+    margin-right: 5px;
+}
+
+.oj-addon {
+    background: #fff3cd;
+    color: #856404;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-right: 5px;
+    display: inline-block;
+    margin-bottom: 2px;
+}
+
+.oj-item-notes {
+    margin: 5px 0;
+    font-size: 12px;
+    background: #f8d7da;
+    color: #721c24;
+    padding: 5px;
+    border-radius: 3px;
+}
+
+.oj-notes-label {
+    font-weight: 600;
+    margin-right: 5px;
+}
+
+.oj-notes-text {
+    font-style: italic;
+}
+
+.oj-no-items {
+    color: #6c757d;
+    font-style: italic;
+}
+
+/* Manager Dashboard compact item styles */
+.oj-manager-items {
+    padding: 5px 0;
+}
+
+.oj-manager-item {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 3px;
+    padding: 5px 8px;
+    margin-bottom: 5px;
+    font-size: 12px;
+}
+
+.oj-manager-item:last-child {
+    margin-bottom: 0;
+}
+
+.oj-manager-item .oj-item-qty {
+    background: #007cba;
+    color: white;
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-size: 10px;
+    font-weight: bold;
+    min-width: 18px;
+    text-align: center;
+    margin-right: 5px;
+}
+
+.oj-manager-item .oj-item-name {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 12px;
+}
+
+.oj-item-variations-compact {
+    margin: 2px 0;
+    font-size: 10px;
+}
+
+.oj-variation-compact {
+    background: #e3f2fd;
+    color: #1976d2;
+    padding: 1px 4px;
+    border-radius: 2px;
+    margin-right: 3px;
+    display: inline-block;
+    margin-bottom: 1px;
+    font-size: 10px;
+}
+
+.oj-item-addons-compact {
+    margin: 2px 0;
+    font-size: 10px;
+}
+
+.oj-addon-compact {
+    background: #fff3cd;
+    color: #856404;
+    padding: 1px 4px;
+    border-radius: 2px;
+    margin-right: 3px;
+    display: inline-block;
+    margin-bottom: 1px;
+    font-size: 10px;
+}
+
+/* Refresh button styles */
+.oj-refresh-dashboard {
+    margin-bottom: 20px;
+}
+
+.oj-dashboard-updating {
+    opacity: 0.7;
+    pointer-events: none;
+}
+
+.oj-dashboard-updating::after {
+    content: " (Updating...)";
+    color: #666;
+    font-style: italic;
+}
+

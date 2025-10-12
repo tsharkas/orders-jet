@@ -120,21 +120,82 @@ if (count($recent_orders_posts) == 0 && function_exists('wc_get_orders')) {
         );
     }
 } else {
-    // Convert posts to the format we need
-    $recent_orders = array();
-    foreach ($recent_orders_posts as $order_post) {
-        $order = wc_get_order($order_post->ID);
-        if ($order) {
-            $recent_orders[] = array(
-                'ID' => $order->get_id(),
-                'post_date' => $order_post->post_date,
-                'post_status' => 'wc-' . $order->get_status(),
-                'order_total' => $order->get_total(),
-                'table_number' => $order->get_meta('_oj_table_number'),
-                'customer_name' => $order->get_billing_first_name()
-            );
+        // Convert posts to the format we need and get order items
+        $recent_orders = array();
+        foreach ($recent_orders_posts as $order_post) {
+            $order = wc_get_order($order_post->ID);
+            if ($order) {
+                $order_data = array(
+                    'ID' => $order->get_id(),
+                    'post_date' => $order_post->post_date,
+                    'post_status' => 'wc-' . $order->get_status(),
+                    'order_total' => $order->get_total(),
+                    'table_number' => $order->get_meta('_oj_table_number'),
+                    'customer_name' => $order->get_billing_first_name(),
+                    'items' => array()
+                );
+                
+                // Get order items with variations using WooCommerce native methods
+                foreach ($order->get_items() as $item) {
+                    $item_data = array(
+                        'name' => $item->get_name(),
+                        'quantity' => $item->get_quantity(),
+                        'total' => $item->get_total(),
+                        'variations' => array(),
+                        'addons' => array(),
+                        'notes' => ''
+                    );
+                    
+                    // Get variations using WooCommerce native methods
+                    $product = $item->get_product();
+                    if ($product && $product->is_type('variation')) {
+                        // For variation products, get variation attributes directly
+                        $variation_attributes = $product->get_variation_attributes();
+                        foreach ($variation_attributes as $attribute_name => $attribute_value) {
+                            if (!empty($attribute_value)) {
+                                // Clean attribute name and get proper label
+                                $clean_attribute_name = str_replace('attribute_', '', $attribute_name);
+                                $attribute_label = wc_attribute_label($clean_attribute_name);
+                                $item_data['variations'][$attribute_label] = $attribute_value;
+                            }
+                        }
+                    }
+                    
+                    // Get add-ons and notes from item meta
+                    $item_meta = $item->get_meta_data();
+                    foreach ($item_meta as $meta) {
+                        $meta_key = $meta->key;
+                        $meta_value = $meta->value;
+                        
+                        // Get add-ons
+                        if ($meta_key === '_oj_item_addons') {
+                            $addons = explode(', ', $meta_value);
+                            $item_data['addons'] = array_map(function($addon) {
+                                return strip_tags($addon);
+                            }, $addons);
+                        }
+                        
+                        // Get notes
+                        if ($meta_key === '_oj_item_notes') {
+                            $item_data['notes'] = $meta_value;
+                        }
+                        
+                        // Also check for variations in meta (fallback)
+                        if (strpos($meta_key, 'pa_') === 0 || strpos($meta_key, 'attribute_') === 0) {
+                            $attribute_name = str_replace(array('pa_', 'attribute_'), '', $meta_key);
+                            $attribute_label = wc_attribute_label($attribute_name);
+                            if (!isset($item_data['variations'][$attribute_label])) {
+                                $item_data['variations'][$attribute_label] = $meta_value;
+                            }
+                        }
+                    }
+                    
+                    $order_data['items'][] = $item_data;
+                }
+                
+                $recent_orders[] = $order_data;
+            }
         }
-    }
 }
 
 error_log('Orders Jet Manager: Found ' . count($recent_orders) . ' recent orders using frontend logic');
@@ -220,8 +281,9 @@ $table_status = $wpdb->get_results("
                         <th><?php _e('Order #', 'orders-jet'); ?></th>
                         <th><?php _e('Date', 'orders-jet'); ?></th>
                         <th><?php _e('Status', 'orders-jet'); ?></th>
-                        <th><?php _e('Total', 'orders-jet'); ?></th>
                         <th><?php _e('Customer/Table', 'orders-jet'); ?></th>
+                        <th><?php _e('Items', 'orders-jet'); ?></th>
+                        <th><?php _e('Total', 'orders-jet'); ?></th>
                         <th><?php _e('Actions', 'orders-jet'); ?></th>
                     </tr>
                 </thead>
@@ -235,7 +297,6 @@ $table_status = $wpdb->get_results("
                                     <?php echo esc_html(ucfirst(str_replace('wc-', '', $order['post_status']))); ?>
                                 </span>
                             </td>
-                            <td><?php echo esc_html($currency_symbol . number_format($order['order_total'] ?: 0, 2)); ?></td>
                             <td>
                                 <?php if ($order['table_number']) : ?>
                                     <strong>Table <?php echo esc_html($order['table_number']); ?></strong><br>
@@ -246,6 +307,35 @@ $table_status = $wpdb->get_results("
                                     Guest
                                 <?php endif; ?>
                             </td>
+                            <td class="oj-manager-items">
+                                <?php if (!empty($order['items'])) : ?>
+                                    <?php foreach ($order['items'] as $item) : ?>
+                                        <div class="oj-manager-item">
+                                            <span class="oj-item-qty"><?php echo esc_html($item['quantity']); ?>x</span>
+                                            <strong class="oj-item-name"><?php echo esc_html($item['name']); ?></strong>
+                                            
+                                            <?php if (!empty($item['variations'])) : ?>
+                                                <div class="oj-item-variations-compact">
+                                                    <?php foreach ($item['variations'] as $variation_name => $variation_value) : ?>
+                                                        <span class="oj-variation-compact"><?php echo esc_html($variation_name); ?>: <?php echo esc_html($variation_value); ?></span>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            <?php endif; ?>
+                                            
+                                            <?php if (!empty($item['addons'])) : ?>
+                                                <div class="oj-item-addons-compact">
+                                                    <?php foreach ($item['addons'] as $addon) : ?>
+                                                        <span class="oj-addon-compact">+ <?php echo esc_html($addon); ?></span>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php endforeach; ?>
+                                <?php else : ?>
+                                    <span class="oj-no-items"><?php _e('No items found', 'orders-jet'); ?></span>
+                                <?php endif; ?>
+                            </td>
+                            <td><strong><?php echo esc_html($currency_symbol . number_format($order['order_total'] ?: 0, 2)); ?></strong></td>
                             <td>
                                 <a href="<?php echo admin_url('post.php?post=' . $order['ID'] . '&action=edit'); ?>" class="button button-small">
                                     <?php _e('View', 'orders-jet'); ?>

@@ -117,18 +117,56 @@ foreach ($active_orders as $order) {
                 'notes' => ''
             );
             
-            // Get item meta data for variations, add-ons, and notes
+            // Get variations using WooCommerce native methods
+            $product = $item->get_product();
+            if ($product && $product->is_type('variation')) {
+                // For variation products, get variation attributes directly
+                $variation_attributes = $product->get_variation_attributes();
+                foreach ($variation_attributes as $attribute_name => $attribute_value) {
+                    if (!empty($attribute_value)) {
+                        // Clean attribute name and get proper label
+                        $clean_attribute_name = str_replace('attribute_', '', $attribute_name);
+                        $attribute_label = wc_attribute_label($clean_attribute_name);
+                        $item_data['variations'][$attribute_label] = $attribute_value;
+                    }
+                }
+                
+                // Also check for variation data in order item meta (fallback)
+                $item_meta = $item->get_meta_data();
+                foreach ($item_meta as $meta) {
+                    $meta_key = $meta->key;
+                    $meta_value = $meta->value;
+                    
+                    // Check for variation attributes in meta
+                    if (strpos($meta_key, 'pa_') === 0 || strpos($meta_key, 'attribute_') === 0) {
+                        $attribute_name = str_replace(array('pa_', 'attribute_'), '', $meta_key);
+                        $attribute_label = wc_attribute_label($attribute_name);
+                        if (!isset($item_data['variations'][$attribute_label])) {
+                            $item_data['variations'][$attribute_label] = $meta_value;
+                        }
+                    }
+                }
+            } else {
+                // For non-variation products, still check meta for any variation info
+                $item_meta = $item->get_meta_data();
+                foreach ($item_meta as $meta) {
+                    $meta_key = $meta->key;
+                    $meta_value = $meta->value;
+                    
+                    // Get variations from stored meta
+                    if (strpos($meta_key, 'pa_') === 0 || strpos($meta_key, 'attribute_') === 0) {
+                        $attribute_name = str_replace(array('pa_', 'attribute_'), '', $meta_key);
+                        $attribute_label = wc_attribute_label($attribute_name);
+                        $item_data['variations'][$attribute_label] = $meta_value;
+                    }
+                }
+            }
+            
+            // Get add-ons and notes from item meta
             $item_meta = $item->get_meta_data();
             foreach ($item_meta as $meta) {
                 $meta_key = $meta->key;
                 $meta_value = $meta->value;
-                
-                // Get variations
-                if (strpos($meta_key, 'pa_') === 0 || strpos($meta_key, 'attribute_') === 0) {
-                    $attribute_name = str_replace(array('pa_', 'attribute_'), '', $meta_key);
-                    $attribute_label = wc_attribute_label($attribute_name);
-                    $item_data['variations'][$attribute_label] = $meta_value;
-                }
                 
                 // Get add-ons
                 if ($meta_key === '_oj_item_addons') {

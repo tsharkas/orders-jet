@@ -124,55 +124,70 @@ class Orders_Jet_AJAX_Handlers {
             }
             
             if ($product) {
-                // Create order item manually to have full control over pricing
-                $order_item = new WC_Order_Item_Product();
-                $order_item->set_product($product);
-                $order_item->set_quantity($quantity);
+                // Use WooCommerce's native method to add items with proper variation handling
+                $item_id = $order->add_product($product, $quantity, array(
+                    'variation' => ($variation_id > 0) ? wc_get_product($variation_id)->get_variation_attributes() : array(),
+                    'totals' => array(
+                        'subtotal' => $custom_price * $quantity,
+                        'total' => $custom_price * $quantity,
+                    )
+                ));
                 
-                // Set the custom price directly
-                $order_item->set_total($custom_price * $quantity);
-                
-                // Add the item to the order
-                $order->add_item($order_item);
-                
-                error_log('Orders Jet: Added item manually with custom price: ' . ($custom_price * $quantity));
-                
-                // Add item notes if any
-                if (!empty($item['notes'])) {
-                    $order_item->add_meta_data('_oj_item_notes', sanitize_text_field($item['notes']));
-                }
-                
-                // Add add-ons if any
-                if (!empty($item['addons'])) {
-                    $addon_names = array();
-                    foreach ($item['addons'] as $addon) {
-                        $addon_names[] = $addon['name'] . ' (+' . wc_price($addon['price']) . ')';
+                if ($item_id) {
+                    // Get the order item that was just added
+                    $order_item = $order->get_item($item_id);
+                    
+                    error_log('Orders Jet: Added item using WooCommerce native method with custom price: ' . ($custom_price * $quantity));
+                    
+                    // Add item notes if any
+                    if (!empty($item['notes'])) {
+                        $order_item->add_meta_data('_oj_item_notes', sanitize_text_field($item['notes']));
                     }
-                    $order_item->add_meta_data('_oj_item_addons', implode(', ', $addon_names));
-                }
-                
-                // Add variations if any
-                if (!empty($item['variations'])) {
-                    $variation_names = array();
-                    foreach ($item['variations'] as $variation) {
-                        $variation_names[] = $variation['name'] . ' (+' . wc_price($variation['price']) . ')';
+                    
+                    // Add add-ons if any (store in WooCommerce-compatible format)
+                    if (!empty($item['addons'])) {
+                        $addon_names = array();
+                        foreach ($item['addons'] as $addon) {
+                            $addon_names[] = $addon['name'] . ' (+' . wc_price($addon['price']) . ')';
+                        }
+                        $order_item->add_meta_data('_oj_item_addons', implode(', ', $addon_names));
+                        
+                        // Also store individual add-on data for better processing
+                        $order_item->add_meta_data('_oj_addons_data', $item['addons']);
                     }
-                    $order_item->add_meta_data('_oj_item_variations', implode(', ', $variation_names));
+                    
+                    // Store variation data if any (for non-variation products with custom variations)
+                    if (!empty($item['variations']) && $variation_id == 0) {
+                        $variation_names = array();
+                        foreach ($item['variations'] as $variation) {
+                            $variation_names[] = $variation['name'] . ' (+' . wc_price($variation['price']) . ')';
+                        }
+                        $order_item->add_meta_data('_oj_item_variations', implode(', ', $variation_names));
+                        
+                        // Store individual variation data
+                        $order_item->add_meta_data('_oj_variations_data', $item['variations']);
+                    }
+                    
+                    // Calculate and store the base price (before add-ons) for order history display
+                    $base_price = $product->get_price(); // Use WooCommerce's native price
+                    if (!empty($item['addons'])) {
+                        $addon_total = array_sum(array_column($item['addons'], 'price'));
+                        // Verify our calculation matches the custom price
+                        $calculated_total = $base_price + $addon_total;
+                        if (abs($calculated_total - $custom_price) > 0.01) {
+                            error_log('Orders Jet: Price mismatch - Calculated: ' . $calculated_total . ', Custom: ' . $custom_price);
+                        }
+                    }
+                    $order_item->add_meta_data('_oj_base_price', $base_price);
+                    
+                    error_log('Orders Jet: Setting custom price for item: ' . $item['name'] . ' - Price: ' . $custom_price . ' - Quantity: ' . $quantity);
+                    error_log('Orders Jet: Base price from product: ' . $base_price . ' (custom_price: ' . $custom_price . ')');
+                    
+                    // Save item meta data
+                    $order_item->save();
+                } else {
+                    error_log('Orders Jet: Failed to add product to order: ' . $product_id);
                 }
-                
-                // Store the base price (before add-ons) for order history display
-                $base_price = $custom_price;
-                if (!empty($item['addons'])) {
-                    $addon_total = array_sum(array_column($item['addons'], 'price'));
-                    $base_price = $custom_price - $addon_total;
-                }
-                $order_item->add_meta_data('_oj_base_price', $base_price);
-                
-                error_log('Orders Jet: Setting custom price for item: ' . $item['name'] . ' - Price: ' . $custom_price . ' - Quantity: ' . $quantity);
-                error_log('Orders Jet: Stored base price: ' . $base_price . ' (custom_price: ' . $custom_price . ')');
-                
-                // Save item meta data
-                $order_item->save();
             } else {
                 error_log('Orders Jet: Product not found for ID: ' . $product_id);
             }
@@ -901,26 +916,59 @@ class Orders_Jet_AJAX_Handlers {
                     'notes' => ''
                 );
                 
-                // Get item meta data for variations, add-ons, and notes
+                // Get variations using WooCommerce native methods first
+                $product = $item->get_product();
+                if ($product && $product->is_type('variation')) {
+                    // For variation products, get variation attributes directly
+                    $variation_attributes = $product->get_variation_attributes();
+                    foreach ($variation_attributes as $attribute_name => $attribute_value) {
+                        if (!empty($attribute_value)) {
+                            // Clean attribute name and get proper label
+                            $clean_attribute_name = str_replace('attribute_', '', $attribute_name);
+                            $attribute_label = wc_attribute_label($clean_attribute_name);
+                            $item_data['variations'][$attribute_label] = $attribute_value;
+                        }
+                    }
+                }
+                
+                // Get item meta data for add-ons, notes, and custom variations
                 $item_meta = $item->get_meta_data();
                 foreach ($item_meta as $meta) {
                     $meta_key = $meta->key;
                     $meta_value = $meta->value;
                     
-                    // Get variations
-                    if (strpos($meta_key, 'pa_') === 0 || strpos($meta_key, 'attribute_') === 0) {
-                        $attribute_name = str_replace(array('pa_', 'attribute_'), '', $meta_key);
-                        $attribute_label = wc_attribute_label($attribute_name);
-                        $item_data['variations'][$attribute_label] = $meta_value;
-                    }
-                    
-                    // Get add-ons
-                    if ($meta_key === '_oj_item_addons') {
+                    // Get add-ons (prefer structured data if available)
+                    if ($meta_key === '_oj_addons_data' && is_array($meta_value)) {
+                        $item_data['addons'] = array_map(function($addon) {
+                            return $addon['name'] . ' (+' . wc_price($addon['price']) . ')';
+                        }, $meta_value);
+                    } elseif ($meta_key === '_oj_item_addons' && empty($item_data['addons'])) {
                         $addons = explode(', ', $meta_value);
-                        // Clean HTML from add-on strings
                         $item_data['addons'] = array_map(function($addon) {
                             return strip_tags($addon);
                         }, $addons);
+                    }
+                    
+                    // Get custom variations (for non-variation products)
+                    if ($meta_key === '_oj_variations_data' && is_array($meta_value) && empty($item_data['variations'])) {
+                        foreach ($meta_value as $variation) {
+                            $item_data['variations'][$variation['name']] = $variation['value'] ?? $variation['name'];
+                        }
+                    } elseif ($meta_key === '_oj_item_variations' && empty($item_data['variations'])) {
+                        // Parse the old format as fallback
+                        $variations = explode(', ', $meta_value);
+                        foreach ($variations as $variation_string) {
+                            if (preg_match('/^(.+?)\s*\(\+/', $variation_string, $matches)) {
+                                $item_data['variations'][$matches[1]] = $matches[1];
+                            }
+                        }
+                    }
+                    
+                    // Also check for standard WooCommerce variation attributes in meta (fallback)
+                    if (empty($item_data['variations']) && (strpos($meta_key, 'pa_') === 0 || strpos($meta_key, 'attribute_') === 0)) {
+                        $attribute_name = str_replace(array('pa_', 'attribute_'), '', $meta_key);
+                        $attribute_label = wc_attribute_label($attribute_name);
+                        $item_data['variations'][$attribute_label] = $meta_value;
                     }
                     
                     // Get notes
