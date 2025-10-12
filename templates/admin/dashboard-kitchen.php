@@ -108,6 +108,57 @@ $active_orders = $unique_orders;
 error_log('Orders Jet Kitchen: After deduplication: ' . count($active_orders) . ' unique orders');
 error_log('Orders Jet Kitchen: Order IDs: ' . implode(', ', array_column($active_orders, 'ID')));
 
+// Get order items for each order using WooCommerce methods (same as frontend)
+foreach ($active_orders as &$order) {
+    $wc_order = wc_get_order($order['ID']);
+    if ($wc_order) {
+        $order_items = array();
+        foreach ($wc_order->get_items() as $item) {
+            // Get basic item info
+            $item_data = array(
+                'name' => $item->get_name(),
+                'quantity' => $item->get_quantity(),
+                'total' => $item->get_total(),
+                'variations' => array(),
+                'addons' => array(),
+                'notes' => ''
+            );
+            
+            // Get item meta data for variations, add-ons, and notes
+            $item_meta = $item->get_meta_data();
+            foreach ($item_meta as $meta) {
+                $meta_key = $meta->key;
+                $meta_value = $meta->value;
+                
+                // Get variations
+                if (strpos($meta_key, 'pa_') === 0 || strpos($meta_key, 'attribute_') === 0) {
+                    $attribute_name = str_replace(array('pa_', 'attribute_'), '', $meta_key);
+                    $attribute_label = wc_attribute_label($attribute_name);
+                    $item_data['variations'][$attribute_label] = $meta_value;
+                }
+                
+                // Get add-ons
+                if ($meta_key === '_oj_item_addons') {
+                    $addons = explode(', ', $meta_value);
+                    $item_data['addons'] = array_map(function($addon) {
+                        return strip_tags($addon);
+                    }, $addons);
+                }
+                
+                // Get notes
+                if ($meta_key === '_oj_item_notes') {
+                    $item_data['notes'] = $meta_value;
+                }
+            }
+            
+            $order_items[] = $item_data;
+        }
+        $order['items'] = $order_items;
+    } else {
+        $order['items'] = array();
+    }
+}
+
 // Kitchen stats (matching actual workflow)
 $pending_orders = $wpdb->get_var($wpdb->prepare("
     SELECT COUNT(*) 
@@ -185,8 +236,9 @@ $currency_symbol = get_woocommerce_currency_symbol();
                         <th><?php _e('Order #', 'orders-jet'); ?></th>
                         <th><?php _e('Date', 'orders-jet'); ?></th>
                         <th><?php _e('Status', 'orders-jet'); ?></th>
-                        <th><?php _e('Total', 'orders-jet'); ?></th>
                         <th><?php _e('Customer/Table', 'orders-jet'); ?></th>
+                        <th style="width: 40%;"><?php _e('Items & Add-ons', 'orders-jet'); ?></th>
+                        <th><?php _e('Total', 'orders-jet'); ?></th>
                         <th><?php _e('Actions', 'orders-jet'); ?></th>
                     </tr>
                 </thead>
@@ -200,7 +252,6 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                     <?php echo esc_html(ucfirst(str_replace('wc-', '', $order['post_status']))); ?>
                                 </span>
                             </td>
-                            <td><?php echo esc_html($currency_symbol . number_format($order['order_total'] ?: 0, 2)); ?></td>
                             <td>
                                 <?php if ($order['table_number']) : ?>
                                     <strong>Table <?php echo esc_html($order['table_number']); ?></strong><br>
@@ -211,6 +262,45 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                     Guest
                                 <?php endif; ?>
                             </td>
+                            <td class="oj-kitchen-items">
+                                <?php if (!empty($order['items'])) : ?>
+                                    <?php foreach ($order['items'] as $item) : ?>
+                                        <div class="oj-kitchen-item">
+                                            <div class="oj-item-main">
+                                                <span class="oj-item-qty"><?php echo esc_html($item['quantity']); ?>x</span>
+                                                <strong class="oj-item-name"><?php echo esc_html($item['name']); ?></strong>
+                                            </div>
+                                            
+                                            <?php if (!empty($item['variations'])) : ?>
+                                                <div class="oj-item-variations">
+                                                    <?php foreach ($item['variations'] as $variation_name => $variation_value) : ?>
+                                                        <span class="oj-variation"><?php echo esc_html($variation_name); ?>: <?php echo esc_html($variation_value); ?></span>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            <?php endif; ?>
+                                            
+                                            <?php if (!empty($item['addons'])) : ?>
+                                                <div class="oj-item-addons">
+                                                    <span class="oj-addons-label"><?php _e('Add-ons:', 'orders-jet'); ?></span>
+                                                    <?php foreach ($item['addons'] as $addon) : ?>
+                                                        <span class="oj-addon"><?php echo esc_html($addon); ?></span>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            <?php endif; ?>
+                                            
+                                            <?php if (!empty($item['notes'])) : ?>
+                                                <div class="oj-item-notes">
+                                                    <span class="oj-notes-label"><?php _e('Notes:', 'orders-jet'); ?></span>
+                                                    <span class="oj-notes-text"><?php echo esc_html($item['notes']); ?></span>
+                                                </div>
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php endforeach; ?>
+                                <?php else : ?>
+                                    <span class="oj-no-items"><?php _e('No items found', 'orders-jet'); ?></span>
+                                <?php endif; ?>
+                            </td>
+                            <td><strong><?php echo esc_html($currency_symbol . number_format($order['order_total'] ?: 0, 2)); ?></strong></td>
                             <td>
                                 <?php if ($order['post_status'] === 'wc-pending') : ?>
                                     <button class="button button-primary oj-start-cooking" data-order-id="<?php echo esc_attr($order['ID']); ?>">
@@ -515,5 +605,104 @@ $currency_symbol = get_woocommerce_currency_symbol();
         width: 100%;
         margin-right: 0;
     }
+}
+
+/* Kitchen-specific styles for order items */
+.oj-kitchen-items {
+    padding: 10px 0;
+}
+
+.oj-kitchen-item {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 8px;
+}
+
+.oj-kitchen-item:last-child {
+    margin-bottom: 0;
+}
+
+.oj-item-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+}
+
+.oj-item-qty {
+    background: #007cba;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: bold;
+    min-width: 24px;
+    text-align: center;
+}
+
+.oj-item-name {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.oj-item-variations {
+    margin: 5px 0;
+    font-size: 12px;
+}
+
+.oj-variation {
+    background: #e3f2fd;
+    color: #1976d2;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-right: 5px;
+    display: inline-block;
+    margin-bottom: 2px;
+}
+
+.oj-item-addons {
+    margin: 5px 0;
+    font-size: 12px;
+}
+
+.oj-addons-label {
+    font-weight: 600;
+    color: #e67e22;
+    margin-right: 5px;
+}
+
+.oj-addon {
+    background: #fff3cd;
+    color: #856404;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-right: 5px;
+    display: inline-block;
+    margin-bottom: 2px;
+}
+
+.oj-item-notes {
+    margin: 5px 0;
+    font-size: 12px;
+    background: #f8d7da;
+    color: #721c24;
+    padding: 5px;
+    border-radius: 3px;
+}
+
+.oj-notes-label {
+    font-weight: 600;
+    margin-right: 5px;
+}
+
+.oj-notes-text {
+    font-style: italic;
+}
+
+.oj-no-items {
+    color: #6c757d;
+    font-style: italic;
 }
 </style>
