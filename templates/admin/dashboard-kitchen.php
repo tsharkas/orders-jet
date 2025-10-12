@@ -21,24 +21,12 @@ $today_formatted = date('F j, Y');
 // Get real data from WooCommerce orders
 global $wpdb;
 
-// Get active orders using the SAME logic as frontend order history
-$active_orders_posts = get_posts(array(
-    'post_type' => 'shop_order',
-    'post_status' => array('wc-pending', 'wc-processing', 'wc-on-hold'),
-    'meta_query' => array(
-        array(
-            'key' => '_oj_table_number',
-            'compare' => 'EXISTS'
-        )
-    ),
-    'posts_per_page' => -1,
-    'orderby' => 'date',
-    'order' => 'ASC'
-));
+// Get active orders using a more precise approach to avoid duplicates
+$active_orders = array();
 
-// If no orders found with get_posts, try WooCommerce's native method
-if (count($active_orders_posts) == 0 && function_exists('wc_get_orders')) {
-    error_log('Orders Jet Kitchen: Trying WooCommerce native method...');
+// Use WooCommerce's native method directly (more reliable)
+if (function_exists('wc_get_orders')) {
+    error_log('Orders Jet Kitchen: Using WooCommerce native method...');
     
     $wc_orders = wc_get_orders(array(
         'status' => array('pending', 'processing', 'on-hold'),
@@ -48,8 +36,9 @@ if (count($active_orders_posts) == 0 && function_exists('wc_get_orders')) {
         'order' => 'ASC'
     ));
     
+    error_log('Orders Jet Kitchen: Found ' . count($wc_orders) . ' orders with WooCommerce method');
+    
     // Convert WC_Order objects to the format we need
-    $active_orders = array();
     foreach ($wc_orders as $wc_order) {
         $active_orders[] = array(
             'ID' => $wc_order->get_id(),
@@ -62,11 +51,27 @@ if (count($active_orders_posts) == 0 && function_exists('wc_get_orders')) {
         );
     }
 } else {
+    // Fallback to get_posts if WooCommerce functions not available
+    error_log('Orders Jet Kitchen: Falling back to get_posts method...');
+    
+    $active_orders_posts = get_posts(array(
+        'post_type' => 'shop_order',
+        'post_status' => array('wc-pending', 'wc-processing', 'wc-on-hold'),
+        'meta_query' => array(
+            array(
+                'key' => '_oj_table_number',
+                'compare' => 'EXISTS'
+            )
+        ),
+        'posts_per_page' => -1,
+        'orderby' => 'date',
+        'order' => 'ASC'
+    ));
+    
     // Convert posts to the format we need
-    $active_orders = array();
     foreach ($active_orders_posts as $order_post) {
         $order = wc_get_order($order_post->ID);
-        if ($order) {
+        if ($order && $order->get_meta('_oj_table_number')) {
             $active_orders[] = array(
                 'ID' => $order->get_id(),
                 'post_date' => $order_post->post_date,
@@ -92,20 +97,7 @@ usort($active_orders, function($a, $b) {
     return $a_priority - $b_priority;
 });
 
-error_log('Orders Jet Kitchen: Found ' . count($active_orders) . ' active orders using frontend logic');
-
-// Remove any duplicate orders by ID
-$unique_orders = array();
-$seen_ids = array();
-foreach ($active_orders as $order) {
-    if (!in_array($order['ID'], $seen_ids)) {
-        $unique_orders[] = $order;
-        $seen_ids[] = $order['ID'];
-    }
-}
-$active_orders = $unique_orders;
-
-error_log('Orders Jet Kitchen: After deduplication: ' . count($active_orders) . ' unique orders');
+error_log('Orders Jet Kitchen: Final order count: ' . count($active_orders));
 error_log('Orders Jet Kitchen: Order IDs: ' . implode(', ', array_column($active_orders, 'ID')));
 
 // Get order items for each order using WooCommerce methods (same as frontend)
