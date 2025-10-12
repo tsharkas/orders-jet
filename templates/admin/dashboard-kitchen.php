@@ -108,19 +108,6 @@ $active_orders = $unique_orders;
 error_log('Orders Jet Kitchen: After deduplication: ' . count($active_orders) . ' unique orders');
 error_log('Orders Jet Kitchen: Order IDs: ' . implode(', ', array_column($active_orders, 'ID')));
 
-// Get order items for each order
-foreach ($active_orders as &$order) {
-    $order_items = $wpdb->get_results($wpdb->prepare("
-        SELECT oi.order_item_name, oim_qty.meta_value as quantity
-        FROM {$wpdb->prefix}woocommerce_order_items oi
-        LEFT JOIN {$wpdb->prefix}woocommerce_order_itemmeta oim_qty ON oi.order_item_id = oim_qty.order_item_id AND oim_qty.meta_key = '_qty'
-        WHERE oi.order_id = %d
-        AND oi.order_item_type = 'line_item'
-    ", $order['ID']), ARRAY_A);
-    
-    $order['items'] = $order_items;
-}
-
 // Kitchen stats (matching actual workflow)
 $pending_orders = $wpdb->get_var($wpdb->prepare("
     SELECT COUNT(*) 
@@ -188,82 +175,67 @@ $currency_symbol = get_woocommerce_currency_symbol();
     </div>
 
     <!-- Order Queue -->
-    <div class="oj-order-queue">
+    <div class="oj-dashboard-orders">
         <h2><?php _e('Order Queue', 'orders-jet'); ?></h2>
         
         <?php if (!empty($active_orders)) : ?>
-            <div class="oj-orders-grid">
-                <?php foreach ($active_orders as $order) : ?>
-                    <div class="oj-order-card status-<?php echo esc_attr(str_replace('wc-', '', $order['post_status'])); ?>">
-                        <div class="oj-order-header">
-                            <span class="oj-order-number">#<?php echo esc_html($order['ID']); ?></span>
-                            <span class="oj-order-time"><?php echo esc_html(human_time_diff(strtotime($order['post_date']), current_time('timestamp')) . ' ' . __('ago', 'orders-jet')); ?></span>
-                            <span class="oj-order-status status-<?php echo esc_attr(str_replace('wc-', '', $order['post_status'])); ?>">
-                                <?php echo esc_html(ucfirst(str_replace('wc-', '', $order['post_status']))); ?>
-                            </span>
-                        </div>
-                        
-                        <?php if ($order['table_number']) : ?>
-                            <div class="oj-order-table">
-                                <span class="dashicons dashicons-tablet"></span>
-                                <?php echo sprintf(__('Table %s', 'orders-jet'), esc_html($order['table_number'])); ?>
-                            </div>
-                        <?php endif; ?>
-                        
-                        <?php if ($order['customer_name']) : ?>
-                            <div class="oj-order-customer">
-                                <span class="dashicons dashicons-admin-users"></span>
-                                <?php echo esc_html($order['customer_name']); ?>
-                            </div>
-                        <?php endif; ?>
-                        
-                        <div class="oj-order-items">
-                            <?php if (!empty($order['items'])) : ?>
-                                <?php foreach ($order['items'] as $item) : ?>
-                                    <div class="oj-order-item">
-                                        <span class="oj-item-qty"><?php echo esc_html($item['quantity'] ?: 1); ?>x</span>
-                                        <span class="oj-item-name"><?php echo esc_html($item['order_item_name']); ?></span>
-                                    </div>
-                                <?php endforeach; ?>
-                            <?php else : ?>
-                                <div class="oj-order-item">
-                                    <?php _e('No items found', 'orders-jet'); ?>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-                        
-                        <div class="oj-order-total">
-                            <strong><?php echo esc_html($currency_symbol . number_format($order['order_total'] ?: 0, 2)); ?></strong>
-                        </div>
-                        
-                        <div class="oj-order-actions">
-                            <?php if ($order['post_status'] === 'wc-pending') : ?>
-                                <button class="button button-primary oj-start-cooking" data-order-id="<?php echo esc_attr($order['ID']); ?>">
-                                    <?php _e('Start Cooking', 'orders-jet'); ?>
-                                </button>
-                            <?php elseif ($order['post_status'] === 'wc-processing') : ?>
-                                <button class="button button-secondary oj-complete-order" data-order-id="<?php echo esc_attr($order['ID']); ?>">
-                                    <?php _e('Mark Ready', 'orders-jet'); ?>
-                                </button>
-                            <?php else : ?>
-                                <button class="button oj-resume-order" data-order-id="<?php echo esc_attr($order['ID']); ?>">
-                                    <?php _e('Resume', 'orders-jet'); ?>
-                                </button>
-                            <?php endif; ?>
-                            <a href="<?php echo admin_url('post.php?post=' . $order['ID'] . '&action=edit'); ?>" class="button button-small">
-                                <?php _e('View Details', 'orders-jet'); ?>
-                            </a>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            </div>
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th><?php _e('Order #', 'orders-jet'); ?></th>
+                        <th><?php _e('Date', 'orders-jet'); ?></th>
+                        <th><?php _e('Status', 'orders-jet'); ?></th>
+                        <th><?php _e('Total', 'orders-jet'); ?></th>
+                        <th><?php _e('Customer/Table', 'orders-jet'); ?></th>
+                        <th><?php _e('Actions', 'orders-jet'); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($active_orders as $order) : ?>
+                        <tr>
+                            <td><strong>#<?php echo esc_html($order['ID']); ?></strong></td>
+                            <td><?php echo esc_html(date('M j, Y g:i A', strtotime($order['post_date']))); ?></td>
+                            <td>
+                                <span class="oj-status-badge status-<?php echo esc_attr(str_replace('wc-', '', $order['post_status'])); ?>">
+                                    <?php echo esc_html(ucfirst(str_replace('wc-', '', $order['post_status']))); ?>
+                                </span>
+                            </td>
+                            <td><?php echo esc_html($currency_symbol . number_format($order['order_total'] ?: 0, 2)); ?></td>
+                            <td>
+                                <?php if ($order['table_number']) : ?>
+                                    <strong>Table <?php echo esc_html($order['table_number']); ?></strong><br>
+                                <?php endif; ?>
+                                <?php if ($order['customer_name']) : ?>
+                                    <?php echo esc_html($order['customer_name']); ?>
+                                <?php else : ?>
+                                    Guest
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if ($order['post_status'] === 'wc-pending') : ?>
+                                    <button class="button button-primary oj-start-cooking" data-order-id="<?php echo esc_attr($order['ID']); ?>">
+                                        <?php _e('Start Cooking', 'orders-jet'); ?>
+                                    </button>
+                                <?php elseif ($order['post_status'] === 'wc-processing') : ?>
+                                    <button class="button button-secondary oj-complete-order" data-order-id="<?php echo esc_attr($order['ID']); ?>">
+                                        <?php _e('Mark Ready', 'orders-jet'); ?>
+                                    </button>
+                                <?php else : ?>
+                                    <button class="button oj-resume-order" data-order-id="<?php echo esc_attr($order['ID']); ?>">
+                                        <?php _e('Resume', 'orders-jet'); ?>
+                                    </button>
+                                <?php endif; ?>
+                                <a href="<?php echo admin_url('post.php?post=' . $order['ID'] . '&action=edit'); ?>" class="button button-small">
+                                    <?php _e('View Details', 'orders-jet'); ?>
+                                </a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
         <?php else : ?>
             <div class="oj-no-orders">
-                <div class="oj-no-orders-icon">
-                    <span class="dashicons dashicons-food" style="font-size: 48px; color: #ccc;"></span>
-                </div>
-                <h3><?php _e('No Active Orders', 'orders-jet'); ?></h3>
-                <p><?php _e('All orders are completed! Great job!', 'orders-jet'); ?></p>
+                <p><?php _e('No active orders found.', 'orders-jet'); ?></p>
             </div>
         <?php endif; ?>
     </div>
