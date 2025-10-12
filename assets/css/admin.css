@@ -403,7 +403,7 @@
     }
     
     .wp-list-table.widefat tbody td:first-child:before {
-        content: "Order: ";
+        content: "Customer/Table: ";
     }
     
     .wp-list-table.widefat tbody td:nth-child(2):before {
@@ -411,16 +411,12 @@
     }
     
     .wp-list-table.widefat tbody td:nth-child(3):before {
-        content: "Table: ";
-    }
-    
-    .wp-list-table.widefat tbody td:nth-child(4):before {
         content: "Items: ";
         display: block;
         margin-bottom: 8px;
     }
     
-    .wp-list-table.widefat tbody td:nth-child(5):before {
+    .wp-list-table.widefat tbody td:nth-child(4):before {
         content: "";
     }
     

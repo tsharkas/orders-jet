@@ -259,18 +259,15 @@ $currency_symbol = get_woocommerce_currency_symbol();
             <table class="wp-list-table widefat fixed striped">
                 <thead>
                     <tr>
-                        <th><?php _e('Order #', 'orders-jet'); ?></th>
-                        <th><?php _e('Date', 'orders-jet'); ?></th>
                         <th><?php _e('Customer/Table', 'orders-jet'); ?></th>
-                        <th style="width: 60%;"><?php _e('Items & Add-ons', 'orders-jet'); ?></th>
-                        <th><?php _e('Actions', 'orders-jet'); ?></th>
+                        <th><?php _e('Date', 'orders-jet'); ?></th>
+                        <th style="width: 50%;"><?php _e('Items & Add-ons', 'orders-jet'); ?></th>
+                        <th><?php _e('Mark Ready', 'orders-jet'); ?></th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($active_orders as $order) : ?>
                         <tr>
-                            <td><strong>#<?php echo esc_html($order['ID']); ?></strong></td>
-                            <td><?php echo esc_html(date('M j, Y g:i A', strtotime($order['post_date']))); ?></td>
                             <td>
                                 <?php if ($order['table_number']) : ?>
                                     <strong>Table <?php echo esc_html($order['table_number']); ?></strong><br>
@@ -280,7 +277,9 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                 <?php else : ?>
                                     Guest
                                 <?php endif; ?>
+                                <br><small><strong>#<?php echo esc_html($order['ID']); ?></strong></small>
                             </td>
+                            <td><?php echo esc_html(date('M j, Y g:i A', strtotime($order['post_date']))); ?></td>
                             <td class="oj-kitchen-items">
                                 <?php if (!empty($order['items'])) : ?>
                                     <?php foreach ($order['items'] as $item) : ?>
