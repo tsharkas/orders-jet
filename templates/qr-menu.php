@@ -2728,7 +2728,15 @@ $products = wc_get_products(array(
             // Update totals - calculate proper cart total
             const total = cart.reduce((sum, item) => {
                 const itemPrice = item.display_price || item.base_price || 0;
-                return sum + (itemPrice * item.quantity);
+                const itemTotal = itemPrice * item.quantity;
+                console.log(`Cart calculation for ${item.name}:`, {
+                    display_price: item.display_price,
+                    base_price: item.base_price, 
+                    addon_total: item.addon_total,
+                    quantity: item.quantity,
+                    itemTotal: itemTotal
+                });
+                return sum + itemTotal;
             }, 0);
             
             const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
