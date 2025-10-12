@@ -204,7 +204,16 @@ class Orders_Jet_AJAX_Handlers {
         $order->set_status('processing');
         
         // Save order first to ensure all items are saved
-        $order->save();
+        $order_id = $order->save();
+        error_log('Orders Jet: Order saved with ID: ' . $order_id);
+        
+        // Verify the meta data was saved
+        $saved_table_number = $order->get_meta('_oj_table_number');
+        error_log('Orders Jet: Saved table number meta: ' . $saved_table_number);
+        
+        // Also check directly in database
+        $db_table_number = get_post_meta($order_id, '_oj_table_number', true);
+        error_log('Orders Jet: Database table number meta: ' . $db_table_number);
         
         // Log totals before any calculation
         error_log('Orders Jet: Order total before calculation: ' . $order->get_total());
