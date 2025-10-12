@@ -261,9 +261,8 @@ $currency_symbol = get_woocommerce_currency_symbol();
                     <tr>
                         <th><?php _e('Order #', 'orders-jet'); ?></th>
                         <th><?php _e('Date', 'orders-jet'); ?></th>
-                        <th><?php _e('Status', 'orders-jet'); ?></th>
                         <th><?php _e('Customer/Table', 'orders-jet'); ?></th>
-                        <th style="width: 50%;"><?php _e('Items & Add-ons', 'orders-jet'); ?></th>
+                        <th style="width: 60%;"><?php _e('Items & Add-ons', 'orders-jet'); ?></th>
                         <th><?php _e('Actions', 'orders-jet'); ?></th>
                     </tr>
                 </thead>
@@ -272,11 +271,6 @@ $currency_symbol = get_woocommerce_currency_symbol();
                         <tr>
                             <td><strong>#<?php echo esc_html($order['ID']); ?></strong></td>
                             <td><?php echo esc_html(date('M j, Y g:i A', strtotime($order['post_date']))); ?></td>
-                            <td>
-                                <span class="oj-status-badge status-<?php echo esc_attr(str_replace('wc-', '', $order['post_status'])); ?>">
-                                    <?php echo esc_html(ucfirst(str_replace('wc-', '', $order['post_status']))); ?>
-                                </span>
-                            </td>
                             <td>
                                 <?php if ($order['table_number']) : ?>
                                     <strong>Table <?php echo esc_html($order['table_number']); ?></strong><br>
@@ -327,18 +321,18 @@ $currency_symbol = get_woocommerce_currency_symbol();
                             </td>
                             <td>
                                 <?php if ($order['post_status'] === 'wc-pending') : ?>
-                                    <button class="button button-primary oj-start-cooking" data-order-id="<?php echo esc_attr($order['ID']); ?>" style="background: #00a32a; border-color: #00a32a; color: white; font-weight: 600;">
-                                        <span class="dashicons dashicons-controls-play" style="font-size: 16px; vertical-align: middle; margin-right: 5px;"></span>
+                                    <button class="button button-primary oj-start-cooking" data-order-id="<?php echo esc_attr($order['ID']); ?>" style="background: #00a32a; border-color: #00a32a; color: white; font-weight: 600; padding: 6px 12px; font-size: 13px;">
+                                        <span class="dashicons dashicons-controls-play" style="font-size: 14px; vertical-align: middle; margin-right: 4px;"></span>
                                         <?php _e('Start Cooking', 'orders-jet'); ?>
                                     </button>
                                 <?php elseif ($order['post_status'] === 'wc-processing') : ?>
-                                    <button class="button button-secondary oj-complete-order" data-order-id="<?php echo esc_attr($order['ID']); ?>" style="background: #2271b1; border-color: #2271b1; color: white; font-weight: 600; padding: 8px 16px;">
-                                        <span class="dashicons dashicons-yes-alt" style="font-size: 18px; vertical-align: middle; margin-right: 5px;"></span>
+                                    <button class="button button-secondary oj-complete-order" data-order-id="<?php echo esc_attr($order['ID']); ?>" style="background: #00a32a; border-color: #00a32a; color: white; font-weight: 600; padding: 6px 12px; font-size: 13px;">
+                                        <span class="dashicons dashicons-yes-alt" style="font-size: 16px; vertical-align: middle; margin-right: 4px;"></span>
                                         <?php _e('Mark Ready', 'orders-jet'); ?>
                                     </button>
                                 <?php else : ?>
-                                    <button class="button oj-resume-order" data-order-id="<?php echo esc_attr($order['ID']); ?>" style="background: #dba617; border-color: #dba617; color: white; font-weight: 600;">
-                                        <span class="dashicons dashicons-controls-repeat" style="font-size: 16px; vertical-align: middle; margin-right: 5px;"></span>
+                                    <button class="button oj-resume-order" data-order-id="<?php echo esc_attr($order['ID']); ?>" style="background: #dba617; border-color: #dba617; color: white; font-weight: 600; padding: 6px 12px; font-size: 13px;">
+                                        <span class="dashicons dashicons-controls-repeat" style="font-size: 14px; vertical-align: middle; margin-right: 4px;"></span>
                                         <?php _e('Resume', 'orders-jet'); ?>
                                     </button>
                                 <?php endif; ?>
