@@ -1,0 +1,257 @@
+# Orders Jet Integration Plugin - Arabic Translation
+# Copyright (C) 2024 Orders Jet
+# This file is distributed under the same license as the Orders Jet Integration plugin.
+msgid ""
+msgstr ""
+"Project-Id-Version: Orders Jet Integration 1.0.0\n"
+"Report-Msgid-Bugs-To: https://ordersjet.site\n"
+"Last-Translator: Orders Jet Team\n"
+"Language-Team: Arabic\n"
+"Language: ar\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2024-12-10T17:00:00+00:00\n"
+"PO-Revision-Date: 2024-12-10T17:00:00+00:00\n"
+"X-Generator: WordPress\n"
+"X-Domain: orders-jet\n"
+"Plural-Forms: nplurals=6; plural=(n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 && n%100<=99 ? 4 : 5);\n"
+
+#: templates/admin/dashboard-manager.php:24
+msgid "Manager Dashboard"
+msgstr "لوحة تحكم المدير"
+
+#: templates/admin/dashboard-manager.php:26
+msgid "Welcome back, %s!"
+msgstr "مرحباً بعودتك، %s!"
+
+#: templates/admin/dashboard-manager.php:32
+msgid "Today's Overview"
+msgstr "نظرة عامة اليوم"
+
+#: templates/admin/dashboard-manager.php:37
+msgid "Orders Today"
+msgstr "الطلبات اليوم"
+
+#: templates/admin/dashboard-manager.php:41
+msgid "Revenue Today"
+msgstr "الإيرادات اليوم"
+
+#: templates/admin/dashboard-manager.php:45
+msgid "Active Tables"
+msgstr "الطاولات النشطة"
+
+#: templates/admin/dashboard-manager.php:52
+msgid "Quick Actions"
+msgstr "الإجراءات السريعة"
+
+#: templates/admin/dashboard-manager.php:56
+msgid "View Orders"
+msgstr "عرض الطلبات"
+
+#: templates/admin/dashboard-manager.php:59
+msgid "Manage Tables"
+msgstr "إدارة الطاولات"
+
+#: templates/admin/dashboard-manager.php:62
+msgid "Manage Menu"
+msgstr "إدارة القائمة"
+
+#: templates/admin/dashboard-manager.php:67
+msgid "System Status"
+msgstr "حالة النظام"
+
+#: templates/admin/dashboard-manager.php:69
+msgid "Plugin Status:"
+msgstr "حالة الإضافة:"
+
+#: templates/admin/dashboard-manager.php:69
+msgid "Active"
+msgstr "نشط"
+
+#: templates/admin/dashboard-manager.php:70
+msgid "WooCommerce:"
+msgstr "ووكومرس:"
+
+#: templates/admin/dashboard-manager.php:70
+msgid "Inactive"
+msgstr "غير نشط"
+
+#: templates/admin/dashboard-manager.php:71
+msgid "Current Date:"
+msgstr "التاريخ الحالي:"
+
+#: templates/admin/dashboard-manager.php:72
+msgid "Current Time:"
+msgstr "الوقت الحالي:"
+
+#: templates/admin/dashboard-kitchen.php:24
+msgid "Kitchen Display"
+msgstr "عرض المطبخ"
+
+#: templates/admin/dashboard-kitchen.php:26
+msgid "Welcome to the kitchen, %s!"
+msgstr "مرحباً بك في المطبخ، %s!"
+
+#: templates/admin/dashboard-kitchen.php:32
+msgid "Kitchen Overview"
+msgstr "نظرة عامة المطبخ"
+
+#: templates/admin/dashboard-kitchen.php:37
+msgid "Pending Orders"
+msgstr "الطلبات المعلقة"
+
+#: templates/admin/dashboard-kitchen.php:41
+msgid "In Progress"
+msgstr "قيد التنفيذ"
+
+#: templates/admin/dashboard-kitchen.php:45
+msgid "Completed Today"
+msgstr "مكتملة اليوم"
+
+#: templates/admin/dashboard-kitchen.php:52
+msgid "Order Queue"
+msgstr "طابور الطلبات"
+
+#: templates/admin/dashboard-kitchen.php:55
+msgid "No pending orders at the moment."
+msgstr "لا توجد طلبات معلقة في الوقت الحالي."
+
+#: templates/admin/dashboard-kitchen.php:56
+msgid "Orders will appear here as they come in."
+msgstr "ستظهر الطلبات هنا عند وصولها."
+
+#: templates/admin/dashboard-kitchen.php:62
+msgid "Quick Actions"
+msgstr "الإجراءات السريعة"
+
+#: templates/admin/dashboard-kitchen.php:66
+msgid "View All Orders"
+msgstr "عرض جميع الطلبات"
+
+#: templates/admin/dashboard-kitchen.php:69
+msgid "Manage Menu Items"
+msgstr "إدارة عناصر القائمة"
+
+#: templates/admin/dashboard-kitchen.php:72
+msgid "Refresh Orders"
+msgstr "تحديث الطلبات"
+
+#: templates/admin/dashboard-kitchen.php:78
+msgid "Kitchen Status"
+msgstr "حالة المطبخ"
+
+#: templates/admin/dashboard-kitchen.php:80
+msgid "Kitchen Status:"
+msgstr "حالة المطبخ:"
+
+#: templates/admin/dashboard-kitchen.php:80
+msgid "Ready"
+msgstr "جاهز"
+
+#: templates/admin/dashboard-kitchen.php:81
+msgid "Last Updated:"
+msgstr "آخر تحديث:"
+
+#: templates/admin/dashboard-kitchen.php:82
+msgid "Staff:"
+msgstr "الموظف:"
+
+#: templates/admin/dashboard-waiter.php:24
+msgid "My Tables"
+msgstr "طاولاتي"
+
+#: templates/admin/dashboard-waiter.php:26
+msgid "Welcome, %s!"
+msgstr "مرحباً، %s!"
+
+#: templates/admin/dashboard-waiter.php:32
+msgid "My Overview"
+msgstr "نظرة عامة"
+
+#: templates/admin/dashboard-waiter.php:37
+msgid "My Tables"
+msgstr "طاولاتي"
+
+#: templates/admin/dashboard-waiter.php:41
+msgid "Occupied"
+msgstr "مشغولة"
+
+#: templates/admin/dashboard-waiter.php:45
+msgid "Active Orders"
+msgstr "الطلبات النشطة"
+
+#: templates/admin/dashboard-waiter.php:52
+msgid "Table Management"
+msgstr "إدارة الطاولات"
+
+#: templates/admin/dashboard-waiter.php:55
+msgid "No tables assigned yet."
+msgstr "لم يتم تعيين طاولات بعد."
+
+#: templates/admin/dashboard-waiter.php:56
+msgid "Tables will appear here once they are assigned to you."
+msgstr "ستظهر الطاولات هنا بمجرد تعيينها لك."
+
+#: templates/admin/dashboard-waiter.php:62
+msgid "Quick Actions"
+msgstr "الإجراءات السريعة"
+
+#: templates/admin/dashboard-waiter.php:66
+msgid "View All Tables"
+msgstr "عرض جميع الطاولات"
+
+#: templates/admin/dashboard-waiter.php:69
+msgid "View Orders"
+msgstr "عرض الطلبات"
+
+#: templates/admin/dashboard-waiter.php:72
+msgid "Refresh Tables"
+msgstr "تحديث الطاولات"
+
+#: templates/admin/dashboard-waiter.php:78
+msgid "My Status"
+msgstr "حالتي"
+
+#: templates/admin/dashboard-waiter.php:80
+msgid "Status:"
+msgstr "الحالة:"
+
+#: templates/admin/dashboard-waiter.php:80
+msgid "Available"
+msgstr "متاح"
+
+#: templates/admin/dashboard-waiter.php:81
+msgid "Last Activity:"
+msgstr "آخر نشاط:"
+
+#: templates/admin/dashboard-waiter.php:82
+msgid "Assigned To:"
+msgstr "معين لـ:"
+
+#: includes/class-orders-jet-admin-dashboard.php:34
+msgid "Manager Dashboard"
+msgstr "لوحة تحكم المدير"
+
+#: includes/class-orders-jet-admin-dashboard.php:48
+msgid "Kitchen Display"
+msgstr "عرض المطبخ"
+
+#: includes/class-orders-jet-admin-dashboard.php:62
+msgid "My Tables"
+msgstr "طاولاتي"
+
+#: includes/class-orders-jet-admin-dashboard.php:113
+#: includes/class-orders-jet-admin-dashboard.php:133
+#: includes/class-orders-jet-admin-dashboard.php:151
+#: templates/admin/dashboard-manager.php:12
+#: templates/admin/dashboard-kitchen.php:12
+#: templates/admin/dashboard-waiter.php:12
+msgid "You do not have permission to access this page."
+msgstr "ليس لديك صلاحية للوصول إلى هذه الصفحة."
+
+#: includes/class-orders-jet-admin-dashboard.php:123
+#: includes/class-orders-jet-admin-dashboard.php:141
+#: includes/class-orders-jet-admin-dashboard.php:159
+msgid "Dashboard template not found."
+msgstr "قالب لوحة التحكم غير موجود."
