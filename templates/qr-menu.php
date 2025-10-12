@@ -2497,6 +2497,14 @@ $products = wc_get_products(array(
             const addonTotalPerItem = selectedAddons.reduce((sum, addon) => sum + (addon.price * (addon.quantity || 1)), 0);
             const pricePerItem = basePrice + addonTotalPerItem;
             
+            console.log('Price calculation debug:');
+            console.log('- Variation price:', variationPrice);
+            console.log('- Base price (final):', basePrice);
+            console.log('- Selected add-ons:', selectedAddons);
+            console.log('- Add-on total per item:', addonTotalPerItem);
+            console.log('- Final price per item:', pricePerItem);
+            console.log('- Quantity:', quantity);
+            
             // Create simple cart item (WooFood style) with calculated price for display
             const cartItem = {
                 product_id: currentProduct.id,
@@ -2545,7 +2553,11 @@ $products = wc_get_products(array(
         // Get selected variation price
         function getSelectedVariationPrice() {
             const checkedRadio = document.querySelector('input[name^="variation-"]:checked');
-            return checkedRadio ? parseFloat(checkedRadio.dataset.price || 0) : 0;
+            if (!checkedRadio) return 0;
+            
+            const price = parseFloat(checkedRadio.dataset.price || 0);
+            console.log('Selected variation price:', price, 'from element:', checkedRadio);
+            return price;
         }
         
         // Parse product price from text
