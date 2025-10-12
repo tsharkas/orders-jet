@@ -22,6 +22,29 @@ $today_formatted = date('F j, Y');
 global $wpdb;
 
 // DEBUG: Let's see what's actually in the database
+error_log('Orders Jet Dashboard: Checking for ALL shop_order posts...');
+$all_orders = $wpdb->get_results("
+    SELECT p.ID, p.post_status, p.post_date, p.post_title
+    FROM {$wpdb->posts} p
+    WHERE p.post_type = 'shop_order'
+    ORDER BY p.post_date DESC
+    LIMIT 10
+", ARRAY_A);
+error_log('Orders Jet Dashboard: Found ' . count($all_orders) . ' total orders: ' . print_r($all_orders, true));
+
+// DEBUG: Let's see what meta keys exist for recent orders
+if (!empty($all_orders)) {
+    $recent_order_id = $all_orders[0]['ID'];
+    $order_meta = $wpdb->get_results($wpdb->prepare("
+        SELECT meta_key, meta_value
+        FROM {$wpdb->postmeta}
+        WHERE post_id = %d
+        ORDER BY meta_key
+    ", $recent_order_id), ARRAY_A);
+    error_log('Orders Jet Dashboard: Meta for order #' . $recent_order_id . ': ' . print_r($order_meta, true));
+}
+
+// DEBUG: Let's see what's actually in the database
 error_log('Orders Jet Dashboard: Checking for orders with table numbers...');
 $debug_orders = $wpdb->get_results("
     SELECT p.ID, p.post_status, pm.meta_value as table_number, p.post_date

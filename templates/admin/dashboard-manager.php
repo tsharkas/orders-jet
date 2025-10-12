@@ -63,6 +63,17 @@ $active_tables = $wpdb->get_var("
 $currency_symbol = get_woocommerce_currency_symbol();
 $formatted_revenue = $currency_symbol . number_format($today_revenue ?: 0, 2);
 
+// DEBUG: Check what orders actually exist
+error_log('Orders Jet Manager: Checking for ALL shop_order posts...');
+$all_orders_debug = $wpdb->get_results("
+    SELECT p.ID, p.post_status, p.post_date, p.post_title
+    FROM {$wpdb->posts} p
+    WHERE p.post_type = 'shop_order'
+    ORDER BY p.post_date DESC
+    LIMIT 5
+", ARRAY_A);
+error_log('Orders Jet Manager: Found ' . count($all_orders_debug) . ' total orders: ' . print_r($all_orders_debug, true));
+
 // Get recent orders (matching actual workflow) - DEBUG VERSION
 error_log('Orders Jet Manager: Searching for recent orders...');
 $recent_orders = $wpdb->get_results("
