@@ -250,6 +250,62 @@ msgstr "طاولاتي"
 msgid "You do not have permission to access this page."
 msgstr "ليس لديك صلاحية للوصول إلى هذه الصفحة."
 
+#: templates/admin/dashboard-manager.php:98
+msgid "Today's Overview - %s"
+msgstr "نظرة عامة على اليوم - %s"
+
+#: templates/admin/dashboard-manager.php:111
+msgid "Tables Available"
+msgstr "الطاولات المتاحة"
+
+#: templates/admin/dashboard-manager.php:135
+msgid "Recent Orders"
+msgstr "الطلبات الأخيرة"
+
+#: templates/admin/dashboard-manager.php:141
+msgid "Order #"
+msgstr "رقم الطلب"
+
+#: templates/admin/dashboard-manager.php:142
+msgid "Date"
+msgstr "التاريخ"
+
+#: templates/admin/dashboard-manager.php:143
+msgid "Status"
+msgstr "الحالة"
+
+#: templates/admin/dashboard-manager.php:144
+msgid "Total"
+msgstr "المجموع"
+
+#: templates/admin/dashboard-manager.php:145
+msgid "Actions"
+msgstr "الإجراءات"
+
+#: templates/admin/dashboard-manager.php:162
+msgid "View"
+msgstr "عرض"
+
+#: templates/admin/dashboard-manager.php:170
+msgid "No recent orders found."
+msgstr "لم يتم العثور على طلبات حديثة."
+
+#: templates/admin/dashboard-manager.php:177
+msgid "Table Status"
+msgstr "حالة الطاولات"
+
+#: templates/admin/dashboard-manager.php:191
+msgid "Manage"
+msgstr "إدارة"
+
+#: templates/admin/dashboard-manager.php:198
+msgid "No tables configured yet."
+msgstr "لم يتم تكوين أي طاولات بعد."
+
+#: templates/admin/dashboard-manager.php:200
+msgid "Add First Table"
+msgstr "إضافة أول طاولة"
+
 #: includes/class-orders-jet-admin-dashboard.php:123
 #: includes/class-orders-jet-admin-dashboard.php:141
 #: includes/class-orders-jet-admin-dashboard.php:159

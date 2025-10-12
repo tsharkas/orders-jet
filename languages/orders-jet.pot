@@ -268,3 +268,59 @@ msgstr ""
 #: templates/admin/dashboard-waiter.php:12
 msgid "You do not have permission to access this page."
 msgstr ""
+
+#: templates/admin/dashboard-manager.php:98
+msgid "Today's Overview - %s"
+msgstr ""
+
+#: templates/admin/dashboard-manager.php:111
+msgid "Tables Available"
+msgstr ""
+
+#: templates/admin/dashboard-manager.php:135
+msgid "Recent Orders"
+msgstr ""
+
+#: templates/admin/dashboard-manager.php:141
+msgid "Order #"
+msgstr ""
+
+#: templates/admin/dashboard-manager.php:142
+msgid "Date"
+msgstr ""
+
+#: templates/admin/dashboard-manager.php:143
+msgid "Status"
+msgstr ""
+
+#: templates/admin/dashboard-manager.php:144
+msgid "Total"
+msgstr ""
+
+#: templates/admin/dashboard-manager.php:145
+msgid "Actions"
+msgstr ""
+
+#: templates/admin/dashboard-manager.php:162
+msgid "View"
+msgstr ""
+
+#: templates/admin/dashboard-manager.php:170
+msgid "No recent orders found."
+msgstr ""
+
+#: templates/admin/dashboard-manager.php:177
+msgid "Table Status"
+msgstr ""
+
+#: templates/admin/dashboard-manager.php:191
+msgid "Manage"
+msgstr ""
+
+#: templates/admin/dashboard-manager.php:198
+msgid "No tables configured yet."
+msgstr ""
+
+#: templates/admin/dashboard-manager.php:200
+msgid "Add First Table"
+msgstr ""
