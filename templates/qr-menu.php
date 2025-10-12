@@ -2472,7 +2472,7 @@ $products = wc_get_products(array(
             return isValid;
         }
         
-        // Cart management - Clean implementation
+        // Cart management - WooCommerce native implementation
         function addToCart() {
             if (!currentProduct) return;
             
@@ -2482,33 +2482,22 @@ $products = wc_get_products(array(
             const quantity = parseInt(elements.quantityInput.value);
             const notes = elements.popupNotes.value.trim();
             
-            // Collect selected variations
-            const selectedVariations = collectSelectedVariations();
+            // Get selected variation ID (simplified)
+            const variationId = getSelectedVariationId();
             
-            // Collect selected add-ons
+            // Collect selected add-ons (simplified)
             const selectedAddons = collectSelectedAddons();
             
-            // Calculate final price
-            const numericPrice = calculateFinalPrice(selectedVariations, selectedAddons);
-            
-            // Create display name
-            const displayName = createDisplayName(selectedVariations);
-            
-            // Get variation ID
-            const variationId = getVariationId(selectedVariations);
-            
-            // Create cart item
+            // Create simple cart item (WooFood style)
             const cartItem = {
-                id: currentProduct.id,
+                product_id: currentProduct.id,
                 variation_id: variationId,
-                name: displayName,
-                price: currentProduct.price,
-                priceHTML: currentProduct.priceHTML,
-                numericPrice: numericPrice,
+                name: currentProduct.name,
                 quantity: quantity,
                 notes: notes,
-                addons: selectedAddons,
-                variations: selectedVariations
+                add_ons: selectedAddons,
+                // Let backend calculate pricing
+                display_name: createDisplayName(variationId, selectedAddons)
             };
             
             // Add to cart
@@ -2517,151 +2506,94 @@ $products = wc_get_products(array(
             updateCartDisplay();
             closePopup();
             
-            showAppNotification(`Added to cart: ${displayName} (Qty: ${quantity})`, 'success');
+            showAppNotification(`Added to cart: ${cartItem.display_name} (Qty: ${quantity})`, 'success');
         }
         
-        // Collect selected variations
-        function collectSelectedVariations() {
-            const selectedVariations = {};
-            document.querySelectorAll('input[name^="variation-"]:checked').forEach(radio => {
-                const attributeName = radio.name.replace('variation-', '');
-                const labelElement = radio.closest('.addon-option-label');
-                let label = radio.value;
-                if (labelElement) {
-                    const nameElement = labelElement.querySelector('.exwo-op-name');
-                    if (nameElement) {
-                        label = nameElement.textContent.trim();
-                    }
-                }
-                selectedVariations[attributeName] = {
-                    value: radio.value,
-                    label: label,
-                    price: parseFloat(radio.dataset.price || 0),
-                    variation_id: parseInt(radio.dataset.variationId || 0)
-                };
-            });
-            return selectedVariations;
+        // Get selected variation ID (simplified)
+        function getSelectedVariationId() {
+            const checkedRadio = document.querySelector('input[name^="variation-"]:checked');
+            return checkedRadio ? parseInt(checkedRadio.dataset.variationId || 0) : 0;
         }
         
-        // Collect selected add-ons
+        // Collect selected add-ons (simplified)
         function collectSelectedAddons() {
-            const selectedAddons = [];
+            const addons = [];
             
-            // Collect checked options (only from add-ons section, not variations)
+            // Collect checked add-ons (not variations)
             document.querySelectorAll('#addons-section .ex-options:checked').forEach(checkbox => {
-                // Try multiple ways to find the label
-                let label = checkbox.closest('.addon-option-label');
-                if (!label) {
-                    // Try finding by ID (checkbox has id, label has for attribute)
-                    const labelElement = document.querySelector(`label[for="${checkbox.id}"]`);
-                    if (labelElement) {
-                        label = labelElement;
-                    }
-                }
-                if (!label) {
-                    // Try finding the next sibling label
-                    label = checkbox.nextElementSibling;
-                    if (label && !label.classList.contains('addon-option-label')) {
-                        label = null;
-                    }
-                }
-                
-                let optionName = 'Option';
-                if (label) {
-                    // Get the add-on name from exwo-op-name element
-                    let nameElement = label.querySelector('.exwo-op-name');
-                    if (nameElement) {
-                        let fullText = nameElement.textContent.trim();
-                        // Remove price part (e.g., "Extra One + 80 EGP" -> "Extra One")
-                        optionName = fullText.replace(/\s*\+\s*[\d,]+\.?\d*\s*EGP.*$/i, '').trim();
-                        
-                        // If the regex didn't work, try a simpler approach
-                        if (optionName === fullText && fullText.includes(' + ')) {
-                            optionName = fullText.split(' + ')[0].trim();
-                        }
-                    }
-                    
-                    // Final fallback
-                    if (!optionName || optionName === 'Option') {
-                        optionName = checkbox.value || 'Option';
-                    }
-                }
-                
-                // Debug removed - add-on names working correctly
-                
-                selectedAddons.push({
+                const label = getAddonLabel(checkbox);
+                addons.push({
                     id: checkbox.value,
-                    name: optionName,
-                    price: parseFloat(checkbox.dataset.price || 0),
-                    quantity: 1
+                    name: label,
+                    price: parseFloat(checkbox.dataset.price || 0)
                 });
             });
             
-            // Collect text inputs
-            document.querySelectorAll('.ex-options[type="text"], .ex-options[type="textarea"]').forEach(input => {
-                if (input.value.trim() !== '') {
-                    selectedAddons.push({
+            // Collect quantity-based add-ons
+            document.querySelectorAll('#addons-section .ex-options[type="number"]').forEach(input => {
+                const quantity = parseInt(input.value || 0);
+                if (quantity > 0) {
+                    const label = getAddonLabel(input);
+                    addons.push({
                         id: input.name,
-                        name: input.placeholder || 'Custom option',
+                        name: label,
                         price: parseFloat(input.dataset.price || 0),
-                        quantity: 1
+                        quantity: quantity
                     });
                 }
             });
             
-            return selectedAddons;
+            // Collect text inputs
+            document.querySelectorAll('#addons-section .ex-options[type="text"], #addons-section .ex-options[type="textarea"]').forEach(input => {
+                if (input.value.trim() !== '') {
+                    addons.push({
+                        id: input.name,
+                        name: input.placeholder || 'Custom option',
+                        value: input.value.trim(),
+                        price: parseFloat(input.dataset.price || 0)
+                    });
+                }
+            });
+            
+            return addons;
         }
         
-        // Calculate final price
-        function calculateFinalPrice(selectedVariations, selectedAddons) {
-            let basePrice = parseProductPrice(currentProduct.price);
-            
-            // Use variation price if variations are selected
-            if (Object.keys(selectedVariations).length > 0) {
-                basePrice = 0;
-                Object.values(selectedVariations).forEach(variation => {
-                    if (variation.price > 0) {
-                        basePrice += variation.price;
-                    }
-                });
+        // Helper function to get add-on label
+        function getAddonLabel(input) {
+            // Try multiple ways to find the label
+            let label = input.closest('.addon-option-label');
+            if (!label) {
+                label = document.querySelector(`label[for="${input.id}"]`);
+            }
+            if (!label) {
+                label = input.nextElementSibling;
+                if (label && !label.classList.contains('addon-option-label')) {
+                    label = null;
+                }
             }
             
-            // Add add-on prices
-            const addonPrice = selectedAddons.reduce((total, addon) => total + addon.price, 0);
-            
-            return basePrice + addonPrice;
-        }
-        
-        // Parse product price from text
-        function parseProductPrice(priceText) {
-            if (!priceText) return 0;
-            
-            if (priceText.includes('Current price is:')) {
-                const match = priceText.match(/Current price is:\s*([\d,]+)/);
-                return match ? parseFloat(match[1].replace(',', '.')) : 0;
+            if (label) {
+                const nameElement = label.querySelector('.exwo-op-name, .addon-name');
+                return nameElement ? nameElement.textContent.trim() : label.textContent.trim();
             }
             
-            const match = priceText.match(/[\d,]+\.?\d*/);
-            return match ? parseFloat(match[0].replace(',', '.')) : 0;
+            return input.dataset.name || 'Option';
         }
         
-        // Create display name
-        function createDisplayName(selectedVariations) {
+        // Create display name (simplified)
+        function createDisplayName(variationId, addons) {
             let displayName = currentProduct.name;
-            if (Object.keys(selectedVariations).length > 0) {
-                const variantLabels = Object.values(selectedVariations).map(v => v.label);
-                displayName += ` (${variantLabels.join(', ')})`;
+            
+            // Add variation info if selected
+            if (variationId > 0) {
+                const variationRadio = document.querySelector(`input[data-variation-id="${variationId}"]`);
+                if (variationRadio) {
+                    const variationLabel = getAddonLabel(variationRadio);
+                    displayName += ` (${variationLabel})`;
+                }
             }
+            
             return displayName;
-        }
-        
-        // Get variation ID
-        function getVariationId(selectedVariations) {
-            if (Object.keys(selectedVariations).length > 0) {
-                const firstVariation = Object.values(selectedVariations)[0];
-                return firstVariation.variation_id || 0;
-            }
-            return 0;
         }
         
         function removeFromCart(index) {
@@ -2685,56 +2617,39 @@ $products = wc_get_products(array(
                 let html = '';
                 cart.forEach((item, index) => {
                     let addonDetails = '';
-                    let extraTotal = 0;
                     
-                    // Show add-ons if any
-                    if (item.addons && item.addons.length > 0) {
+                    // Show add-ons if any (simplified format)
+                    if (item.add_ons && item.add_ons.length > 0) {
                         addonDetails += '<div class="cart-addon-details">';
-                        item.addons.forEach(addon => {
-                            const addonPrice = addon.price.toFixed(2);
-                            const addonTotal = (addon.price * item.quantity).toFixed(2);
-                            addonDetails += `<div class="cart-addon-item">+ ${addon.name}: +${addonPrice} EGP × ${item.quantity} = +${addonTotal} EGP</div>`;
-                            extraTotal += addon.price * item.quantity;
+                        item.add_ons.forEach(addon => {
+                            if (addon.quantity && addon.quantity > 1) {
+                                addonDetails += `<div class="cart-addon-item">+ ${addon.name} × ${addon.quantity}</div>`;
+                            } else if (addon.value) {
+                                addonDetails += `<div class="cart-addon-item">+ ${addon.name}: ${addon.value}</div>`;
+                            } else {
+                                addonDetails += `<div class="cart-addon-item">+ ${addon.name}</div>`;
+                            }
                         });
                         addonDetails += '</div>';
                     }
                     
-                    // Note: Variations are NOT displayed as add-ons because their price is already included in numericPrice
-                    // Only actual add-ons should be displayed as "+ Option: +X EGP"
-                    
-                    // Calculate base price (without add-ons)
-                    let basePrice = 0;
-                    if (item.variations && Object.keys(item.variations).length > 0) {
-                        // Use variation price as base price
-                        const selectedVariation = Object.values(item.variations)[0];
-                        basePrice = selectedVariation.price || 0;
-                    } else {
-                        // Use numeric price as base price for non-variant products
-                        basePrice = item.numericPrice || 0;
-                    }
-                    
-                    // Calculate add-on total
-                    const addonTotal = (item.addons || []).reduce((sum, addon) => sum + addon.price, 0);
-                    
-                    // Calculate final total
-                    const itemTotal = (basePrice + addonTotal) * item.quantity;
-                    
-                    // Display selected variant price instead of price range
-                    let displayPrice = item.priceHTML || item.price;
-                    if (item.variations && Object.keys(item.variations).length > 0) {
-                        // Show the selected variant price
-                        const selectedVariation = Object.values(item.variations)[0];
-                        displayPrice = `${selectedVariation.price.toFixed(2)} EGP`;
+                    // Support old cart format for backward compatibility
+                    if (!addonDetails && item.addons && item.addons.length > 0) {
+                        addonDetails += '<div class="cart-addon-details">';
+                        item.addons.forEach(addon => {
+                            addonDetails += `<div class="cart-addon-item">+ ${addon.name}</div>`;
+                        });
+                        addonDetails += '</div>';
                     }
                     
                     html += `
                         <div class="cart-item">
                             <div class="cart-item-info">
-                                <div class="cart-item-name">${item.name}</div>
-                                <div class="cart-item-price">${displayPrice} × ${item.quantity}</div>
+                                <div class="cart-item-name">${item.display_name || item.name}</div>
+                                <div class="cart-item-quantity">Qty: ${item.quantity}</div>
                                 ${addonDetails}
                                 ${item.notes ? `<div class="cart-item-notes">${item.notes}</div>` : ''}
-                                ${item.numericPrice > 0 ? `<div class="cart-item-total">Total: ${itemTotal.toFixed(2)} EGP</div>` : ''}
+                                <div class="cart-item-price-note"><?php _e('Price calculated at checkout', 'orders-jet'); ?></div>
                             </div>
                             <button class="cart-item-remove" onclick="removeFromCart(${index})"><?php _e('Remove', 'orders-jet'); ?></button>
                         </div>
@@ -2743,46 +2658,23 @@ $products = wc_get_products(array(
                 elements.cartItems.innerHTML = html;
             }
             
-            // Update totals
-            const total = cart.reduce((sum, item) => {
-                // Use the stored numeric price if available, otherwise parse from text
-                let price = item.numericPrice;
-                
-                if (!price || price === 0) {
-                    // Fallback: parse from price text for old cart items
-                    let priceText = item.price;
-                    
-                    // If the price contains sale information, extract the sale price
-                    if (priceText.includes('Current price is:')) {
-                        // Extract the sale price from "Current price is: 80,00 EGP"
-                        const salePriceMatch = priceText.match(/Current price is:\s*([\d,]+)/);
-                        if (salePriceMatch) {
-                            priceText = salePriceMatch[1];
-                        }
-                    } else if (priceText.includes('Original price was:')) {
-                        // If there's sale info but no "Current price is:", look for the last price in the text
-                        const prices = priceText.match(/[\d,]+\.?\d*/g);
-                        if (prices && prices.length > 1) {
-                            // Take the last price (usually the sale price)
-                            priceText = prices[prices.length - 1];
-                        }
-                    }
-                    
-                    price = parseFloat(priceText.replace(/[^\d.,]/g, '').replace(',', '.'));
-                }
-                
-                return sum + (price * item.quantity);
-            }, 0);
-            
-            const currencySymbol = '<?php echo get_woocommerce_currency_symbol(); ?>';
-            elements.cartTotal.textContent = `${total.toFixed(2)} ${currencySymbol}`;
-            elements.floatingCartTotal.textContent = `${total.toFixed(2)} ${currencySymbol}`;
+            // Update totals - show item count instead of complex price calculations
+            const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+            elements.cartTotal.textContent = `${itemCount} <?php _e('items', 'orders-jet'); ?>`;
+            elements.floatingCartTotal.textContent = `${itemCount}`;
             
             // Show/hide floating cart
             if (cart.length > 0) {
                 elements.floatingCart.classList.add('show');
             } else {
                 elements.floatingCart.classList.remove('show');
+            }
+            
+            // Update cart badge
+            const cartBadge = document.querySelector('.oj-cart-badge');
+            if (cartBadge) {
+                cartBadge.textContent = itemCount;
+                cartBadge.style.display = itemCount > 0 ? 'block' : 'none';
             }
         }
         
@@ -2796,41 +2688,47 @@ $products = wc_get_products(array(
             if (saved) {
                 cart = JSON.parse(saved);
                 
-                // Migrate old cart items that don't have priceHTML or numericPrice
-                cart.forEach(item => {
-                    if (!item.priceHTML && item.price) {
-                        // Try to extract clean price from the concatenated text
-                        const cleanPrice = item.price.replace(/Original price was:.*?Current price is:/g, '').trim();
-                        item.priceHTML = cleanPrice;
-                        item.price = cleanPrice.replace(/<[^>]*>/g, ''); // Remove HTML tags for text version
+                // Migrate old cart format to new simplified format
+                cart = cart.map(item => {
+                    // If already in new format, return as is
+                    if (item.product_id && item.add_ons !== undefined) {
+                        return item;
                     }
                     
-                    // Add numericPrice for old items that don't have it
-                    if (!item.numericPrice && item.price) {
-                        let priceText = item.price;
-                        let numericPrice = 0;
-                        
-                        // If the price contains sale information, extract the sale price
-                        if (priceText.includes('Current price is:')) {
-                            const salePriceMatch = priceText.match(/Current price is:\s*([\d,]+)/);
-                            if (salePriceMatch) {
-                                numericPrice = parseFloat(salePriceMatch[1].replace(',', '.'));
-                            }
-                        } else if (priceText.includes('Original price was:')) {
-                            const prices = priceText.match(/[\d,]+\.?\d*/g);
-                            if (prices && prices.length > 1) {
-                                numericPrice = parseFloat(prices[prices.length - 1].replace(',', '.'));
-                            }
-                        } else {
-                            const priceMatch = priceText.match(/[\d,]+\.?\d*/);
-                            if (priceMatch) {
-                                numericPrice = parseFloat(priceMatch[0].replace(',', '.'));
-                            }
-                        }
-                        
-                        item.numericPrice = numericPrice;
+                    // Convert old format to new format
+                    const newItem = {
+                        product_id: item.id || item.product_id,
+                        variation_id: item.variation_id || 0,
+                        name: item.name,
+                        quantity: item.quantity,
+                        notes: item.notes || '',
+                        add_ons: [],
+                        display_name: item.display_name || item.name
+                    };
+                    
+                    // Convert old addons format
+                    if (item.addons && Array.isArray(item.addons)) {
+                        newItem.add_ons = item.addons.map(addon => ({
+                            id: addon.id || 'addon_' + Math.random(),
+                            name: addon.name || 'Add-on',
+                            price: addon.price || 0,
+                            quantity: addon.quantity || 1
+                        }));
                     }
+                    
+                    // Handle old variations format (extract variation_id)
+                    if (item.variations && typeof item.variations === 'object' && !newItem.variation_id) {
+                        const firstVariation = Object.values(item.variations)[0];
+                        if (firstVariation && firstVariation.variation_id) {
+                            newItem.variation_id = firstVariation.variation_id;
+                        }
+                    }
+                    
+                    return newItem;
                 });
+                
+                // Save migrated cart
+                saveCart();
             }
         }
         
@@ -2852,29 +2750,22 @@ $products = wc_get_products(array(
                     // Show loading notification
                     showAppNotification('Placing order...', 'info');
                     
-                    // Prepare order data
+                    // Prepare order data (WooFood-style simplified)
                     const orderData = {
                         table_number: '<?php echo esc_js($table_number); ?>',
                         items: cart.map(item => ({
-                            product_id: item.id,
-                            name: item.name,
+                            product_id: item.product_id || item.id,  // Support both new and old format
+                            variation_id: item.variation_id || 0,
+                            name: item.display_name || item.name,
                             quantity: item.quantity,
-                            price: item.numericPrice,
-                            notes: item.notes,
-                            addons: item.addons || [],
-                            variations: item.variations || {}
-                        })),
-                        total: cart.reduce((sum, item) => sum + (item.numericPrice * item.quantity), 0)
+                            notes: item.notes || '',
+                            add_ons: item.add_ons || item.addons || []  // Support both formats
+                        }))
                     };
                     
                     console.log('Order data being sent:', orderData);
-                    console.log('Individual item totals:', cart.map(item => ({
-                        name: item.name,
-                        price: item.numericPrice,
-                        quantity: item.quantity,
-                        total: item.numericPrice * item.quantity
-                    })));
-                    console.log('Calculated total:', orderData.total);
+                    console.log('Cart items count:', cart.length);
+                    console.log('Total items:', orderData.items.reduce((sum, item) => sum + item.quantity, 0));
                     
                     // Send order to server
                     fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
