@@ -2676,11 +2676,11 @@ $products = wc_get_products(array(
                             const addonTotalForAllItems = addonPricePerUnit * addonQty * item.quantity;
                             
                             if (addonQty > 1) {
-                                addonDetails += `<div class="cart-addon-item">+ ${addon.name} [Add-on total per item: ${addonPricePerUnit.toFixed(2)}] × ${addonQty} × ${item.quantity} (+${addonTotalForAllItems.toFixed(2)} EGP)</div>`;
+                                addonDetails += `<div class="cart-addon-item">+ ${addon.name} + ${addonPricePerUnit.toFixed(2)} EGP × ${addonQty} × ${item.quantity} (+${addonTotalForAllItems.toFixed(2)} EGP)</div>`;
                             } else if (addon.value) {
                                 addonDetails += `<div class="cart-addon-item">+ ${addon.name}: ${addon.value}</div>`;
                             } else {
-                                addonDetails += `<div class="cart-addon-item">+ ${addon.name} [Add-on total per item: ${addonPricePerUnit.toFixed(2)}] × ${item.quantity} (+${addonTotalForAllItems.toFixed(2)} EGP)</div>`;
+                                addonDetails += `<div class="cart-addon-item">+ ${addon.name} + ${addonPricePerUnit.toFixed(2)} EGP × ${item.quantity} (+${addonTotalForAllItems.toFixed(2)} EGP)</div>`;
                             }
                         });
                         addonDetails += '</div>';
@@ -2708,7 +2708,7 @@ $products = wc_get_products(array(
                         <div class="cart-item">
                             <div class="cart-item-info">
                                 <div class="cart-item-name">${item.display_name || item.name}</div>
-                                <div class="cart-item-price">[Variation price: ${basePrice.toFixed(2)}] × ${item.quantity} (${basePriceTotal.toFixed(2)} EGP)</div>
+                                <div class="cart-item-price">${basePrice.toFixed(2)} EGP × ${item.quantity} (${basePriceTotal.toFixed(2)} EGP)</div>
                                 ${addonDetails}
                                 ${item.notes ? `<div class="cart-item-notes">${item.notes}</div>` : ''}
                                 <div class="cart-item-total"><strong>Total: ${itemTotal.toFixed(2)} EGP</strong></div>
