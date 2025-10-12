@@ -21,18 +21,21 @@ $today_formatted = date('F j, Y');
 // Get real data from WooCommerce orders
 global $wpdb;
 
-// Active orders for kitchen
+// Active orders for kitchen (matching actual workflow: orders start as wc-processing)
 $active_orders = $wpdb->get_results($wpdb->prepare("
     SELECT p.ID, p.post_date, p.post_status, 
            pm_total.meta_value as order_total,
            pm_customer.meta_value as customer_name,
-           pm_table.meta_value as table_number
+           pm_table.meta_value as table_number,
+           pm_session.meta_value as session_id
     FROM {$wpdb->posts} p
     LEFT JOIN {$wpdb->postmeta} pm_total ON p.ID = pm_total.post_id AND pm_total.meta_key = '_order_total'
     LEFT JOIN {$wpdb->postmeta} pm_customer ON p.ID = pm_customer.post_id AND pm_customer.meta_key = '_billing_first_name'
-    LEFT JOIN {$wpdb->postmeta} pm_table ON p.ID = pm_table.post_id AND pm_table.meta_key = '_table_number'
+    LEFT JOIN {$wpdb->postmeta} pm_table ON p.ID = pm_table.post_id AND pm_table.meta_key = '_oj_table_number'
+    LEFT JOIN {$wpdb->postmeta} pm_session ON p.ID = pm_session.post_id AND pm_session.meta_key = '_oj_session_id'
     WHERE p.post_type = 'shop_order'
-    AND p.post_status IN ('wc-pending', 'wc-processing', 'wc-on-hold')
+    AND p.post_status IN ('wc-processing', 'wc-pending', 'wc-on-hold')
+    AND pm_table.meta_value IS NOT NULL
     ORDER BY 
         CASE p.post_status 
             WHEN 'wc-processing' THEN 1
@@ -55,27 +58,33 @@ foreach ($active_orders as &$order) {
     $order['items'] = $order_items;
 }
 
-// Kitchen stats
-$pending_orders = $wpdb->get_var("
+// Kitchen stats (matching actual workflow)
+$pending_orders = $wpdb->get_var($wpdb->prepare("
     SELECT COUNT(*) 
-    FROM {$wpdb->posts}
-    WHERE post_type = 'shop_order'
-    AND post_status = 'wc-pending'
-");
+    FROM {$wpdb->posts} p
+    INNER JOIN {$wpdb->postmeta} pm_table ON p.ID = pm_table.post_id AND pm_table.meta_key = '_oj_table_number'
+    WHERE p.post_type = 'shop_order'
+    AND p.post_status = 'wc-pending'
+    AND pm_table.meta_value IS NOT NULL
+"));
 
-$processing_orders = $wpdb->get_var("
+$processing_orders = $wpdb->get_var($wpdb->prepare("
     SELECT COUNT(*) 
-    FROM {$wpdb->posts}
-    WHERE post_type = 'shop_order'
-    AND post_status = 'wc-processing'
-");
+    FROM {$wpdb->posts} p
+    INNER JOIN {$wpdb->postmeta} pm_table ON p.ID = pm_table.post_id AND pm_table.meta_key = '_oj_table_number'
+    WHERE p.post_type = 'shop_order'
+    AND p.post_status = 'wc-processing'
+    AND pm_table.meta_value IS NOT NULL
+"));
 
 $completed_today = $wpdb->get_var($wpdb->prepare("
     SELECT COUNT(*) 
-    FROM {$wpdb->posts}
-    WHERE post_type = 'shop_order'
-    AND post_status = 'wc-completed'
-    AND DATE(post_date) = %s
+    FROM {$wpdb->posts} p
+    INNER JOIN {$wpdb->postmeta} pm_table ON p.ID = pm_table.post_id AND pm_table.meta_key = '_oj_table_number'
+    WHERE p.post_type = 'shop_order'
+    AND p.post_status = 'wc-completed'
+    AND pm_table.meta_value IS NOT NULL
+    AND DATE(p.post_date) = %s
 ", $today));
 
 // Format currency
@@ -87,6 +96,10 @@ $currency_symbol = get_woocommerce_currency_symbol();
         <span class="dashicons dashicons-food" style="font-size: 28px; vertical-align: middle; margin-right: 10px;"></span>
         <?php _e('Kitchen Display', 'orders-jet'); ?>
     </h1>
+    <button type="button" class="button oj-refresh-dashboard" style="margin-left: 10px;">
+        <span class="dashicons dashicons-update" style="vertical-align: middle; margin-right: 5px;"></span>
+        <?php _e('Refresh', 'orders-jet'); ?>
+    </button>
     <p class="description"><?php echo sprintf(__('Welcome to the kitchen, %s!', 'orders-jet'), $current_user->display_name); ?></p>
     
     <hr class="wp-header-end">

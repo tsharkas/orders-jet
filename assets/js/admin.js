@@ -6,6 +6,49 @@
 jQuery(document).ready(function($) {
     'use strict';
     
+    // Auto-refresh dashboards every 30 seconds
+    var dashboardRefreshInterval;
+    
+    // Check if we're on a dashboard page
+    if (window.location.href.indexOf('orders-jet') !== -1) {
+        startDashboardAutoRefresh();
+    }
+    
+    function startDashboardAutoRefresh() {
+        // Refresh every 30 seconds
+        dashboardRefreshInterval = setInterval(function() {
+            refreshDashboard();
+        }, 30000);
+        
+        console.log('Orders Jet Admin: Auto-refresh started (30s interval)');
+    }
+    
+    function stopDashboardAutoRefresh() {
+        if (dashboardRefreshInterval) {
+            clearInterval(dashboardRefreshInterval);
+            console.log('Orders Jet Admin: Auto-refresh stopped');
+        }
+    }
+    
+    function refreshDashboard() {
+        console.log('Orders Jet Admin: Refreshing dashboard...');
+        
+        // Show subtle refresh indicator
+        var $refreshIndicator = $('<div class="oj-refresh-indicator" style="position: fixed; top: 32px; right: 20px; background: #0073aa; color: white; padding: 5px 10px; border-radius: 3px; font-size: 12px; z-index: 9999;">Updating...</div>');
+        $('body').append($refreshIndicator);
+        
+        // Reload the page after a short delay to show the indicator
+        setTimeout(function() {
+            window.location.reload();
+        }, 500);
+    }
+    
+    // Manual refresh button
+    $(document).on('click', '.oj-refresh-dashboard', function(e) {
+        e.preventDefault();
+        refreshDashboard();
+    });
+    
     // Regenerate QR Code
     $(document).on('click', '.oj-regenerate-qr', function(e) {
         e.preventDefault();

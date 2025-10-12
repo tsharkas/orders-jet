@@ -41,14 +41,6 @@ $today_orders = $wpdb->get_var($wpdb->prepare("
     AND DATE(post_date) = %s
 ", $today));
 
-// Active tables (from existing table management)
-$active_tables = $wpdb->get_var("
-    SELECT COUNT(*) 
-    FROM {$wpdb->posts}
-    WHERE post_type = 'oj_table'
-    AND post_status = 'publish'
-");
-
 // Total tables
 $total_tables = $wpdb->get_var("
     SELECT COUNT(*) 
@@ -57,26 +49,48 @@ $total_tables = $wpdb->get_var("
     AND post_status = 'publish'
 ");
 
+// Active tables (tables with active orders)
+$active_tables = $wpdb->get_var("
+    SELECT COUNT(DISTINCT pm_table.meta_value)
+    FROM {$wpdb->posts} p
+    INNER JOIN {$wpdb->postmeta} pm_table ON p.ID = pm_table.post_id AND pm_table.meta_key = '_oj_table_number'
+    WHERE p.post_type = 'shop_order'
+    AND p.post_status IN ('wc-pending', 'wc-processing', 'wc-on-hold')
+    AND pm_table.meta_value IS NOT NULL
+");
+
 // Format revenue
 $currency_symbol = get_woocommerce_currency_symbol();
 $formatted_revenue = $currency_symbol . number_format($today_revenue ?: 0, 2);
 
-// Get recent orders
+// Get recent orders (matching actual workflow)
 $recent_orders = $wpdb->get_results($wpdb->prepare("
-    SELECT p.ID, p.post_date, p.post_status, pm_total.meta_value as order_total
+    SELECT p.ID, p.post_date, p.post_status, pm_total.meta_value as order_total,
+           pm_table.meta_value as table_number, pm_customer.meta_value as customer_name
     FROM {$wpdb->posts} p
     LEFT JOIN {$wpdb->postmeta} pm_total ON p.ID = pm_total.post_id AND pm_total.meta_key = '_order_total'
+    LEFT JOIN {$wpdb->postmeta} pm_table ON p.ID = pm_table.post_id AND pm_table.meta_key = '_oj_table_number'
+    LEFT JOIN {$wpdb->postmeta} pm_customer ON p.ID = pm_customer.post_id AND pm_customer.meta_key = '_billing_first_name'
     WHERE p.post_type = 'shop_order'
     AND p.post_status IN ('wc-pending', 'wc-processing', 'wc-on-hold')
+    AND pm_table.meta_value IS NOT NULL
     ORDER BY p.post_date DESC
     LIMIT 5
 "), ARRAY_A);
 
-// Get table status
+// Get table status with active order information
 $table_status = $wpdb->get_results("
-    SELECT p.ID, p.post_title, pm_status.meta_value as table_status
+    SELECT p.ID, p.post_title, pm_status.meta_value as table_status,
+           pm_capacity.meta_value as table_capacity, pm_location.meta_value as table_location,
+           (SELECT COUNT(*) FROM {$wpdb->posts} p2 
+            INNER JOIN {$wpdb->postmeta} pm_table ON p2.ID = pm_table.post_id AND pm_table.meta_key = '_oj_table_number'
+            WHERE p2.post_type = 'shop_order' 
+            AND p2.post_status IN ('wc-pending', 'wc-processing', 'wc-on-hold')
+            AND pm_table.meta_value = p.post_title) as active_orders_count
     FROM {$wpdb->posts} p
-    LEFT JOIN {$wpdb->postmeta} pm_status ON p.ID = pm_status.post_id AND pm_status.meta_key = '_table_status'
+    LEFT JOIN {$wpdb->postmeta} pm_status ON p.ID = pm_status.post_id AND pm_status.meta_key = '_oj_table_status'
+    LEFT JOIN {$wpdb->postmeta} pm_capacity ON p.ID = pm_capacity.post_id AND pm_capacity.meta_key = '_oj_table_capacity'
+    LEFT JOIN {$wpdb->postmeta} pm_location ON p.ID = pm_location.post_id AND pm_location.meta_key = '_oj_table_location'
     WHERE p.post_type = 'oj_table'
     AND p.post_status = 'publish'
     ORDER BY p.post_title ASC
@@ -89,6 +103,10 @@ $table_status = $wpdb->get_results("
         <span class="dashicons dashicons-businessman" style="font-size: 28px; vertical-align: middle; margin-right: 10px;"></span>
         <?php _e('Manager Dashboard', 'orders-jet'); ?>
     </h1>
+    <button type="button" class="button oj-refresh-dashboard" style="margin-left: 10px;">
+        <span class="dashicons dashicons-update" style="vertical-align: middle; margin-right: 5px;"></span>
+        <?php _e('Refresh', 'orders-jet'); ?>
+    </button>
     <p class="description"><?php echo sprintf(__('Welcome back, %s!', 'orders-jet'), $current_user->display_name); ?></p>
     
     <hr class="wp-header-end">
@@ -179,16 +197,41 @@ $table_status = $wpdb->get_results("
         <?php if (!empty($table_status)) : ?>
             <div class="oj-tables-grid">
                 <?php foreach ($table_status as $table) : ?>
-                    <div class="oj-table-card status-<?php echo esc_attr($table['table_status'] ?: 'available'); ?>">
+                    <?php 
+                    $meta_status = $table['table_status'] ?: 'available';
+                    $has_active_orders = intval($table['active_orders_count']) > 0;
+                    $display_status = $has_active_orders ? 'occupied' : $meta_status;
+                    ?>
+                    <div class="oj-table-card status-<?php echo esc_attr($display_status); ?>">
                         <div class="oj-table-number"><?php echo esc_html($table['post_title']); ?></div>
+                        
+                        <?php if ($table['table_capacity']) : ?>
+                            <div class="oj-table-info"><?php echo sprintf(__('Capacity: %s', 'orders-jet'), esc_html($table['table_capacity'])); ?></div>
+                        <?php endif; ?>
+                        
+                        <?php if ($table['table_location']) : ?>
+                            <div class="oj-table-info"><?php echo esc_html($table['table_location']); ?></div>
+                        <?php endif; ?>
+                        
                         <div class="oj-table-status">
                             <span class="oj-status-indicator"></span>
-                            <?php echo esc_html(ucfirst($table['table_status'] ?: 'available')); ?>
+                            <?php 
+                            if ($has_active_orders) {
+                                echo sprintf(__('%s Active Orders', 'orders-jet'), $table['active_orders_count']);
+                            } else {
+                                echo esc_html(ucfirst($meta_status));
+                            }
+                            ?>
                         </div>
                         <div class="oj-table-actions">
                             <a href="<?php echo admin_url('post.php?post=' . $table['ID'] . '&action=edit'); ?>" class="button button-small">
                                 <?php _e('Manage', 'orders-jet'); ?>
                             </a>
+                            <?php if ($has_active_orders) : ?>
+                                <a href="<?php echo admin_url('edit.php?post_type=shop_order&table_number=' . urlencode($table['post_title'])); ?>" class="button button-primary button-small">
+                                    <?php _e('View Orders', 'orders-jet'); ?>
+                                </a>
+                            <?php endif; ?>
                         </div>
                     </div>
                 <?php endforeach; ?>
@@ -347,6 +390,12 @@ $table_status = $wpdb->get_results("
     font-weight: bold;
     color: #23282d;
     margin-bottom: 8px;
+}
+
+.oj-table-info {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 5px;
 }
 
 .oj-table-status {

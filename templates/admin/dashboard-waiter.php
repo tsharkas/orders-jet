@@ -36,13 +36,15 @@ $tables = $wpdb->get_results("
     ORDER BY p.post_title ASC
 ", ARRAY_A);
 
-// Get active orders for each table
+// Get active orders for each table (matching actual workflow)
 foreach ($tables as &$table) {
     $table_orders = $wpdb->get_results($wpdb->prepare("
-        SELECT p.ID, p.post_date, p.post_status, pm_total.meta_value as order_total
+        SELECT p.ID, p.post_date, p.post_status, pm_total.meta_value as order_total,
+               pm_session.meta_value as session_id
         FROM {$wpdb->posts} p
         LEFT JOIN {$wpdb->postmeta} pm_total ON p.ID = pm_total.post_id AND pm_total.meta_key = '_order_total'
-        LEFT JOIN {$wpdb->postmeta} pm_table ON p.ID = pm_table.post_id AND pm_table.meta_key = '_table_number'
+        LEFT JOIN {$wpdb->postmeta} pm_table ON p.ID = pm_table.post_id AND pm_table.meta_key = '_oj_table_number'
+        LEFT JOIN {$wpdb->postmeta} pm_session ON p.ID = pm_session.post_id AND pm_session.meta_key = '_oj_session_id'
         WHERE p.post_type = 'shop_order'
         AND p.post_status IN ('wc-pending', 'wc-processing', 'wc-on-hold')
         AND pm_table.meta_value = %s
@@ -52,12 +54,20 @@ foreach ($tables as &$table) {
     $table['orders'] = $table_orders;
     $table['has_orders'] = !empty($table_orders);
     $table['total_amount'] = array_sum(array_column($table_orders, 'order_total'));
+    
+    // Determine actual table status based on orders and meta status
+    $meta_status = $table['table_status'] ?: 'available';
+    if ($table['has_orders']) {
+        $table['display_status'] = 'occupied';
+    } else {
+        $table['display_status'] = $meta_status;
+    }
 }
 
-// Waiter stats
+// Waiter stats (based on actual order activity)
 $total_tables = count($tables);
 $occupied_tables = count(array_filter($tables, function($table) {
-    return $table['table_status'] === 'occupied' || $table['has_orders'];
+    return $table['has_orders']; // Only count tables with active orders
 }));
 $available_tables = $total_tables - $occupied_tables;
 
@@ -81,6 +91,10 @@ $currency_symbol = get_woocommerce_currency_symbol();
         <span class="dashicons dashicons-tickets-alt" style="font-size: 28px; vertical-align: middle; margin-right: 10px;"></span>
         <?php _e('My Tables', 'orders-jet'); ?>
     </h1>
+    <button type="button" class="button oj-refresh-dashboard" style="margin-left: 10px;">
+        <span class="dashicons dashicons-update" style="vertical-align: middle; margin-right: 5px;"></span>
+        <?php _e('Refresh', 'orders-jet'); ?>
+    </button>
     <p class="description"><?php echo sprintf(__('Welcome, %s!', 'orders-jet'), $current_user->display_name); ?></p>
     
     <hr class="wp-header-end">
@@ -113,9 +127,8 @@ $currency_symbol = get_woocommerce_currency_symbol();
             <div class="oj-table-grid">
                 <?php foreach ($tables as $table) : ?>
                     <?php 
-                    $table_status = $table['table_status'] ?: 'available';
+                    $display_status = $table['display_status']; // Use the calculated display status
                     $has_orders = $table['has_orders'];
-                    $display_status = $has_orders ? 'occupied' : $table_status;
                     ?>
                     <div class="oj-table-card status-<?php echo esc_attr($display_status); ?>">
                         <div class="oj-table-number"><?php echo esc_html($table['post_title']); ?></div>
