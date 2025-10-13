@@ -407,7 +407,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
         <?php if (!empty($active_orders)) : ?>
             <div class="oj-kitchen-cards-container">
                 <?php foreach ($active_orders as $order) : ?>
-                    <div class="oj-kitchen-card <?php echo esc_attr($order['order_type_class'] ?? ''); ?>" data-order-id="<?php echo esc_attr($order['ID']); ?>">
+                    <div class="oj-kitchen-card" data-order-id="<?php echo esc_attr($order['ID']); ?>">
                         <!-- Card Header -->
                         <div class="oj-card-header">
                             <div class="oj-card-info">
