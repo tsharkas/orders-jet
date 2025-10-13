@@ -54,6 +54,12 @@ if ($woofood_location_id) {
 }
 
 $products = wc_get_products($product_args);
+
+// Apply menu integration enhancements
+if (class_exists('Orders_Jet_Menu_Integration')) {
+    $products = apply_filters('oj_qr_menu_products', $products, $table_id);
+    $categories = apply_filters('oj_qr_menu_categories', $categories, $table_id);
+}
 ?>
 
 <!DOCTYPE html>
@@ -1557,6 +1563,84 @@ $products = wc_get_products($product_args);
                 border-radius: 6px;
             }
         }
+        
+        /* Menu Management Styles */
+        .menu-item-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            z-index: 2;
+        }
+        
+        .featured-badge {
+            background: linear-gradient(135deg, #ffd700, #ffb347);
+            color: #333;
+            box-shadow: 0 2px 4px rgba(255, 215, 0, 0.3);
+        }
+        
+        .unavailable-badge {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+            color: white;
+            box-shadow: 0 2px 4px rgba(255, 107, 107, 0.3);
+        }
+        
+        .menu-item-featured {
+            border: 2px solid #ffd700;
+            box-shadow: 0 4px 15px rgba(255, 215, 0, 0.2);
+        }
+        
+        .menu-item-unavailable {
+            opacity: 0.6;
+            filter: grayscale(50%);
+        }
+        
+        .menu-item-unavailable .menu-item-hint {
+            color: #999;
+            font-style: italic;
+        }
+        
+        .menu-item-locations {
+            margin: 5px 0;
+        }
+        
+        /* Menu filter enhancements */
+        .oj-menu-filters {
+            animation: slideDown 0.3s ease-out;
+        }
+        
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .oj-filter-btn {
+            transition: all 0.2s ease;
+        }
+        
+        .oj-filter-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .oj-menu-enhancements {
+            animation: fadeIn 0.3s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
     </style>
 </head>
 
@@ -1580,6 +1664,11 @@ $products = wc_get_products($product_args);
             </div>
             <?php endif; ?>
         </div>
+        
+        <?php
+        // Add menu filters and enhancements
+        do_action('oj_table_menu_before_products', $table_id);
+        ?>
         
         <!-- Tabs -->
         <div class="tabs">
@@ -1620,8 +1709,42 @@ $products = wc_get_products($product_args);
                         
                         foreach ($category_products as $post):
                             $product = wc_get_product($post->ID);
+                            
+                            // Get WooFood menu management data
+                            $menu_availability = get_post_meta($product->get_id(), '_oj_menu_availability', true);
+                            $menu_priority = get_post_meta($product->get_id(), '_oj_menu_priority', true);
+                            $menu_featured = get_post_meta($product->get_id(), '_oj_menu_featured', true);
+                            
+                            // Check if product is available
+                            $is_available = ($menu_availability !== 'unavailable');
+                            $is_featured = ($menu_featured === '1' || $menu_priority === 'featured');
+                            
+                            // Skip unavailable products unless admin
+                            if (!$is_available && !current_user_can('manage_options')) {
+                                continue;
+                            }
+                            
+                            $item_classes = 'menu-item';
+                            if (!$is_available) $item_classes .= ' menu-item-unavailable';
+                            if ($is_featured) $item_classes .= ' menu-item-featured';
                         ?>
-                            <div class="menu-item" data-product-id="<?php echo $product->get_id(); ?>" data-categories="<?php echo implode(',', wp_get_post_terms($product->get_id(), 'product_cat', array('fields' => 'slugs'))); ?>">
+                            <div class="<?php echo esc_attr($item_classes); ?>" 
+                                 data-product-id="<?php echo $product->get_id(); ?>" 
+                                 data-categories="<?php echo implode(',', wp_get_post_terms($product->get_id(), 'product_cat', array('fields' => 'slugs'))); ?>"
+                                 data-availability="<?php echo esc_attr($menu_availability ?: 'available'); ?>">
+                                
+                                <?php if ($is_featured): ?>
+                                <div class="menu-item-badge featured-badge">
+                                    ⭐ <?php _e('Featured', 'orders-jet'); ?>
+                                </div>
+                                <?php endif; ?>
+                                
+                                <?php if (!$is_available): ?>
+                                <div class="menu-item-badge unavailable-badge">
+                                    <?php _e('Temporarily Unavailable', 'orders-jet'); ?>
+                                </div>
+                                <?php endif; ?>
+                                
                                 <div class="menu-item-image">
                                     <?php if ($product->get_image_id()): ?>
                                         <img class="lazy-image" 
@@ -1637,13 +1760,37 @@ $products = wc_get_products($product_args);
                                     <h3 class="menu-item-title"><?php echo esc_html($product->get_name()); ?></h3>
                                     <p class="menu-item-description"><?php echo esc_html($product->get_short_description()); ?></p>
                                     <div class="menu-item-price"><?php echo $product->get_price_html(); ?></div>
-                                    <div class="menu-item-hint"><?php _e('Tap to view details', 'orders-jet'); ?></div>
+                                    
+                                    <?php
+                                    // Show WooFood locations if available
+                                    $woofood_locations = wp_get_post_terms($product->get_id(), 'exwoofood_loc');
+                                    if ($woofood_locations && !is_wp_error($woofood_locations) && count($woofood_locations) > 1):
+                                    ?>
+                                    <div class="menu-item-locations">
+                                        <small style="color: #666;">
+                                            📍 <?php echo implode(', ', array_map(function($loc) { return $loc->name; }, $woofood_locations)); ?>
+                                        </small>
+                                    </div>
+                                    <?php endif; ?>
+                                    
+                                    <div class="menu-item-hint">
+                                        <?php if ($is_available): ?>
+                                            <?php _e('Tap to view details', 'orders-jet'); ?>
+                                        <?php else: ?>
+                                            <?php _e('Currently unavailable', 'orders-jet'); ?>
+                                        <?php endif; ?>
+                                    </div>
                                 </div>
                             </div>
                         <?php endforeach; ?>
                     </div>
                 <?php endforeach; ?>
             </div>
+            
+            <?php
+            // Add menu enhancements after products
+            do_action('oj_table_menu_after_products', $table_id);
+            ?>
         </div>
         
         <!-- Cart Tab -->

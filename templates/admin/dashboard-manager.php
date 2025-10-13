@@ -307,8 +307,115 @@ $table_status = $wpdb->get_results($table_status_query, ARRAY_A);
             <a href="<?php echo admin_url('edit.php?post_type=product'); ?>" class="button button-secondary">
                 <?php _e('Manage Menu', 'orders-jet'); ?>
             </a>
+            <?php if (class_exists('Orders_Jet_Menu_Integration')): ?>
+            <a href="<?php echo admin_url('admin.php?page=orders-jet-menu-analyzer'); ?>" class="button button-secondary">
+                <?php _e('Menu Analytics', 'orders-jet'); ?>
+            </a>
+            <?php endif; ?>
         </div>
     </div>
+    
+    <?php if (class_exists('Orders_Jet_Menu_Integration')): ?>
+    <!-- Menu Management Section -->
+    <div class="oj-dashboard-section">
+        <h2><?php _e('Menu Management', 'orders-jet'); ?></h2>
+        
+        <?php
+        // Get menu analytics
+        global $wpdb;
+        
+        // Get total products
+        $total_products = $wpdb->get_var("
+            SELECT COUNT(*)
+            FROM {$wpdb->posts}
+            WHERE post_type = 'product'
+            AND post_status = 'publish'
+        ");
+        
+        // Get available products
+        $available_products = $wpdb->get_var("
+            SELECT COUNT(DISTINCT p.ID)
+            FROM {$wpdb->posts} p
+            LEFT JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id AND pm.meta_key = '_oj_menu_availability'
+            WHERE p.post_type = 'product'
+            AND p.post_status = 'publish'
+            AND (pm.meta_value IS NULL OR pm.meta_value != 'unavailable')
+        ");
+        
+        // Get featured products
+        $featured_products = $wpdb->get_var("
+            SELECT COUNT(DISTINCT p.ID)
+            FROM {$wpdb->posts} p
+            JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+            WHERE p.post_type = 'product'
+            AND p.post_status = 'publish'
+            AND ((pm.meta_key = '_oj_menu_featured' AND pm.meta_value = '1')
+                 OR (pm.meta_key = '_oj_menu_priority' AND pm.meta_value = 'featured'))
+        ");
+        
+        // Get unavailable products
+        $unavailable_products = $total_products - $available_products;
+        ?>
+        
+        <div class="oj-menu-stats-grid">
+            <div class="oj-menu-stat-card">
+                <div class="oj-stat-number"><?php echo $total_products; ?></div>
+                <div class="oj-stat-label"><?php _e('Total Menu Items', 'orders-jet'); ?></div>
+            </div>
+            <div class="oj-menu-stat-card oj-stat-success">
+                <div class="oj-stat-number"><?php echo $available_products; ?></div>
+                <div class="oj-stat-label"><?php _e('Available Items', 'orders-jet'); ?></div>
+            </div>
+            <div class="oj-menu-stat-card oj-stat-warning">
+                <div class="oj-stat-number"><?php echo $unavailable_products; ?></div>
+                <div class="oj-stat-label"><?php _e('Unavailable Items', 'orders-jet'); ?></div>
+            </div>
+            <div class="oj-menu-stat-card oj-stat-featured">
+                <div class="oj-stat-number"><?php echo $featured_products; ?></div>
+                <div class="oj-stat-label"><?php _e('Featured Items', 'orders-jet'); ?></div>
+            </div>
+        </div>
+        
+        <?php if (taxonomy_exists('exwoofood_loc') && $woofood_locations && !is_wp_error($woofood_locations)): ?>
+        <div class="oj-location-menu-overview">
+            <h3><?php _e('Menu by Location', 'orders-jet'); ?></h3>
+            <div class="oj-location-menu-grid">
+                <?php foreach ($woofood_locations as $location): 
+                    // Get products count for this location
+                    $location_products = get_posts(array(
+                        'post_type' => 'product',
+                        'post_status' => 'publish',
+                        'numberposts' => -1,
+                        'tax_query' => array(
+                            array(
+                                'taxonomy' => 'exwoofood_loc',
+                                'field' => 'term_id',
+                                'terms' => $location->term_id
+                            )
+                        ),
+                        'fields' => 'ids'
+                    ));
+                    
+                    $location_product_count = count($location_products);
+                ?>
+                <div class="oj-location-menu-card">
+                    <h4>📍 <?php echo esc_html($location->name); ?></h4>
+                    <div class="oj-location-stats">
+                        <span class="oj-location-count"><?php echo $location_product_count; ?> <?php _e('items', 'orders-jet'); ?></span>
+                    </div>
+                    <div class="oj-location-actions">
+                        <a href="<?php echo admin_url('edit.php?post_type=product&exwoofood_loc=' . $location->slug); ?>" 
+                           class="button button-small">
+                            <?php _e('View Menu', 'orders-jet'); ?>
+                        </a>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
 
     <!-- Recent Orders -->
     <div class="oj-dashboard-orders">
@@ -561,7 +668,8 @@ $table_status = $wpdb->get_results($table_status_query, ARRAY_A);
 .oj-dashboard-actions,
 .oj-dashboard-info,
 .oj-dashboard-orders,
-.oj-dashboard-tables {
+.oj-dashboard-tables,
+.oj-dashboard-section {
     background: white;
     border: 1px solid #ccd0d4;
     border-radius: 4px;
@@ -743,6 +851,122 @@ $table_status = $wpdb->get_results($table_status_query, ARRAY_A);
     
     .oj-tables-grid {
         grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+}
+
+/* Menu Management Styles */
+.oj-menu-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.oj-menu-stat-card {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.oj-menu-stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.oj-menu-stat-card.oj-stat-success {
+    background: linear-gradient(135deg, #d4edda, #c3e6cb);
+    border-color: #c3e6cb;
+}
+
+.oj-menu-stat-card.oj-stat-warning {
+    background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+    border-color: #ffeaa7;
+}
+
+.oj-menu-stat-card.oj-stat-featured {
+    background: linear-gradient(135deg, #ffd700, #ffb347);
+    border-color: #ffb347;
+}
+
+.oj-menu-stat-card .oj-stat-number {
+    font-size: 2.5em;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.oj-menu-stat-card .oj-stat-label {
+    font-size: 14px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.oj-location-menu-overview {
+    margin-top: 30px;
+}
+
+.oj-location-menu-overview h3 {
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.oj-location-menu-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 15px;
+}
+
+.oj-location-menu-card {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 15px;
+    transition: all 0.2s ease;
+}
+
+.oj-location-menu-card:hover {
+    border-color: #0073aa;
+    box-shadow: 0 2px 8px rgba(0, 115, 170, 0.1);
+}
+
+.oj-location-menu-card h4 {
+    margin: 0 0 10px 0;
+    color: #0073aa;
+    font-size: 16px;
+}
+
+.oj-location-stats {
+    margin-bottom: 15px;
+}
+
+.oj-location-count {
+    background: #f0f0f1;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #666;
+}
+
+.oj-location-actions .button {
+    width: 100%;
+}
+
+@media (max-width: 768px) {
+    .oj-menu-stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+    }
+    
+    .oj-location-menu-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .oj-menu-stat-card .oj-stat-number {
+        font-size: 2em;
     }
 }
 </style>
