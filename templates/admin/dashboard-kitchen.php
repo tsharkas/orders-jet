@@ -1068,6 +1068,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
 /* Card Body */
 .oj-card-body {
     padding: 20px;
+    background: #f8f9fa;
 }
 
 .oj-card-items {
@@ -1244,6 +1245,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
 /* Card Body */
 .oj-card-body {
     padding: 20px;
+    background: #f8f9fa;
 }
 
 .oj-card-items {
