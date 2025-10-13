@@ -704,9 +704,12 @@ class Orders_Jet_AJAX_Handlers {
                             error_log('Orders Jet: No variation found for attribute ' . $attribute_name . ' = ' . $option);
                         }
                         
+                        // Format label properly (handle multiple words, capitalize each word)
+                        $formatted_label = ucwords(str_replace(array('-', '_'), ' ', $option));
+                        
                         $variation_options[] = array(
                             'value' => $option,
-                            'label' => $option,
+                            'label' => $formatted_label, // Properly formatted display label
                             'price' => $variation_price,
                             'variation_id' => $variation_id,
                             'price_display' => $variation_price > 0 ? wc_price($variation_price) : ''
