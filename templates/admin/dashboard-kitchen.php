@@ -355,15 +355,25 @@ $currency_symbol = get_woocommerce_currency_symbol();
 ?>
 
 <div class="wrap">
-    <h1 class="wp-heading-inline">
-        <span class="dashicons dashicons-food" style="font-size: 28px; vertical-align: middle; margin-right: 10px;"></span>
-        <?php _e('Kitchen Display', 'orders-jet'); ?>
-    </h1>
-    <button type="button" class="button oj-refresh-dashboard" style="margin-left: 10px;">
-        <span class="dashicons dashicons-update" style="vertical-align: middle; margin-right: 5px;"></span>
-        <?php _e('Refresh', 'orders-jet'); ?>
-    </button>
-    <p class="description"><?php echo sprintf(__('Welcome to the kitchen, %s!', 'orders-jet'), $current_user->display_name); ?></p>
+    <div class="oj-header-container">
+        <div class="oj-header-left">
+            <h1 class="wp-heading-inline">
+                <span class="dashicons dashicons-food" style="font-size: 28px; vertical-align: middle; margin-right: 10px;"></span>
+                <?php _e('Kitchen Display', 'orders-jet'); ?>
+            </h1>
+            <p class="description"><?php echo sprintf(__('Welcome to the kitchen, %s!', 'orders-jet'), $current_user->display_name); ?></p>
+            <p class="oj-last-updated">
+                <span class="dashicons dashicons-clock" style="font-size: 14px; vertical-align: middle; margin-right: 4px;"></span>
+                <strong><?php _e('Last Updated:', 'orders-jet'); ?></strong> <?php echo esc_html(date('g:i:s A')); ?>
+            </p>
+        </div>
+        <div class="oj-header-right">
+            <button type="button" class="oj-check-orders-btn" onclick="location.reload();">
+                <span class="dashicons dashicons-update"></span>
+                <?php _e('Check for New Orders', 'orders-jet'); ?>
+            </button>
+        </div>
+    </div>
     
     <hr class="wp-header-end">
 
@@ -500,39 +510,72 @@ $currency_symbol = get_woocommerce_currency_symbol();
         <?php endif; ?>
     </div>
 
-    <!-- Quick Actions -->
-    <div class="oj-kitchen-actions">
-        <h2><?php _e('Quick Actions', 'orders-jet'); ?></h2>
-        
-        <div class="oj-action-buttons">
-            <a href="<?php echo admin_url('edit.php?post_type=shop_order'); ?>" class="button button-primary">
-                <?php _e('View All Orders', 'orders-jet'); ?>
-            </a>
-            <a href="<?php echo admin_url('edit.php?post_type=product'); ?>" class="button button-secondary">
-                <?php _e('Manage Menu Items', 'orders-jet'); ?>
-            </a>
-            <button type="button" class="button button-secondary" onclick="location.reload()">
-                <?php _e('Refresh Orders', 'orders-jet'); ?>
-            </button>
-        </div>
-    </div>
-
-    <!-- Kitchen Info -->
-    <div class="oj-kitchen-info">
-        <h2><?php _e('Kitchen Status', 'orders-jet'); ?></h2>
-        <div class="oj-info-box">
-            <p><strong><?php _e('Kitchen Status:', 'orders-jet'); ?></strong> <?php _e('Ready', 'orders-jet'); ?></p>
-            <p><strong><?php _e('Last Updated:', 'orders-jet'); ?></strong> <?php echo date('H:i:s'); ?></p>
-            <p><strong><?php _e('Staff:', 'orders-jet'); ?></strong> <?php echo esc_html($current_user->display_name); ?></p>
-        </div>
-    </div>
 </div>
 
 <style>
+/* Header Layout */
+.oj-header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    gap: 20px;
+}
+
+.oj-header-left {
+    flex: 1;
+}
+
+.oj-header-right {
+    flex-shrink: 0;
+}
+
+.oj-last-updated {
+    color: #6c757d;
+    font-size: 13px;
+    margin: 8px 0 0 0;
+}
+
+.oj-check-orders-btn {
+    background: linear-gradient(135deg, #007cba 0%, #005a87 100%);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 8px rgba(0, 124, 186, 0.3);
+}
+
+.oj-check-orders-btn:hover {
+    background: linear-gradient(135deg, #005a87 0%, #004666 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 124, 186, 0.4);
+}
+
+.oj-check-orders-btn .dashicons {
+    font-size: 16px;
+    animation: spin 2s linear infinite;
+}
+
+.oj-check-orders-btn:hover .dashicons {
+    animation-duration: 0.5s;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
 .oj-kitchen-stats,
-.oj-order-queue,
-.oj-kitchen-actions,
-.oj-kitchen-info {
+.oj-order-queue {
     background: white;
     border: 1px solid #ccd0d4;
     border-radius: 4px;
@@ -1147,6 +1190,22 @@ $currency_symbol = get_woocommerce_currency_symbol();
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
+    .oj-header-container {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .oj-header-right {
+        align-self: stretch;
+    }
+    
+    .oj-check-orders-btn {
+        width: 100%;
+        justify-content: center;
+        padding: 14px 20px;
+        font-size: 15px;
+    }
+    
     .oj-kitchen-cards-container {
         grid-template-columns: 1fr;
         gap: 16px;
