@@ -293,26 +293,38 @@ foreach ($active_orders as $order) {
 // Replace the original array with the new one
 $active_orders = $orders_with_items;
 
-// Kitchen stats (simplified to match workflow)
-// In Progress: Orders being cooked (wc-processing)
-$in_progress_orders = $wpdb->get_var($wpdb->prepare("
-    SELECT COUNT(*) 
-    FROM {$wpdb->posts} p
-    INNER JOIN {$wpdb->postmeta} pm_table ON p.ID = pm_table.post_id AND pm_table.meta_key = '_oj_table_number'
-    WHERE p.post_type = 'shop_order'
-    AND p.post_status = 'wc-processing'
-    AND pm_table.meta_value IS NOT NULL
-"));
+// Kitchen stats (count from existing data)
+// In Progress: Count orders with wc-processing status
+$in_progress_orders = 0;
+$completed_orders = 0;
 
-// Completed: Orders ready for pickup (wc-on-hold)
-$completed_orders = $wpdb->get_var($wpdb->prepare("
-    SELECT COUNT(*) 
-    FROM {$wpdb->posts} p
-    INNER JOIN {$wpdb->postmeta} pm_table ON p.ID = pm_table.post_id AND pm_table.meta_key = '_oj_table_number'
-    WHERE p.post_type = 'shop_order'
-    AND p.post_status = 'wc-on-hold'
-    AND pm_table.meta_value IS NOT NULL
-"));
+foreach ($active_orders as $order) {
+    if ($order['post_status'] === 'wc-processing') {
+        $in_progress_orders++;
+    }
+}
+
+// Get completed orders (wc-on-hold) using the same method as active orders
+$completed_orders_posts = get_posts(array(
+    'post_type' => 'shop_order',
+    'post_status' => array('wc-on-hold'), // Ready orders
+    'meta_query' => array(
+        array(
+            'key' => '_oj_table_number',
+            'compare' => 'EXISTS'
+        )
+    ),
+    'posts_per_page' => -1,
+    'orderby' => 'date',
+    'order' => 'ASC'
+));
+
+$completed_orders = count($completed_orders_posts);
+
+// Debug logging
+error_log('Orders Jet Kitchen Stats: In Progress Orders = ' . $in_progress_orders);
+error_log('Orders Jet Kitchen Stats: Completed Orders = ' . $completed_orders);
+error_log('Orders Jet Kitchen Stats: Active Orders Count = ' . count($active_orders));
 
 // Format currency
 $currency_symbol = get_woocommerce_currency_symbol();
