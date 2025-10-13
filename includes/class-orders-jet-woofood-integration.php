@@ -40,7 +40,18 @@ class Orders_Jet_WooFood_Integration {
         // Check if WooFood is active
         if (class_exists('EX_WooFood')) {
             $this->is_woofood_active = true;
-            $this->woofood_instance = EX_WooFood::instance();
+            
+            // Try to get WooFood instance - check different patterns
+            if (method_exists('EX_WooFood', 'instance')) {
+                $this->woofood_instance = EX_WooFood::instance();
+            } elseif (method_exists('EX_WooFood', 'get_instance')) {
+                $this->woofood_instance = EX_WooFood::get_instance();
+            } else {
+                // WooFood might not use singleton pattern
+                $this->woofood_instance = null;
+                error_log('Orders Jet: WooFood detected but no singleton method found');
+            }
+            
             $this->setup_hooks();
             $this->register_integration_hooks();
         }
@@ -471,6 +482,13 @@ class Orders_Jet_WooFood_Integration {
      */
     public function get_woofood_instance() {
         return $this->woofood_instance;
+    }
+    
+    /**
+     * Check if WooFood instance is available
+     */
+    public function has_woofood_instance() {
+        return $this->woofood_instance !== null;
     }
     
     /**

@@ -540,17 +540,36 @@ class Orders_Jet_WooFood_Analyzer {
                 $reflection = new ReflectionClass('EX_WooFood');
                 $output .= "   File: " . $reflection->getFileName() . "\n";
                 
-                // Check if it's a singleton
+                // Check different singleton patterns
                 if ($reflection->hasMethod('instance')) {
-                    $output .= "   Pattern: Singleton\n";
+                    $output .= "   Pattern: Singleton (instance method)\n";
+                } elseif ($reflection->hasMethod('get_instance')) {
+                    $output .= "   Pattern: Singleton (get_instance method)\n";
+                } else {
+                    $output .= "   Pattern: Regular class (no singleton)\n";
                 }
                 
                 // Key methods
-                $key_methods = array('init', 'load', 'setup', 'register_hooks', 'get_locations', 'process_order');
+                $key_methods = array('init', 'load', 'setup', 'register_hooks', 'get_locations', 'process_order', '__construct');
+                $output .= "   Available key methods:\n";
                 foreach ($key_methods as $method) {
                     if ($reflection->hasMethod($method)) {
-                        $output .= "   Has method: {$method}()\n";
+                        $output .= "     ✅ {$method}()\n";
+                    } else {
+                        $output .= "     ❌ {$method}()\n";
                     }
+                }
+                
+                // List all public methods
+                $public_methods = $reflection->getMethods(ReflectionMethod::IS_PUBLIC);
+                $output .= "   All public methods (" . count($public_methods) . " total):\n";
+                foreach (array_slice($public_methods, 0, 15) as $method) {
+                    if (!$method->isConstructor() && !$method->isDestructor()) {
+                        $output .= "     - " . $method->getName() . "()\n";
+                    }
+                }
+                if (count($public_methods) > 15) {
+                    $output .= "     ... and " . (count($public_methods) - 15) . " more methods\n";
                 }
                 
             } catch (Exception $e) {
