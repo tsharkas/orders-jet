@@ -388,94 +388,111 @@ $currency_symbol = get_woocommerce_currency_symbol();
         <h2><?php _e('Order Queue', 'orders-jet'); ?></h2>
         
         <?php if (!empty($active_orders)) : ?>
-            <table class="wp-list-table widefat fixed striped">
-                <thead>
-                    <tr>
-                        <th><?php _e('Customer/Table', 'orders-jet'); ?></th>
-                        <th><?php _e('Date', 'orders-jet'); ?></th>
-                        <th style="width: 50%;"><?php _e('Items & Add-ons', 'orders-jet'); ?></th>
-                        <th><?php _e('Mark Ready', 'orders-jet'); ?></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($active_orders as $order) : ?>
-                        <tr>
-                            <td>
-                                <?php if ($order['table_number']) : ?>
-                                    <strong>Table <?php echo esc_html($order['table_number']); ?></strong><br>
-                                <?php endif; ?>
+            <div class="oj-kitchen-cards-container">
+                <?php foreach ($active_orders as $order) : ?>
+                    <div class="oj-kitchen-card" data-order-id="<?php echo esc_attr($order['ID']); ?>">
+                        <!-- Card Header -->
+                        <div class="oj-card-header">
+                            <div class="oj-card-info">
+                                <div class="oj-table-info">
+                                    <?php if ($order['table_number']) : ?>
+                                        <span class="oj-table-number">Table <?php echo esc_html($order['table_number']); ?></span>
+                                    <?php endif; ?>
+                                    <span class="oj-order-number">#<?php echo esc_html($order['ID']); ?></span>
+                                </div>
                                 <?php if ($order['customer_name']) : ?>
-                                    <?php echo esc_html($order['customer_name']); ?>
+                                    <div class="oj-customer-name"><?php echo esc_html($order['customer_name']); ?></div>
                                 <?php else : ?>
-                                    Guest
+                                    <div class="oj-customer-name">Guest</div>
                                 <?php endif; ?>
-                                <br><small><strong>#<?php echo esc_html($order['ID']); ?></strong></small>
-                            </td>
-                            <td><?php echo esc_html(date('M j, Y g:i A', strtotime($order['post_date']))); ?></td>
-                            <td class="oj-kitchen-items">
-                                <?php if (!empty($order['items'])) : ?>
+                                <div class="oj-order-time">
+                                    <span class="dashicons dashicons-clock"></span>
+                                    <?php echo esc_html(date('g:i A', strtotime($order['post_date']))); ?>
+                                </div>
+                            </div>
+                            <div class="oj-card-status">
+                                <?php if ($order['post_status'] === 'wc-pending') : ?>
+                                    <span class="oj-status-badge pending">
+                                        <span class="dashicons dashicons-hourglass"></span>
+                                        <?php _e('Pending', 'orders-jet'); ?>
+                                    </span>
+                                <?php elseif ($order['post_status'] === 'wc-processing') : ?>
+                                    <span class="oj-status-badge processing">
+                                        <span class="dashicons dashicons-admin-tools"></span>
+                                        <?php _e('Cooking', 'orders-jet'); ?>
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+
+                        <!-- Card Body - Items -->
+                        <div class="oj-card-body">
+                            <?php if (!empty($order['items'])) : ?>
+                                <div class="oj-card-items">
                                     <?php foreach ($order['items'] as $item) : ?>
-                                        <div class="oj-kitchen-item">
-                                            <div class="oj-item-main">
-                                                <span class="oj-item-qty"><?php echo esc_html($item['quantity']); ?>x</span>
-                                                <strong class="oj-item-name"><?php echo esc_html($item['name']); ?></strong>
+                                        <div class="oj-card-item">
+                                            <div class="oj-item-header">
+                                                <span class="oj-item-qty"><?php echo esc_html($item['quantity']); ?>×</span>
+                                                <span class="oj-item-name"><?php echo esc_html($item['name']); ?></span>
                                             </div>
                                             
                                             <?php if (!empty($item['variations'])) : ?>
                                                 <div class="oj-item-variations">
                                                     <?php foreach ($item['variations'] as $variation_name => $variation_value) : ?>
-                                                        <span class="oj-variation"><?php echo esc_html($variation_name); ?>: <?php echo esc_html($variation_value); ?></span>
+                                                        <span class="oj-variation-tag"><?php echo esc_html($variation_name); ?>: <?php echo esc_html($variation_value); ?></span>
                                                     <?php endforeach; ?>
                                                 </div>
                                             <?php endif; ?>
                                             
                                             <?php if (!empty($item['addons'])) : ?>
                                                 <div class="oj-item-addons">
-                                                    <span class="oj-addons-label"><?php _e('Add-ons:', 'orders-jet'); ?></span>
+                                                    <span class="oj-addons-label">+</span>
                                                     <?php foreach ($item['addons'] as $addon) : ?>
-                                                        <span class="oj-addon"><?php echo esc_html($addon); ?></span>
+                                                        <span class="oj-addon-tag"><?php echo esc_html($addon); ?></span>
                                                     <?php endforeach; ?>
                                                 </div>
                                             <?php endif; ?>
                                             
                                             <?php if (!empty($item['notes'])) : ?>
                                                 <div class="oj-item-notes">
-                                                    <span class="oj-notes-label"><?php _e('Notes:', 'orders-jet'); ?></span>
+                                                    <span class="dashicons dashicons-format-quote"></span>
                                                     <span class="oj-notes-text"><?php echo esc_html($item['notes']); ?></span>
                                                 </div>
                                             <?php endif; ?>
                                         </div>
                                     <?php endforeach; ?>
-                                <?php else : ?>
-                                    <span class="oj-no-items"><?php _e('No items found', 'orders-jet'); ?></span>
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <?php if ($order['post_status'] === 'wc-pending') : ?>
-                                    <button class="button button-primary oj-start-cooking" data-order-id="<?php echo esc_attr($order['ID']); ?>" style="background: #00a32a; border-color: #00a32a; color: white; font-weight: 600; padding: 6px 12px; font-size: 13px;">
-                                        <span class="dashicons dashicons-controls-play" style="font-size: 14px; vertical-align: middle; margin-right: 4px;"></span>
-                                        <?php _e('Start Cooking', 'orders-jet'); ?>
+                                </div>
+                            <?php else : ?>
+                                <div class="oj-no-items"><?php _e('No items found', 'orders-jet'); ?></div>
+                            <?php endif; ?>
+                        </div>
+
+                        <!-- Card Footer - Action Button -->
+                        <div class="oj-card-footer">
+                            <?php if ($order['post_status'] === 'wc-pending') : ?>
+                                <button class="oj-action-btn oj-start-cooking" data-order-id="<?php echo esc_attr($order['ID']); ?>">
+                                    <span class="dashicons dashicons-controls-play"></span>
+                                    <?php _e('Start Cooking', 'orders-jet'); ?>
+                                </button>
+                            <?php elseif ($order['post_status'] === 'wc-processing') : ?>
+                                <form method="post" style="width: 100%;">
+                                    <?php wp_nonce_field('oj_mark_ready_' . $order['ID']); ?>
+                                    <input type="hidden" name="order_id" value="<?php echo esc_attr($order['ID']); ?>">
+                                    <button type="submit" name="oj_mark_ready" class="oj-action-btn oj-mark-ready">
+                                        <span class="dashicons dashicons-yes-alt"></span>
+                                        <?php _e('Mark Ready', 'orders-jet'); ?>
                                     </button>
-                                <?php elseif ($order['post_status'] === 'wc-processing') : ?>
-                                    <form method="post" style="display: inline-block;">
-                                        <?php wp_nonce_field('oj_mark_ready_' . $order['ID']); ?>
-                                        <input type="hidden" name="order_id" value="<?php echo esc_attr($order['ID']); ?>">
-                                        <button type="submit" name="oj_mark_ready" class="button button-secondary oj-mark-ready-form" style="background: #00a32a; border-color: #00a32a; color: white; font-weight: 600; padding: 6px 12px; font-size: 13px;">
-                                            <span class="dashicons dashicons-yes-alt" style="font-size: 16px; vertical-align: middle; margin-right: 4px;"></span>
-                                            <?php _e('Mark Ready', 'orders-jet'); ?>
-                                        </button>
-                                    </form>
-                                <?php else : ?>
-                                    <button class="button oj-resume-order" data-order-id="<?php echo esc_attr($order['ID']); ?>" style="background: #dba617; border-color: #dba617; color: white; font-weight: 600; padding: 6px 12px; font-size: 13px;">
-                                        <span class="dashicons dashicons-controls-repeat" style="font-size: 14px; vertical-align: middle; margin-right: 4px;"></span>
-                                        <?php _e('Resume', 'orders-jet'); ?>
-                                    </button>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
+                                </form>
+                            <?php else : ?>
+                                <button class="oj-action-btn oj-resume-order" data-order-id="<?php echo esc_attr($order['ID']); ?>">
+                                    <span class="dashicons dashicons-controls-repeat"></span>
+                                    <?php _e('Resume', 'orders-jet'); ?>
+                                </button>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
         <?php else : ?>
             <div class="oj-no-orders">
                 <p><?php _e('No active orders found.', 'orders-jet'); ?></p>
@@ -857,6 +874,353 @@ $currency_symbol = get_woocommerce_currency_symbol();
 .oj-no-items {
     color: #6c757d;
     font-style: italic;
+}
+
+/* Kitchen Cards Layout */
+.oj-kitchen-cards-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.oj-kitchen-card {
+    background: #ffffff;
+    border: 2px solid #e1e5e9;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.oj-kitchen-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+/* Card Header */
+.oj-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-bottom: 1px solid #dee2e6;
+}
+
+.oj-card-info {
+    flex: 1;
+}
+
+.oj-table-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.oj-table-number {
+    background: #007cba;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.oj-order-number {
+    background: #6c757d;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.oj-customer-name {
+    font-weight: 500;
+    color: #495057;
+    margin-bottom: 4px;
+}
+
+.oj-order-time {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #6c757d;
+    font-size: 13px;
+}
+
+.oj-order-time .dashicons {
+    font-size: 14px;
+}
+
+.oj-card-status {
+    margin-left: 16px;
+}
+
+.oj-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.oj-status-badge.pending {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.oj-status-badge.processing {
+    background: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+
+.oj-status-badge .dashicons {
+    font-size: 14px;
+}
+
+/* Card Body */
+.oj-card-body {
+    padding: 20px;
+}
+
+.oj-card-items {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.oj-card-item {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.oj-item-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.oj-item-qty {
+    background: #007cba;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    min-width: 28px;
+    text-align: center;
+}
+
+.oj-item-name {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 15px;
+}
+
+.oj-item-variations {
+    margin: 6px 0;
+}
+
+.oj-variation-tag {
+    background: #e3f2fd;
+    color: #1976d2;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    margin-right: 6px;
+    margin-bottom: 4px;
+    display: inline-block;
+}
+
+.oj-item-addons {
+    margin: 6px 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.oj-addons-label {
+    background: #28a745;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 50%;
+    font-size: 10px;
+    font-weight: bold;
+    width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.oj-addon-tag {
+    background: #fff3cd;
+    color: #856404;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    margin-bottom: 4px;
+    display: inline-block;
+}
+
+.oj-item-notes {
+    margin: 8px 0;
+    background: #f8d7da;
+    color: #721c24;
+    padding: 8px;
+    border-radius: 6px;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 12px;
+}
+
+.oj-item-notes .dashicons {
+    font-size: 14px;
+    margin-top: 1px;
+}
+
+.oj-notes-text {
+    font-style: italic;
+    line-height: 1.4;
+}
+
+/* Card Footer */
+.oj-card-footer {
+    padding: 16px 20px;
+    background: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+}
+
+.oj-action-btn {
+    width: 100%;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.oj-action-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.oj-action-btn.oj-start-cooking {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+}
+
+.oj-action-btn.oj-mark-ready {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    color: white;
+}
+
+.oj-action-btn.oj-resume-order {
+    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+    color: #212529;
+}
+
+.oj-action-btn .dashicons {
+    font-size: 16px;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .oj-kitchen-cards-container {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    
+    .oj-kitchen-card {
+        margin: 0 -10px;
+        border-radius: 8px;
+    }
+    
+    .oj-card-header {
+        padding: 12px 16px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .oj-card-status {
+        margin-left: 0;
+        align-self: flex-end;
+    }
+    
+    .oj-table-info {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .oj-card-body {
+        padding: 16px;
+    }
+    
+    .oj-card-item {
+        padding: 10px;
+    }
+    
+    .oj-item-header {
+        flex-wrap: wrap;
+    }
+    
+    .oj-action-btn {
+        padding: 14px 16px;
+        font-size: 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .oj-kitchen-cards-container {
+        gap: 12px;
+    }
+    
+    .oj-kitchen-card {
+        margin: 0 -5px;
+    }
+    
+    .oj-card-header,
+    .oj-card-body,
+    .oj-card-footer {
+        padding: 12px;
+    }
+    
+    .oj-table-number,
+    .oj-order-number {
+        font-size: 12px;
+        padding: 3px 8px;
+    }
+    
+    .oj-item-name {
+        font-size: 14px;
+    }
+    
+    .oj-action-btn {
+        padding: 16px;
+        font-size: 15px;
+    }
 }
 </style>
 
