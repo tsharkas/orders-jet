@@ -135,10 +135,41 @@ if (function_exists('wc_get_orders')) {
     
     error_log('Orders Jet Kitchen: Found ' . count($wc_orders) . ' orders');
     
-    // Convert to simple format
+    // Convert to simple format with enhanced pickup logic
     $active_orders = array();
     foreach ($wc_orders as $wc_order) {
         $table_number = $wc_order->get_meta('_oj_table_number');
+        
+        // Get delivery date/time for WooFood orders
+        $delivery_date = $wc_order->get_meta('exwf_delivery_date');
+        $delivery_time = $wc_order->get_meta('_exwf_delivery_time') ?: $wc_order->get_meta('_oj_delivery_time');
+        
+        // For pickup orders with delivery date/time, only show today's orders
+        if (empty($table_number) && !empty($delivery_date)) {
+            $today = date('Y-m-d');
+            $order_date = date('Y-m-d', strtotime($delivery_date));
+            
+            // Skip if not today's delivery
+            if ($order_date !== $today) {
+                error_log('Orders Jet Kitchen: Skipping order #' . $wc_order->get_id() . ' - scheduled for ' . $order_date . ' (not today)');
+                continue;
+            }
+            
+            // Enhanced badge for timed pickup orders
+            $order_type = 'pickup_timed';
+            $time_display = !empty($delivery_time) ? date('g:i A', strtotime($delivery_time)) : '';
+            $order_type_label = !empty($time_display) ? __('PICK UP', 'orders-jet') . ' ' . $time_display : __('PICK UP TODAY', 'orders-jet');
+            $order_type_icon = '🕒';
+            $order_type_class = 'oj-order-type-pickup-timed';
+            
+            error_log('Orders Jet Kitchen: Including timed pickup order #' . $wc_order->get_id() . ' for today at ' . $time_display);
+        } else {
+            // Regular logic for table orders and pickup orders without delivery times
+            $order_type = !empty($table_number) ? 'dinein' : 'pickup';
+            $order_type_label = !empty($table_number) ? __('DINE IN', 'orders-jet') : __('PICK UP', 'orders-jet');
+            $order_type_icon = !empty($table_number) ? '🍽️' : '🥡';
+            $order_type_class = !empty($table_number) ? 'oj-order-type-dinein' : 'oj-order-type-pickup';
+        }
         
         $active_orders[] = array(
             'ID' => $wc_order->get_id(),
@@ -148,11 +179,13 @@ if (function_exists('wc_get_orders')) {
             'table_number' => $table_number,
             'customer_name' => $wc_order->get_billing_first_name(),
             'session_id' => $wc_order->get_meta('_oj_session_id'),
-            // Simple badge logic
-            'order_type' => !empty($table_number) ? 'dinein' : 'pickup',
-            'order_type_label' => !empty($table_number) ? __('DINE IN', 'orders-jet') : __('PICK UP', 'orders-jet'),
-            'order_type_icon' => !empty($table_number) ? '🍽️' : '🥡',
-            'order_type_class' => !empty($table_number) ? 'oj-order-type-dinein' : 'oj-order-type-pickup'
+            'delivery_date' => $delivery_date,
+            'delivery_time' => $delivery_time,
+            // Enhanced badge logic
+            'order_type' => $order_type,
+            'order_type_label' => $order_type_label,
+            'order_type_icon' => $order_type_icon,
+            'order_type_class' => $order_type_class
         );
     }
 } else {
@@ -173,6 +206,34 @@ if (function_exists('wc_get_orders')) {
         if ($order) {
             $table_number = $order->get_meta('_oj_table_number');
             
+            // Get delivery date/time for WooFood orders
+            $delivery_date = $order->get_meta('exwf_delivery_date');
+            $delivery_time = $order->get_meta('_exwf_delivery_time') ?: $order->get_meta('_oj_delivery_time');
+            
+            // For pickup orders with delivery date/time, only show today's orders
+            if (empty($table_number) && !empty($delivery_date)) {
+                $today = date('Y-m-d');
+                $order_date = date('Y-m-d', strtotime($delivery_date));
+                
+                // Skip if not today's delivery
+                if ($order_date !== $today) {
+                    continue;
+                }
+                
+                // Enhanced badge for timed pickup orders
+                $order_type = 'pickup_timed';
+                $time_display = !empty($delivery_time) ? date('g:i A', strtotime($delivery_time)) : '';
+                $order_type_label = !empty($time_display) ? __('PICK UP', 'orders-jet') . ' ' . $time_display : __('PICK UP TODAY', 'orders-jet');
+                $order_type_icon = '🕒';
+                $order_type_class = 'oj-order-type-pickup-timed';
+            } else {
+                // Regular logic for table orders and pickup orders without delivery times
+                $order_type = !empty($table_number) ? 'dinein' : 'pickup';
+                $order_type_label = !empty($table_number) ? __('DINE IN', 'orders-jet') : __('PICK UP', 'orders-jet');
+                $order_type_icon = !empty($table_number) ? '🍽️' : '🥡';
+                $order_type_class = !empty($table_number) ? 'oj-order-type-dinein' : 'oj-order-type-pickup';
+            }
+            
             $active_orders[] = array(
                 'ID' => $order->get_id(),
                 'post_date' => $order_post->post_date,
@@ -181,18 +242,36 @@ if (function_exists('wc_get_orders')) {
                 'table_number' => $table_number,
                 'customer_name' => $order->get_billing_first_name(),
                 'session_id' => $order->get_meta('_oj_session_id'),
-                // Simple badge logic
-                'order_type' => !empty($table_number) ? 'dinein' : 'pickup',
-                'order_type_label' => !empty($table_number) ? __('DINE IN', 'orders-jet') : __('PICK UP', 'orders-jet'),
-                'order_type_icon' => !empty($table_number) ? '🍽️' : '🥡',
-                'order_type_class' => !empty($table_number) ? 'oj-order-type-dinein' : 'oj-order-type-pickup'
+                'delivery_date' => $delivery_date,
+                'delivery_time' => $delivery_time,
+                // Enhanced badge logic
+                'order_type' => $order_type,
+                'order_type_label' => $order_type_label,
+                'order_type_icon' => $order_type_icon,
+                'order_type_class' => $order_type_class
             );
         }
     }
 }
 
-// Sort by priority: processing first, then pending, then on-hold
+// Sort by priority: timed pickups by delivery time, then processing first, then pending, then on-hold
 usort($active_orders, function($a, $b) {
+    // First priority: timed pickup orders sorted by delivery time
+    if ($a['order_type'] === 'pickup_timed' && $b['order_type'] === 'pickup_timed') {
+        $time_a = !empty($a['delivery_time']) ? strtotime($a['delivery_time']) : 0;
+        $time_b = !empty($b['delivery_time']) ? strtotime($b['delivery_time']) : 0;
+        return $time_a - $time_b;
+    }
+    
+    // Timed pickups come before regular orders
+    if ($a['order_type'] === 'pickup_timed' && $b['order_type'] !== 'pickup_timed') {
+        return -1;
+    }
+    if ($b['order_type'] === 'pickup_timed' && $a['order_type'] !== 'pickup_timed') {
+        return 1;
+    }
+    
+    // Regular priority for other orders
     $priority = array('wc-processing' => 1, 'wc-pending' => 2, 'wc-on-hold' => 3);
     $a_priority = $priority[$a['post_status']] ?? 4;
     $b_priority = $priority[$b['post_status']] ?? 4;
@@ -1026,6 +1105,19 @@ $currency_symbol = get_woocommerce_currency_symbol();
 .oj-order-type-pickup {
     background: #FF9800;
     color: #ffffff;
+}
+
+.oj-order-type-pickup-timed {
+    background: #FF5722;
+    color: #ffffff;
+    font-weight: bold;
+    animation: pulse-timed 2s infinite;
+}
+
+@keyframes pulse-timed {
+    0% { box-shadow: 0 0 0 0 rgba(255, 87, 34, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(255, 87, 34, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 87, 34, 0); }
 }
 
 .oj-order-type-unknown {
