@@ -22,7 +22,10 @@ class Orders_Jet_Table_Management {
         add_action('wp_ajax_oj_regenerate_qr_code', array($this, 'regenerate_qr_code_ajax'));
         add_action('wp_ajax_oj_flush_rewrite_rules', array($this, 'flush_rewrite_rules_ajax'));
         
-        error_log('Orders Jet: Table Management class initialized');
+        // WooFood location integration
+        add_action('add_meta_boxes', array($this, 'add_woofood_location_metabox'));
+        
+        error_log('Orders Jet: Table Management class initialized with WooFood integration');
     }
     
     /**
@@ -236,6 +239,12 @@ class Orders_Jet_Table_Management {
             return;
         }
         
+        // Handle WooFood location nonce separately
+        $woofood_location_nonce_valid = true;
+        if (isset($_POST['oj_woofood_location_nonce'])) {
+            $woofood_location_nonce_valid = wp_verify_nonce($_POST['oj_woofood_location_nonce'], 'oj_woofood_location_nonce');
+        }
+        
         if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
             error_log("Orders Jet: Autosave in progress, skipping");
             return;
@@ -255,6 +264,11 @@ class Orders_Jet_Table_Management {
             'oj_table_status' => '_oj_table_status',
             'oj_table_location' => '_oj_table_location'
         );
+        
+        // Add WooFood location if nonce is valid
+        if ($woofood_location_nonce_valid && class_exists('EX_WooFood')) {
+            $meta_fields['oj_woofood_location_id'] = '_oj_woofood_location_id';
+        }
         
         foreach ($meta_fields as $form_field => $meta_key) {
             if (isset($_POST[$form_field])) {
@@ -348,6 +362,12 @@ class Orders_Jet_Table_Management {
         $new_columns['oj_table_capacity'] = __('Capacity', 'orders-jet');
         $new_columns['oj_table_status'] = __('Status', 'orders-jet');
         $new_columns['oj_table_location'] = __('Location', 'orders-jet');
+        
+        // Add WooFood location column if WooFood is active
+        if (class_exists('EX_WooFood')) {
+            $new_columns['oj_woofood_location'] = __('WooFood Location', 'orders-jet');
+        }
+        
         $new_columns['date'] = $columns['date'];
         
         return $new_columns;
@@ -378,6 +398,19 @@ class Orders_Jet_Table_Management {
             case 'oj_table_location':
                 echo esc_html(get_post_meta($post_id, '_oj_table_location', true));
                 break;
+            case 'oj_woofood_location':
+                $location_id = get_post_meta($post_id, '_oj_woofood_location_id', true);
+                if ($location_id && class_exists('EX_WooFood')) {
+                    $location = get_term($location_id, 'exwoofood_loc');
+                    if ($location && !is_wp_error($location)) {
+                        echo '<span class="oj-woofood-location">' . esc_html($location->name) . '</span>';
+                    } else {
+                        echo '<span class="oj-no-location">' . __('Invalid Location', 'orders-jet') . '</span>';
+                    }
+                } else {
+                    echo '<span class="oj-no-location">' . __('No Location', 'orders-jet') . '</span>';
+                }
+                break;
         }
     }
     
@@ -396,5 +429,80 @@ class Orders_Jet_Table_Management {
             'ajax_url' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('oj_table_nonce')
         ));
+    }
+    
+    /**
+     * Add WooFood location metabox to table edit screen
+     */
+    public function add_woofood_location_metabox() {
+        // Only add if WooFood is active
+        if (!class_exists('EX_WooFood')) {
+            return;
+        }
+        
+        add_meta_box(
+            'oj_woofood_location',
+            __('WooFood Location', 'orders-jet'),
+            array($this, 'render_woofood_location_metabox'),
+            'oj_table',
+            'side',
+            'high'
+        );
+    }
+    
+    /**
+     * Render WooFood location metabox
+     */
+    public function render_woofood_location_metabox($post) {
+        // Get WooFood locations
+        $woofood_locations = get_terms(array(
+            'taxonomy' => 'exwoofood_loc',
+            'hide_empty' => false
+        ));
+        
+        $selected_location = get_post_meta($post->ID, '_oj_woofood_location_id', true);
+        
+        wp_nonce_field('oj_woofood_location_nonce', 'oj_woofood_location_nonce');
+        
+        echo '<div class="oj-woofood-location-field">';
+        
+        if ($woofood_locations && !is_wp_error($woofood_locations)) {
+            echo '<label for="oj_woofood_location_id">' . __('Select Location:', 'orders-jet') . '</label>';
+            echo '<select name="oj_woofood_location_id" id="oj_woofood_location_id" style="width: 100%; margin-top: 5px;">';
+            echo '<option value="">' . __('-- Select Location --', 'orders-jet') . '</option>';
+            
+            foreach ($woofood_locations as $location) {
+                $selected = selected($selected_location, $location->term_id, false);
+                echo '<option value="' . esc_attr($location->term_id) . '" ' . $selected . '>';
+                echo esc_html($location->name);
+                echo '</option>';
+            }
+            echo '</select>';
+            
+            if ($selected_location) {
+                $location = get_term($selected_location, 'exwoofood_loc');
+                if ($location && !is_wp_error($location)) {
+                    echo '<div class="oj-location-info" style="margin-top: 10px; padding: 10px; background: #f0f9ff; border: 1px solid #0073aa; border-radius: 4px;">';
+                    echo '<strong>' . __('Current Location:', 'orders-jet') . '</strong><br>';
+                    echo esc_html($location->name);
+                    if ($location->description) {
+                        echo '<br><small>' . esc_html($location->description) . '</small>';
+                    }
+                    echo '</div>';
+                }
+            }
+            
+        } else {
+            echo '<div class="notice notice-warning inline">';
+            echo '<p>' . __('No WooFood locations found. Please create locations in WooFood settings first.', 'orders-jet') . '</p>';
+            echo '</div>';
+        }
+        
+        echo '<div class="oj-location-help" style="margin-top: 10px; font-size: 12px; color: #666;">';
+        echo '<strong>' . __('Note:', 'orders-jet') . '</strong> ';
+        echo __('Assigning a location will filter the menu to show only products available at this location.', 'orders-jet');
+        echo '</div>';
+        
+        echo '</div>';
     }
 }

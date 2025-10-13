@@ -192,3 +192,159 @@ function oj_get_table_orders_for_admin($table_number, $limit = 10) {
     return Orders_Jet_Helpers::get_table_orders_for_admin($table_number, $limit);
 }
 
+/**
+ * WooFood Location Integration Helper Functions
+ */
+
+/**
+ * Get tables by WooFood location ID
+ */
+function oj_get_tables_by_woofood_location($location_id) {
+    return get_posts(array(
+        'post_type' => 'oj_table',
+        'post_status' => 'publish',
+        'meta_query' => array(
+            array(
+                'key' => '_oj_woofood_location_id',
+                'value' => $location_id,
+                'compare' => '='
+            )
+        ),
+        'numberposts' => -1
+    ));
+}
+
+/**
+ * Get WooFood location by table ID
+ */
+function oj_get_woofood_location_by_table($table_id) {
+    $location_id = get_post_meta($table_id, '_oj_woofood_location_id', true);
+    if ($location_id && class_exists('EX_WooFood')) {
+        return get_term($location_id, 'exwoofood_loc');
+    }
+    return false;
+}
+
+/**
+ * Get all available WooFood locations
+ */
+function oj_get_available_woofood_locations() {
+    if (!class_exists('EX_WooFood')) {
+        return array();
+    }
+    
+    return get_terms(array(
+        'taxonomy' => 'exwoofood_loc',
+        'hide_empty' => false
+    ));
+}
+
+/**
+ * Check if a table is assigned to a WooFood location
+ */
+function oj_table_has_woofood_location($table_id) {
+    $location_id = get_post_meta($table_id, '_oj_woofood_location_id', true);
+    return !empty($location_id);
+}
+
+/**
+ * Get WooFood location name by table number
+ */
+function oj_get_woofood_location_name_by_table($table_number) {
+    $table_id = oj_get_table_id_by_number($table_number);
+    if ($table_id) {
+        $location = oj_get_woofood_location_by_table($table_id);
+        if ($location && !is_wp_error($location)) {
+            return $location->name;
+        }
+    }
+    return '';
+}
+
+/**
+ * Filter products by WooFood location
+ */
+function oj_filter_products_by_woofood_location($products, $location_id) {
+    if (!$location_id || !class_exists('EX_WooFood')) {
+        return $products;
+    }
+    
+    $filtered_products = array();
+    
+    foreach ($products as $product) {
+        // Check if product is assigned to this location
+        $product_locations = wp_get_post_terms($product->get_id(), 'exwoofood_loc', array('fields' => 'ids'));
+        
+        if (empty($product_locations) || in_array($location_id, $product_locations)) {
+            $filtered_products[] = $product;
+        }
+    }
+    
+    return $filtered_products;
+}
+
+/**
+ * Get table count by WooFood location
+ */
+function oj_get_table_count_by_woofood_location($location_id) {
+    $tables = oj_get_tables_by_woofood_location($location_id);
+    return count($tables);
+}
+
+/**
+ * Get active orders count by WooFood location
+ */
+function oj_get_active_orders_count_by_woofood_location($location_id) {
+    $tables = oj_get_tables_by_woofood_location($location_id);
+    $total_orders = 0;
+    
+    foreach ($tables as $table) {
+        $table_number = get_post_meta($table->ID, '_oj_table_number', true);
+        if ($table_number) {
+            $orders = oj_get_current_table_order($table_number);
+            if ($orders) {
+                $total_orders += count($orders);
+            }
+        }
+    }
+    
+    return $total_orders;
+}
+
+/**
+ * Get WooFood location statistics
+ */
+function oj_get_woofood_location_stats($location_id) {
+    $tables = oj_get_tables_by_woofood_location($location_id);
+    $stats = array(
+        'total_tables' => count($tables),
+        'occupied_tables' => 0,
+        'available_tables' => 0,
+        'active_orders' => 0
+    );
+    
+    foreach ($tables as $table) {
+        $status = get_post_meta($table->ID, '_oj_table_status', true);
+        $table_number = get_post_meta($table->ID, '_oj_table_number', true);
+        
+        // Check for active orders
+        if ($table_number) {
+            $orders = oj_get_current_table_order($table_number);
+            if ($orders && count($orders) > 0) {
+                $stats['occupied_tables']++;
+                $stats['active_orders'] += count($orders);
+            } else {
+                $stats['available_tables']++;
+            }
+        } else {
+            if ($status === 'occupied') {
+                $stats['occupied_tables']++;
+            } else {
+                $stats['available_tables']++;
+            }
+        }
+    }
+    
+    return $stats;
+}
+

@@ -18,6 +18,10 @@ $current_user = wp_get_current_user();
 $today = date('Y-m-d');
 $today_formatted = date('F j, Y');
 
+// Handle location filtering
+$selected_location_id = isset($_GET['location']) ? intval($_GET['location']) : '';
+$woofood_locations = oj_get_available_woofood_locations();
+
 // Get real data from WooCommerce and tables
 global $wpdb;
 
@@ -209,9 +213,11 @@ if (count($recent_orders_posts) == 0 && function_exists('wc_get_orders')) {
 error_log('Orders Jet Manager: Found ' . count($recent_orders) . ' recent orders using frontend logic');
 
 // Get table status with active order information
-$table_status = $wpdb->get_results("
+// Build table status query with location filtering
+$table_status_query = "
     SELECT p.ID, p.post_title, pm_status.meta_value as table_status,
            pm_capacity.meta_value as table_capacity, pm_location.meta_value as table_location,
+           pm_woofood_loc.meta_value as woofood_location_id,
            (SELECT COUNT(*) FROM {$wpdb->posts} p2 
             INNER JOIN {$wpdb->postmeta} pm_table ON p2.ID = pm_table.post_id AND pm_table.meta_key = '_oj_table_number'
             WHERE p2.post_type = 'shop_order' 
@@ -221,11 +227,18 @@ $table_status = $wpdb->get_results("
     LEFT JOIN {$wpdb->postmeta} pm_status ON p.ID = pm_status.post_id AND pm_status.meta_key = '_oj_table_status'
     LEFT JOIN {$wpdb->postmeta} pm_capacity ON p.ID = pm_capacity.post_id AND pm_capacity.meta_key = '_oj_table_capacity'
     LEFT JOIN {$wpdb->postmeta} pm_location ON p.ID = pm_location.post_id AND pm_location.meta_key = '_oj_table_location'
+    LEFT JOIN {$wpdb->postmeta} pm_woofood_loc ON p.ID = pm_woofood_loc.post_id AND pm_woofood_loc.meta_key = '_oj_woofood_location_id'
     WHERE p.post_type = 'oj_table'
-    AND p.post_status = 'publish'
-    ORDER BY p.post_title ASC
-    LIMIT 10
-", ARRAY_A);
+    AND p.post_status = 'publish'";
+
+// Add location filter if selected
+if ($selected_location_id) {
+    $table_status_query .= $wpdb->prepare(" AND pm_woofood_loc.meta_value = %d", $selected_location_id);
+}
+
+$table_status_query .= " ORDER BY p.post_title ASC LIMIT 20";
+
+$table_status = $wpdb->get_results($table_status_query, ARRAY_A);
 ?>
 
 <div class="wrap">
@@ -237,6 +250,25 @@ $table_status = $wpdb->get_results("
         <span class="dashicons dashicons-update" style="vertical-align: middle; margin-right: 5px;"></span>
         <?php _e('Refresh', 'orders-jet'); ?>
     </button>
+    
+    <?php if ($woofood_locations && !is_wp_error($woofood_locations) && count($woofood_locations) > 0): ?>
+    <div class="oj-location-filter" style="float: right; margin-top: 5px;">
+        <form method="get" style="display: inline-block;">
+            <input type="hidden" name="page" value="orders-jet-manager">
+            <label for="location-filter" style="margin-right: 5px;"><?php _e('Filter by Location:', 'orders-jet'); ?></label>
+            <select name="location" id="location-filter" onchange="this.form.submit()" style="margin-right: 10px;">
+                <option value=""><?php _e('All Locations', 'orders-jet'); ?></option>
+                <?php foreach ($woofood_locations as $location): ?>
+                    <option value="<?php echo esc_attr($location->term_id); ?>" <?php selected($selected_location_id, $location->term_id); ?>>
+                        <?php echo esc_html($location->name); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </form>
+    </div>
+    <div style="clear: both;"></div>
+    <?php endif; ?>
+    
     <p class="description"><?php echo sprintf(__('Welcome back, %s!', 'orders-jet'), $current_user->display_name); ?></p>
     
     <hr class="wp-header-end">
@@ -469,6 +501,15 @@ $table_status = $wpdb->get_results("
                         <?php if ($table['table_location']) : ?>
                             <div class="oj-table-info"><?php echo esc_html($table['table_location']); ?></div>
                         <?php endif; ?>
+                        
+                        <?php if ($table['woofood_location_id'] && class_exists('EX_WooFood')) : 
+                            $woofood_loc = get_term($table['woofood_location_id'], 'exwoofood_loc');
+                            if ($woofood_loc && !is_wp_error($woofood_loc)) :
+                        ?>
+                            <div class="oj-table-info" style="color: #0073aa; font-weight: 500;">
+                                📍 <?php echo esc_html($woofood_loc->name); ?>
+                            </div>
+                        <?php endif; endif; ?>
                         
                         <div class="oj-table-status">
                             <span class="oj-status-indicator"></span>

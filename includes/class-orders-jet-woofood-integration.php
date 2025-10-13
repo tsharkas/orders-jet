@@ -78,6 +78,10 @@ class Orders_Jet_WooFood_Integration {
         
         // Admin integration
         add_action('oj_admin_dashboard_data', array($this, 'add_woofood_dashboard_data'));
+        
+        // WooFood location admin integration
+        add_action('exwoofood_loc_edit_form', array($this, 'add_table_management_to_woofood_location'));
+        add_action('exwoofood_loc_add_form_fields', array($this, 'add_table_management_to_woofood_location_new'));
     }
     
     /**
@@ -512,6 +516,147 @@ class Orders_Jet_WooFood_Integration {
     public function handle_order_ready_notification($order_id) {
         error_log("Orders Jet: WooFood order ready notification - Order ID: {$order_id}");
         // Additional processing if needed
+    }
+    
+    /**
+     * Add table management to WooFood location edit form
+     */
+    public function add_table_management_to_woofood_location($term) {
+        $location_id = $term->term_id;
+        $tables = oj_get_tables_by_woofood_location($location_id);
+        $stats = oj_get_woofood_location_stats($location_id);
+        
+        echo '<tr class="form-field">';
+        echo '<th scope="row"><label>' . __('Orders Jet Tables', 'orders-jet') . '</label></th>';
+        echo '<td>';
+        echo '<div class="oj-location-tables-management">';
+        
+        // Location statistics
+        echo '<div class="oj-location-stats" style="background: #f0f9ff; border: 1px solid #0073aa; border-radius: 4px; padding: 15px; margin-bottom: 20px;">';
+        echo '<h4 style="margin-top: 0;">' . sprintf(__('Location Statistics for %s', 'orders-jet'), esc_html($term->name)) . '</h4>';
+        echo '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px;">';
+        echo '<div><strong>' . __('Total Tables:', 'orders-jet') . '</strong><br>' . $stats['total_tables'] . '</div>';
+        echo '<div><strong>' . __('Available:', 'orders-jet') . '</strong><br>' . $stats['available_tables'] . '</div>';
+        echo '<div><strong>' . __('Occupied:', 'orders-jet') . '</strong><br>' . $stats['occupied_tables'] . '</div>';
+        echo '<div><strong>' . __('Active Orders:', 'orders-jet') . '</strong><br>' . $stats['active_orders'] . '</div>';
+        echo '</div>';
+        echo '</div>';
+        
+        // Tables list
+        echo '<h4>' . __('Tables at this Location', 'orders-jet') . '</h4>';
+        
+        if ($tables) {
+            echo '<table class="wp-list-table widefat fixed striped" style="margin-bottom: 15px;">';
+            echo '<thead>';
+            echo '<tr>';
+            echo '<th style="width: 15%;">' . __('Table #', 'orders-jet') . '</th>';
+            echo '<th style="width: 15%;">' . __('Capacity', 'orders-jet') . '</th>';
+            echo '<th style="width: 15%;">' . __('Status', 'orders-jet') . '</th>';
+            echo '<th style="width: 25%;">' . __('QR Code', 'orders-jet') . '</th>';
+            echo '<th style="width: 30%;">' . __('Actions', 'orders-jet') . '</th>';
+            echo '</tr>';
+            echo '</thead>';
+            echo '<tbody>';
+            
+            foreach ($tables as $table) {
+                $table_number = get_post_meta($table->ID, '_oj_table_number', true);
+                $capacity = get_post_meta($table->ID, '_oj_table_capacity', true);
+                $status = get_post_meta($table->ID, '_oj_table_status', true);
+                
+                // Check for active orders
+                $active_orders = oj_get_current_table_order($table_number);
+                $display_status = ($active_orders && count($active_orders) > 0) ? 'occupied' : $status;
+                
+                echo '<tr>';
+                echo '<td><strong>' . esc_html($table_number) . '</strong></td>';
+                echo '<td>' . esc_html($capacity) . ' ' . __('people', 'orders-jet') . '</td>';
+                echo '<td>';
+                
+                $status_colors = array(
+                    'available' => '#00a32a',
+                    'occupied' => '#d63638',
+                    'reserved' => '#dba617',
+                    'maintenance' => '#666'
+                );
+                $status_labels = array(
+                    'available' => __('Available', 'orders-jet'),
+                    'occupied' => __('Occupied', 'orders-jet'),
+                    'reserved' => __('Reserved', 'orders-jet'),
+                    'maintenance' => __('Maintenance', 'orders-jet')
+                );
+                
+                $color = isset($status_colors[$display_status]) ? $status_colors[$display_status] : '#666';
+                $label = isset($status_labels[$display_status]) ? $status_labels[$display_status] : $display_status;
+                
+                echo '<span style="display: inline-block; padding: 3px 8px; border-radius: 3px; color: white; background: ' . $color . '; font-size: 11px;">';
+                echo esc_html($label);
+                echo '</span>';
+                
+                if ($active_orders && count($active_orders) > 0) {
+                    echo '<br><small>' . sprintf(__('%d active orders', 'orders-jet'), count($active_orders)) . '</small>';
+                }
+                
+                echo '</td>';
+                echo '<td>';
+                
+                $qr_url = home_url('/table-menu/?table=' . urlencode($table_number));
+                echo '<a href="' . esc_url($qr_url) . '" target="_blank" style="font-size: 11px;">';
+                echo esc_html($table_number) . ' QR Menu';
+                echo '</a>';
+                
+                echo '</td>';
+                echo '<td>';
+                
+                echo '<a href="' . get_edit_post_link($table->ID) . '" class="button button-small">' . __('Edit', 'orders-jet') . '</a> ';
+                echo '<a href="' . esc_url($qr_url) . '" target="_blank" class="button button-small">' . __('View Menu', 'orders-jet') . '</a>';
+                
+                if ($active_orders && count($active_orders) > 0) {
+                    echo ' <a href="' . admin_url('admin.php?page=orders-jet-manager&table=' . urlencode($table_number)) . '" class="button button-small button-primary">';
+                    echo __('View Orders', 'orders-jet') . '</a>';
+                }
+                
+                echo '</td>';
+                echo '</tr>';
+            }
+            
+            echo '</tbody>';
+            echo '</table>';
+        } else {
+            echo '<div class="notice notice-info inline">';
+            echo '<p>' . __('No tables assigned to this location yet.', 'orders-jet') . '</p>';
+            echo '</div>';
+        }
+        
+        // Quick actions
+        echo '<div class="oj-location-actions" style="border-top: 1px solid #ddd; padding-top: 15px;">';
+        echo '<h4>' . __('Quick Actions', 'orders-jet') . '</h4>';
+        echo '<p>';
+        echo '<a href="' . admin_url('post-new.php?post_type=oj_table&woofood_location=' . $location_id) . '" class="button button-primary">';
+        echo __('Add New Table', 'orders-jet') . '</a> ';
+        echo '<a href="' . admin_url('edit.php?post_type=oj_table&woofood_location=' . $location_id) . '" class="button">';
+        echo __('Manage All Tables', 'orders-jet') . '</a> ';
+        echo '<a href="' . admin_url('admin.php?page=orders-jet-manager&location=' . $location_id) . '" class="button">';
+        echo __('View Location Dashboard', 'orders-jet') . '</a>';
+        echo '</p>';
+        echo '</div>';
+        
+        echo '</div>';
+        echo '</td>';
+        echo '</tr>';
+    }
+    
+    /**
+     * Add table management to WooFood location add form
+     */
+    public function add_table_management_to_woofood_location_new($taxonomy) {
+        echo '<div class="form-field">';
+        echo '<label>' . __('Orders Jet Integration', 'orders-jet') . '</label>';
+        echo '<div style="background: #f0f9ff; border: 1px solid #0073aa; border-radius: 4px; padding: 15px;">';
+        echo '<p><strong>' . __('Table Management Integration', 'orders-jet') . '</strong></p>';
+        echo '<p>' . __('After creating this location, you can assign tables to it from the Orders Jet table management system.', 'orders-jet') . '</p>';
+        echo '<p>' . __('Tables assigned to this location will automatically filter the menu to show only products available at this location.', 'orders-jet') . '</p>';
+        echo '</div>';
+        echo '</div>';
     }
 }
 

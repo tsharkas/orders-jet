@@ -19,6 +19,13 @@ $table_capacity = get_post_meta($table_id, '_oj_table_capacity', true);
 $table_location = get_post_meta($table_id, '_oj_table_location', true);
 $table_status = get_post_meta($table_id, '_oj_table_status', true);
 
+// Get WooFood location integration
+$woofood_location_id = get_post_meta($table_id, '_oj_woofood_location_id', true);
+$woofood_location = null;
+if ($woofood_location_id && class_exists('EX_WooFood')) {
+    $woofood_location = get_term($woofood_location_id, 'exwoofood_loc');
+}
+
 // Get menu categories
 $categories = get_terms(array(
     'taxonomy' => 'product_cat',
@@ -27,13 +34,26 @@ $categories = get_terms(array(
     'order' => 'ASC'
 ));
 
-// Get products
-$products = wc_get_products(array(
+// Get products - filter by WooFood location if assigned
+$product_args = array(
     'limit' => -1,
     'status' => 'publish',
     'orderby' => 'menu_order',
     'order' => 'ASC'
-));
+);
+
+// Add WooFood location filter if table is assigned to a location
+if ($woofood_location_id) {
+    $product_args['tax_query'] = array(
+        array(
+            'taxonomy' => 'exwoofood_loc',
+            'field'    => 'term_id',
+            'terms'    => $woofood_location_id,
+        )
+    );
+}
+
+$products = wc_get_products($product_args);
 ?>
 
 <!DOCTYPE html>
@@ -1546,6 +1566,19 @@ $products = wc_get_products(array(
         <div class="header">
             <h1><?php echo sprintf(__('Table %s', 'orders-jet'), $table_number); ?></h1>
             <p><?php echo sprintf(__('Capacity: %d people', 'orders-jet'), $table_capacity); ?></p>
+            <?php if ($woofood_location && !is_wp_error($woofood_location)): ?>
+            <div class="location-info" style="background: #f0f9ff; border: 1px solid #0073aa; border-radius: 8px; padding: 10px; margin-top: 10px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 18px;">📍</span>
+                    <div>
+                        <strong style="color: #0073aa;"><?php echo esc_html($woofood_location->name); ?></strong>
+                        <?php if ($woofood_location->description): ?>
+                        <br><small style="color: #666;"><?php echo esc_html($woofood_location->description); ?></small>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
         </div>
         
         <!-- Tabs -->
