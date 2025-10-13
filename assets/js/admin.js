@@ -11,8 +11,9 @@ jQuery(document).ready(function($) {
     console.log('Orders Jet Admin: oj_admin object:', typeof oj_admin !== 'undefined' ? oj_admin : 'NOT FOUND');
     console.log('Orders Jet Admin: OrdersJetAdmin object:', typeof OrdersJetAdmin !== 'undefined' ? OrdersJetAdmin : 'NOT FOUND');
     
-    // Use the available admin object (prioritize oj_admin for compatibility)
-    var adminConfig = typeof oj_admin !== 'undefined' ? oj_admin : (typeof OrdersJetAdmin !== 'undefined' ? OrdersJetAdmin : null);
+    // Use OrdersJetAdmin on dashboard pages, fallback to oj_admin on table management pages
+    var adminConfig = typeof OrdersJetAdmin !== 'undefined' ? OrdersJetAdmin : 
+                      (typeof oj_admin !== 'undefined' ? oj_admin : null);
     console.log('Orders Jet Admin: Using config:', adminConfig);
     
     // Auto-refresh dashboards every 30 seconds

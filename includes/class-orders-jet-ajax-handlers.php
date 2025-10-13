@@ -1330,7 +1330,7 @@ class Orders_Jet_AJAX_Handlers {
      */
     public function mark_order_ready() {
         // Check nonce for security
-        check_ajax_referer('oj_table_nonce', 'nonce');
+        check_ajax_referer('oj_dashboard_nonce', 'nonce');
         
         // Check user permissions
         if (!current_user_can('access_oj_kitchen_dashboard') && !current_user_can('manage_options')) {
@@ -1426,7 +1426,7 @@ class Orders_Jet_AJAX_Handlers {
      */
     public function mark_order_delivered() {
         // Check nonce for security
-        check_ajax_referer('oj_table_nonce', 'nonce');
+        check_ajax_referer('oj_dashboard_nonce', 'nonce');
         
         // Check user permissions
         if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_options')) {

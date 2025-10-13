@@ -97,7 +97,7 @@ class Orders_Jet_Admin_Dashboard {
         wp_localize_script('orders-jet-admin', 'OrdersJetAdmin', array(
             'ajaxUrl' => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('oj_dashboard_nonce'),
-            'userRole' => oj_get_user_role(),
+            'userRole' => oj_get_user_role() ?: (current_user_can('manage_options') ? 'oj_manager' : ''),
             'userId' => get_current_user_id(),
             'userName' => wp_get_current_user()->display_name,
             'isRTL' => is_rtl(), // Add RTL detection for JavaScript
