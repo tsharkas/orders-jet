@@ -32,62 +32,60 @@ if (isset($_POST['oj_mark_ready']) && isset($_POST['order_id']) && isset($_POST[
             
             if ($order) {
                 $table_number = $order->get_meta('_oj_table_number');
-                error_log('Orders Jet Kitchen: Table number: ' . $table_number);
+                error_log('Orders Jet Kitchen: Table number: ' . ($table_number ?: 'None (pickup order)'));
                 
-                if ($table_number) {
-                    $current_status = $order->get_status();
-                    error_log('Orders Jet Kitchen: Current order status: ' . $current_status);
+                // Allow both table orders AND pickup orders (no table number required)
+                $current_status = $order->get_status();
+                error_log('Orders Jet Kitchen: Current order status: ' . $current_status);
+                
+                if (in_array($current_status, array('pending', 'processing'))) {
+                    error_log('Orders Jet Kitchen: Status is valid for marking ready, attempting to change status...');
                     
-                    if (in_array($current_status, array('pending', 'processing'))) {
-                        error_log('Orders Jet Kitchen: Status is valid for marking ready, attempting to change status...');
+                    try {
+                        // Get current status before change
+                        $old_status = $order->get_status();
                         
-                        try {
-                            // Get current status before change
-                            $old_status = $order->get_status();
+                        // Mark order as ready (on-hold status means ready for pickup)
+                        $order->set_status('on-hold');
+                        
+                        // Add order note
+                        $order_type = !empty($table_number) ? 'table order' : 'pickup order';
+                        $order->add_order_note(sprintf(
+                            __('Order marked as ready by kitchen staff (%s) - %s', 'orders-jet'), 
+                            wp_get_current_user()->display_name,
+                            $order_type
+                        ));
+                        
+                        // Save the order
+                        $save_result = $order->save();
+                        
+                        // Verify the status change
+                        $new_status = $order->get_status();
+                        
+                        error_log('Orders Jet Kitchen: Status change attempt - Old: ' . $old_status . ', New: ' . $new_status . ', Save result: ' . $save_result);
+                        
+                        if ($new_status === 'on-hold') {
+                            error_log('Orders Jet Kitchen: SUCCESS - Order #' . $order_id . ' status changed to on-hold by user #' . get_current_user_id());
                             
-                            // Mark order as ready (on-hold status means ready for pickup)
-                            $order->set_status('on-hold');
+                            // Store success message
+                            $success_message = sprintf(__('Order #%d marked as ready! (Status: %s → %s)', 'orders-jet'), $order_id, $old_status, $new_status);
                             
-                            // Add order note
-                            $order->add_order_note(sprintf(
-                                __('Order marked as ready by kitchen staff (%s)', 'orders-jet'), 
-                                wp_get_current_user()->display_name
-                            ));
-                            
-                            // Save the order
-                            $save_result = $order->save();
-                            
-                            // Verify the status change
-                            $new_status = $order->get_status();
-                            
-                            error_log('Orders Jet Kitchen: Status change attempt - Old: ' . $old_status . ', New: ' . $new_status . ', Save result: ' . $save_result);
-                            
-                            if ($new_status === 'on-hold') {
-                                error_log('Orders Jet Kitchen: SUCCESS - Order #' . $order_id . ' status changed to on-hold by user #' . get_current_user_id());
-                                
-                                // Store success message
-                                $success_message = sprintf(__('Order #%d marked as ready for pickup! (Status: %s → %s)', 'orders-jet'), $order_id, $old_status, $new_status);
-                                
-                                // Redirect to avoid resubmission
-                                wp_redirect(add_query_arg('success', urlencode($success_message), $_SERVER['REQUEST_URI']));
-                                exit;
-                            } else {
-                                error_log('Orders Jet Kitchen: ERROR - Status did not change as expected. Expected: on-hold, Actual: ' . $new_status);
-                                $error_message = sprintf(__('Status change failed. Expected: on-hold, Got: %s', 'orders-jet'), $new_status);
-                            }
-                            
-                        } catch (Exception $e) {
-                            error_log('Orders Jet Kitchen: EXCEPTION during status change: ' . $e->getMessage());
-                            error_log('Orders Jet Kitchen: Exception trace: ' . $e->getTraceAsString());
-                            $error_message = __('Failed to mark order as ready. Error: ', 'orders-jet') . $e->getMessage();
+                            // Redirect to avoid resubmission
+                            wp_redirect(add_query_arg('success', urlencode($success_message), $_SERVER['REQUEST_URI']));
+                            exit;
+                        } else {
+                            error_log('Orders Jet Kitchen: ERROR - Status did not change as expected. Expected: on-hold, Actual: ' . $new_status);
+                            $error_message = sprintf(__('Status change failed. Expected: on-hold, Got: %s', 'orders-jet'), $new_status);
                         }
-                    } else {
-                        error_log('Orders Jet Kitchen: Invalid status for marking ready: ' . $current_status);
-                        $error_message = sprintf(__('Order cannot be marked ready from status: %s (must be pending or processing)', 'orders-jet'), $current_status);
+                        
+                    } catch (Exception $e) {
+                        error_log('Orders Jet Kitchen: EXCEPTION during status change: ' . $e->getMessage());
+                        error_log('Orders Jet Kitchen: Exception trace: ' . $e->getTraceAsString());
+                        $error_message = __('Failed to mark order as ready. Error: ', 'orders-jet') . $e->getMessage();
                     }
                 } else {
-                    error_log('Orders Jet Kitchen: Order has no table number');
-                    $error_message = __('Order is not a table order (no table number found).', 'orders-jet');
+                    error_log('Orders Jet Kitchen: Invalid status for marking ready: ' . $current_status);
+                    $error_message = sprintf(__('Order cannot be marked ready from status: %s (must be pending or processing)', 'orders-jet'), $current_status);
                 }
             } else {
                 error_log('Orders Jet Kitchen: Order not found for ID: ' . $order_id);
