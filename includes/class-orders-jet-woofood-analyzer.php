@@ -27,14 +27,37 @@ class Orders_Jet_WooFood_Analyzer {
      * Add analyzer menu to admin
      */
     public function add_analyzer_menu() {
-        add_submenu_page(
-            'orders-jet-manager',
-            __('WooFood Analyzer', 'orders-jet'),
-            __('WooFood Analyzer', 'orders-jet'),
-            'manage_options',
-            'orders-jet-woofood-analyzer',
-            array($this, 'render_analyzer_page')
-        );
+        // Check if we're in a MultiSite environment and adjust capabilities
+        $capability = 'manage_options';
+        if (is_multisite()) {
+            // For MultiSite, allow both network admins and site admins
+            if (current_user_can('manage_network') || current_user_can('manage_options')) {
+                $capability = current_user_can('manage_network') ? 'manage_network' : 'manage_options';
+            }
+        }
+        
+        // Try to add as submenu first
+        if (menu_page_url('orders-jet-manager', false)) {
+            add_submenu_page(
+                'orders-jet-manager',
+                __('WooFood Analyzer', 'orders-jet'),
+                __('WooFood Analyzer', 'orders-jet'),
+                $capability,
+                'orders-jet-woofood-analyzer',
+                array($this, 'render_analyzer_page')
+            );
+        } else {
+            // If parent menu doesn't exist, create as top-level menu
+            add_menu_page(
+                __('WooFood Analyzer', 'orders-jet'),
+                __('WooFood Analyzer', 'orders-jet'),
+                $capability,
+                'orders-jet-woofood-analyzer',
+                array($this, 'render_analyzer_page'),
+                'dashicons-search',
+                30
+            );
+        }
     }
     
     /**
@@ -203,8 +226,15 @@ class Orders_Jet_WooFood_Analyzer {
             wp_die('Security check failed');
         }
         
-        // Check permissions
-        if (!current_user_can('manage_options')) {
+        // Check permissions - MultiSite compatible
+        $has_permission = false;
+        if (is_multisite()) {
+            $has_permission = current_user_can('manage_network') || current_user_can('manage_options');
+        } else {
+            $has_permission = current_user_can('manage_options');
+        }
+        
+        if (!$has_permission) {
             wp_die('Insufficient permissions');
         }
         
