@@ -157,7 +157,12 @@ foreach ($active_orders as $order) {
                 if ($meta_key === '_oj_item_addons') {
                     $addons = explode(', ', $meta_value);
                     $item_data['addons'] = array_map(function($addon) {
-                        return strip_tags($addon);
+                        // Remove price information from add-ons for kitchen display
+                        // Convert "Combo Plus (+90,00 EGP)" to "Combo Plus"
+                        $addon_clean = strip_tags($addon);
+                        // Remove price in parentheses (e.g., "(+90,00 EGP)" or "(+0,00 EGP)")
+                        $addon_clean = preg_replace('/\s*\(\+[^)]+\)/', '', $addon_clean);
+                        return trim($addon_clean);
                     }, $addons);
                 }
                 
