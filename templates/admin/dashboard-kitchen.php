@@ -304,27 +304,51 @@ foreach ($active_orders as $order) {
     }
 }
 
-// Get completed orders (wc-on-hold) using the same method as active orders
-$completed_orders_posts = get_posts(array(
-    'post_type' => 'shop_order',
-    'post_status' => array('wc-on-hold'), // Ready orders
-    'meta_query' => array(
-        array(
-            'key' => '_oj_table_number',
-            'compare' => 'EXISTS'
-        )
-    ),
-    'posts_per_page' => -1,
-    'orderby' => 'date',
-    'order' => 'ASC'
-));
-
-$completed_orders = count($completed_orders_posts);
+// Get completed orders (wc-on-hold) using WooCommerce method for consistency
+if (function_exists('wc_get_orders')) {
+    $completed_wc_orders = wc_get_orders(array(
+        'status' => array('on-hold'), // Ready orders
+        'meta_key' => '_oj_table_number',
+        'limit' => -1,
+        'orderby' => 'date',
+        'order' => 'ASC'
+    ));
+    $completed_orders = count($completed_wc_orders);
+} else {
+    // Fallback to get_posts
+    $completed_orders_posts = get_posts(array(
+        'post_type' => 'shop_order',
+        'post_status' => array('wc-on-hold'), // Ready orders
+        'meta_query' => array(
+            array(
+                'key' => '_oj_table_number',
+                'compare' => 'EXISTS'
+            )
+        ),
+        'posts_per_page' => -1,
+        'orderby' => 'date',
+        'order' => 'ASC'
+    ));
+    $completed_orders = count($completed_orders_posts);
+}
 
 // Debug logging
 error_log('Orders Jet Kitchen Stats: In Progress Orders = ' . $in_progress_orders);
 error_log('Orders Jet Kitchen Stats: Completed Orders = ' . $completed_orders);
 error_log('Orders Jet Kitchen Stats: Active Orders Count = ' . count($active_orders));
+
+// Additional debug for completed orders
+if (function_exists('wc_get_orders')) {
+    error_log('Orders Jet Kitchen Stats: Using wc_get_orders for completed orders');
+    if (isset($completed_wc_orders)) {
+        error_log('Orders Jet Kitchen Stats: Found ' . count($completed_wc_orders) . ' on-hold orders');
+        foreach ($completed_wc_orders as $completed_order) {
+            error_log('Orders Jet Kitchen Stats: On-hold Order #' . $completed_order->get_id() . ' - Status: ' . $completed_order->get_status() . ' - Table: ' . $completed_order->get_meta('_oj_table_number'));
+        }
+    }
+} else {
+    error_log('Orders Jet Kitchen Stats: Using get_posts fallback for completed orders');
+}
 
 // Format currency
 $currency_symbol = get_woocommerce_currency_symbol();
