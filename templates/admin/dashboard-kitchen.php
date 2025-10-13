@@ -840,18 +840,8 @@ $currency_symbol = get_woocommerce_currency_symbol();
 jQuery(document).ready(function($) {
     'use strict';
     
-    // Add loading state to Mark Ready form buttons (without preventing form submission)
-    $('button[name="oj_mark_ready"]').on('click', function(e) {
-        var $button = $(this);
-        var originalText = $button.html();
-        
-        // Show loading state immediately (form will submit naturally)
-        $button.prop('disabled', true);
-        $button.html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite; font-size: 16px; vertical-align: middle; margin-right: 4px;"></span><?php _e("Processing...", "orders-jet"); ?>');
-        
-        // Don't prevent form submission - let it happen naturally
-        // The page will refresh, so no need to restore button state
-    });
+    // DISABLED: Loading state JavaScript interferes with form submission
+    // The form works perfectly without JavaScript - keeping it simple and reliable
     
     // Auto-dismiss success/error notices after 5 seconds
     setTimeout(function() {
