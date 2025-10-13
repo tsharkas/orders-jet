@@ -640,9 +640,7 @@ $products = wc_get_products(array(
         }
         
         .variation-option .variation-price {
-            color: #c41e3a;
-            font-weight: 600;
-            font-size: 14px;
+            display: none; /* Hide individual variation prices for native WooCommerce behavior */
         }
         
         .variation-option input[type="radio"] {
@@ -821,8 +819,22 @@ $products = wc_get_products(array(
             color: white;
         }
         
-        .popup-btn-primary:hover {
+        .popup-btn-primary:hover:not(:disabled) {
             background: #a0172f;
+        }
+        
+        .popup-btn-primary:disabled,
+        .popup-btn-primary.disabled {
+            background: #ccc !important;
+            color: #666 !important;
+            cursor: not-allowed !important;
+            opacity: 0.7;
+        }
+        
+        .popup-btn-primary:disabled:hover,
+        .popup-btn-primary.disabled:hover {
+            background: #ccc !important;
+            transform: none !important;
         }
         
         /* Floating Cart */
@@ -2030,6 +2042,11 @@ $products = wc_get_products(array(
         
         // Display product details - Clean implementation
         function displayProductDetails(data) {
+            // Handle price information for variable products
+            if (data.price_info) {
+                handleProductPricing(data.price_info);
+            }
+            
             // Display variations first (most important)
             if (data.variations && Object.keys(data.variations).length > 0) {
                 displayVariations(data.variations);
@@ -2043,6 +2060,29 @@ $products = wc_get_products(array(
             // Display food information (if any)
             if (data.food_info && Object.keys(data.food_info).length > 0) {
                 displayFoodInfo(data.food_info);
+            }
+        }
+        
+        // Handle product pricing based on type
+        function handleProductPricing(priceInfo) {
+            if (priceInfo.is_variable) {
+                // For variable products, show price range and disable add to cart
+                elements.popupPrice.innerHTML = priceInfo.price_range;
+                elements.popupAddToCart.disabled = true;
+                elements.popupAddToCart.textContent = '<?php _e('Select Options', 'orders-jet'); ?>';
+                elements.popupAddToCart.classList.add('disabled');
+                
+                // Store price info for later use
+                currentProduct.priceInfo = priceInfo;
+                currentProduct.isVariable = true;
+            } else {
+                // For simple products, show normal price and enable add to cart
+                elements.popupPrice.innerHTML = priceInfo.price_range;
+                elements.popupAddToCart.disabled = false;
+                elements.popupAddToCart.textContent = '<?php _e('Add to Cart', 'orders-jet'); ?>';
+                elements.popupAddToCart.classList.remove('disabled');
+                
+                currentProduct.isVariable = false;
             }
         }
         
@@ -2062,13 +2102,14 @@ $products = wc_get_products(array(
                             ${options.map(option => `
                                 <div class="addon-option-item">
                                     <div class="addon-option-content">
-                                        <input type="radio" class="ex-options" name="variation-${attributeName}" 
+                                        <input type="radio" class="ex-options variation-option" name="variation-${attributeName}" 
                                                id="variation-${option.value}" value="${option.value}" 
                                                data-price="${option.price || 0}" 
-                                               data-variation-id="${option.variation_id || 0}">
+                                               data-variation-id="${option.variation_id || 0}"
+                                               onchange="updateVariationPrice()">
                                         <label class="addon-option-label" for="variation-${option.value}">
                                             <span class="exwo-op-name">${option.label}</span>
-                                            ${option.price_display ? `<span class="variation-price">${option.price_display}</span>` : ''}
+                                            <!-- Price removed for native WooCommerce behavior -->
                                         </label>
                                     </div>
                                 </div>
@@ -2520,6 +2561,40 @@ $products = wc_get_products(array(
             showAppNotification(`Added to cart: ${cartItem.display_name} (Qty: ${quantity})`, 'success');
         }
         
+        // Update price when variation is selected (Native WooCommerce behavior)
+        function updateVariationPrice() {
+            if (!currentProduct || !currentProduct.isVariable) return;
+            
+            const selectedVariation = document.querySelector('input[name^="variation-"]:checked');
+            
+            if (selectedVariation) {
+                const variationPrice = parseFloat(selectedVariation.dataset.price) || 0;
+                const formattedPrice = formatPrice(variationPrice);
+                
+                // Update price display
+                elements.popupPrice.innerHTML = formattedPrice;
+                
+                // Enable add to cart button
+                elements.popupAddToCart.disabled = false;
+                elements.popupAddToCart.textContent = '<?php _e('Add to Cart', 'orders-jet'); ?>';
+                elements.popupAddToCart.classList.remove('disabled');
+            } else {
+                // No variation selected, show price range and disable button
+                if (currentProduct.priceInfo) {
+                    elements.popupPrice.innerHTML = currentProduct.priceInfo.price_range;
+                }
+                elements.popupAddToCart.disabled = true;
+                elements.popupAddToCart.textContent = '<?php _e('Select Options', 'orders-jet'); ?>';
+                elements.popupAddToCart.classList.add('disabled');
+            }
+        }
+        
+        // Format price helper function
+        function formatPrice(price) {
+            const currencySymbol = '<?php echo get_woocommerce_currency_symbol(); ?>';
+            return price.toFixed(2) + ' ' + currencySymbol;
+        }
+        
         // Validate required variations
         function validateRequiredVariations() {
             const variationInputs = document.querySelectorAll('input[name^="variation-"]');
@@ -2529,7 +2604,7 @@ $products = wc_get_products(array(
             
             const selectedVariation = document.querySelector('input[name^="variation-"]:checked');
             if (!selectedVariation) {
-                showAppNotification('Please select a variation', 'error');
+                showAppNotification('<?php _e('Please select a variation', 'orders-jet'); ?>', 'error');
                 return false;
             }
             

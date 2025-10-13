@@ -472,6 +472,30 @@ class Orders_Jet_AJAX_Handlers {
                 wp_send_json_error(array('message' => __('Product not found', 'orders-jet')));
             }
         
+        // For variable products, calculate price range
+        $price_info = array();
+        if ($product->is_type('variable')) {
+            $prices = $product->get_variation_prices();
+            $min_price = min($prices['price']);
+            $max_price = max($prices['price']);
+            
+            if ($min_price === $max_price) {
+                $price_info['price_range'] = wc_price($min_price);
+                $price_info['price_range_text'] = wc_price($min_price);
+            } else {
+                $price_info['price_range'] = wc_price($min_price) . ' - ' . wc_price($max_price);
+                $price_info['price_range_text'] = wc_price($min_price) . ' - ' . wc_price($max_price);
+            }
+            $price_info['is_variable'] = true;
+            $price_info['min_price'] = $min_price;
+            $price_info['max_price'] = $max_price;
+        } else {
+            $price_info['price_range'] = $product->get_price_html();
+            $price_info['price_range_text'] = $product->get_price_html();
+            $price_info['is_variable'] = false;
+            $price_info['price'] = $product->get_price();
+        }
+        
         // Debug: Get ALL meta fields for this product to see what's available
         $all_meta = get_post_meta($product_id);
         $debug_info = array();
@@ -785,6 +809,9 @@ class Orders_Jet_AJAX_Handlers {
         $response_data['debug']['active_food_plugins'] = $food_plugins;
         $response_data['debug']['product_type'] = $product->get_type();
         $response_data['debug']['product_attributes'] = $product->get_attributes();
+        
+        // Add price information to response
+        $response_data['price_info'] = $price_info;
         
         wp_send_json_success($response_data);
         
