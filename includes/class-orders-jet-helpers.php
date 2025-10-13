@@ -348,3 +348,153 @@ function oj_get_woofood_location_stats($location_id) {
     return $stats;
 }
 
+/**
+ * Order Type Detection Functions
+ */
+
+/**
+ * Get order type from WooCommerce order
+ */
+function oj_get_order_type($order) {
+    if (!$order || !is_a($order, 'WC_Order')) {
+        return 'unknown';
+    }
+    
+    // Check Orders Jet order method first (most reliable)
+    $oj_method = $order->get_meta('_oj_order_method');
+    if ($oj_method) {
+        return sanitize_text_field($oj_method);
+    }
+    
+    // Check WooFood order method
+    $woofood_method = $order->get_meta('exwf_order_method');
+    if ($woofood_method) {
+        return sanitize_text_field($woofood_method);
+    }
+    
+    // Check for WooFood delivery/pickup meta
+    $woofood_delivery = $order->get_meta('exwf_delivery_date');
+    $woofood_pickup = $order->get_meta('exwf_pickup_date');
+    
+    if ($woofood_delivery) {
+        return 'delivery';
+    }
+    
+    if ($woofood_pickup) {
+        return 'takeaway';
+    }
+    
+    // Check shipping method as fallback
+    $shipping_methods = $order->get_shipping_methods();
+    if (!empty($shipping_methods)) {
+        $shipping_method = reset($shipping_methods);
+        $method_id = $shipping_method->get_method_id();
+        $method_title = strtolower($shipping_method->get_method_title());
+        
+        if (strpos($method_id, 'delivery') !== false || strpos($method_title, 'delivery') !== false) {
+            return 'delivery';
+        }
+        
+        if (strpos($method_id, 'pickup') !== false || strpos($method_title, 'pickup') !== false || 
+            strpos($method_title, 'takeaway') !== false || strpos($method_title, 'take away') !== false) {
+            return 'takeaway';
+        }
+    }
+    
+    // Check if it's a table order (Orders Jet dine-in)
+    $table_number = $order->get_meta('_oj_table_number');
+    if ($table_number) {
+        return 'dinein';
+    }
+    
+    // Check billing details for clues
+    $billing_first_name = $order->get_billing_first_name();
+    if (strpos($billing_first_name, 'Table') === 0) {
+        return 'dinein';
+    }
+    
+    // Default fallback - check if there's any shipping
+    if ($order->needs_shipping()) {
+        return 'delivery';
+    }
+    
+    return 'unknown';
+}
+
+/**
+ * Get order type display label
+ */
+function oj_get_order_type_label($type) {
+    $labels = array(
+        'dinein' => __('Dine In', 'orders-jet'),
+        'delivery' => __('Delivery', 'orders-jet'),
+        'takeaway' => __('Takeaway', 'orders-jet'),
+        'pickup' => __('Pickup', 'orders-jet'),
+        'unknown' => __('Standard', 'orders-jet')
+    );
+    
+    return isset($labels[$type]) ? $labels[$type] : $labels['unknown'];
+}
+
+/**
+ * Get order type icon
+ */
+function oj_get_order_type_icon($type) {
+    $icons = array(
+        'dinein' => '🍽️',
+        'delivery' => '🚚',
+        'takeaway' => '🥡',
+        'pickup' => '👜',
+        'unknown' => '📋'
+    );
+    
+    return isset($icons[$type]) ? $icons[$type] : $icons['unknown'];
+}
+
+/**
+ * Get order type CSS class
+ */
+function oj_get_order_type_class($type) {
+    return 'oj-order-type-' . sanitize_html_class($type);
+}
+
+/**
+ * Get order type color scheme
+ */
+function oj_get_order_type_colors($type) {
+    $colors = array(
+        'dinein' => array(
+            'bg' => '#4CAF50',
+            'bg_light' => '#E8F5E8',
+            'text' => '#ffffff',
+            'border' => '#45a049'
+        ),
+        'delivery' => array(
+            'bg' => '#2196F3',
+            'bg_light' => '#E3F2FD',
+            'text' => '#ffffff',
+            'border' => '#1976D2'
+        ),
+        'takeaway' => array(
+            'bg' => '#FF9800',
+            'bg_light' => '#FFF3E0',
+            'text' => '#ffffff',
+            'border' => '#F57C00'
+        ),
+        'pickup' => array(
+            'bg' => '#9C27B0',
+            'bg_light' => '#F3E5F5',
+            'text' => '#ffffff',
+            'border' => '#7B1FA2'
+        ),
+        'unknown' => array(
+            'bg' => '#757575',
+            'bg_light' => '#F5F5F5',
+            'text' => '#ffffff',
+            'border' => '#616161'
+        )
+    );
+    
+    return isset($colors[$type]) ? $colors[$type] : $colors['unknown'];
+}
+

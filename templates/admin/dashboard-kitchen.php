@@ -205,6 +205,13 @@ $orders_with_items = array();
 foreach ($active_orders as $order) {
     $wc_order = wc_get_order($order['ID']);
     if ($wc_order) {
+        // Get order type information
+        $order_type = oj_get_order_type($wc_order);
+        $order['order_type'] = $order_type;
+        $order['order_type_label'] = oj_get_order_type_label($order_type);
+        $order['order_type_icon'] = oj_get_order_type_icon($order_type);
+        $order['order_type_class'] = oj_get_order_type_class($order_type);
+        
         $order_items = array();
         foreach ($wc_order->get_items() as $item) {
             // Get basic item info
@@ -400,21 +407,24 @@ $currency_symbol = get_woocommerce_currency_symbol();
         <?php if (!empty($active_orders)) : ?>
             <div class="oj-kitchen-cards-container">
                 <?php foreach ($active_orders as $order) : ?>
-                    <div class="oj-kitchen-card" data-order-id="<?php echo esc_attr($order['ID']); ?>">
+                    <div class="oj-kitchen-card <?php echo esc_attr($order['order_type_class'] ?? ''); ?>" data-order-id="<?php echo esc_attr($order['ID']); ?>">
                         <!-- Card Header -->
                         <div class="oj-card-header">
+                            <!-- Order Type Badge -->
+                            <div class="oj-order-type-badge <?php echo esc_attr($order['order_type_class'] ?? 'oj-order-type-unknown'); ?>">
+                                <span class="oj-type-icon"><?php echo esc_html($order['order_type_icon'] ?? '📋'); ?></span>
+                                <span class="oj-type-label"><?php echo esc_html($order['order_type_label'] ?? __('Standard', 'orders-jet')); ?></span>
+                            </div>
+                            
                             <div class="oj-card-info">
                                 <div class="oj-table-info">
                                     <?php if ($order['table_number']) : ?>
                                         <span class="oj-table-number">Table <?php echo esc_html($order['table_number']); ?></span>
+                                    <?php elseif (isset($order['order_type']) && $order['order_type'] !== 'dinein') : ?>
+                                        <span class="oj-customer-name"><?php echo esc_html($order['customer_name'] ?: __('Customer', 'orders-jet')); ?></span>
                                     <?php endif; ?>
                                     <span class="oj-order-number">#<?php echo esc_html($order['ID']); ?></span>
                                 </div>
-                                <?php if ($order['customer_name']) : ?>
-                                    <div class="oj-customer-name"><?php echo esc_html($order['customer_name']); ?></div>
-                                <?php else : ?>
-                                    <div class="oj-customer-name">Guest</div>
-                                <?php endif; ?>
                                 <div class="oj-order-time">
                                     <span class="dashicons dashicons-clock"></span>
                                     <?php echo esc_html(date('g:i A', strtotime($order['post_date']))); ?>
@@ -941,17 +951,71 @@ $currency_symbol = get_woocommerce_currency_symbol();
     transform: translateY(-2px);
 }
 
+/* Order Type Badge */
+.oj-order-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.oj-order-type-badge .oj-type-icon {
+    font-size: 14px;
+}
+
+.oj-order-type-badge .oj-type-label {
+    font-size: 11px;
+}
+
+/* Order Type Colors */
+.oj-order-type-dinein {
+    background: linear-gradient(135deg, #4CAF50, #45a049);
+    color: #ffffff;
+    border: 1px solid #45a049;
+}
+
+.oj-order-type-delivery {
+    background: linear-gradient(135deg, #2196F3, #1976D2);
+    color: #ffffff;
+    border: 1px solid #1976D2;
+}
+
+.oj-order-type-takeaway {
+    background: linear-gradient(135deg, #FF9800, #F57C00);
+    color: #ffffff;
+    border: 1px solid #F57C00;
+}
+
+.oj-order-type-pickup {
+    background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+    color: #ffffff;
+    border: 1px solid #7B1FA2;
+}
+
+.oj-order-type-unknown {
+    background: linear-gradient(135deg, #757575, #616161);
+    color: #ffffff;
+    border: 1px solid #616161;
+}
+
 /* Card Header */
 .oj-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
     padding: 16px 20px;
     background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
     border-bottom: 1px solid #dee2e6;
 }
 
 .oj-card-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
     flex: 1;
 }
 
@@ -1264,6 +1328,20 @@ $currency_symbol = get_woocommerce_currency_symbol();
     .oj-card-body,
     .oj-card-footer {
         padding: 12px;
+    }
+    
+    .oj-order-type-badge {
+        padding: 4px 8px;
+        font-size: 10px;
+        margin-bottom: 8px;
+    }
+    
+    .oj-order-type-badge .oj-type-icon {
+        font-size: 12px;
+    }
+    
+    .oj-order-type-badge .oj-type-label {
+        font-size: 9px;
     }
     
     .oj-table-number,
