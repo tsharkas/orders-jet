@@ -115,6 +115,8 @@ class Orders_Jet_Integration {
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-shortcodes.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-helpers.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-assets.php';
+        include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-woofood-analyzer.php';
+        include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-woofood-integration.php';
     }
     
     /**
