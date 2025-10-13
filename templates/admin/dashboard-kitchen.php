@@ -453,10 +453,15 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                         <?php _e('Start Cooking', 'orders-jet'); ?>
                                     </button>
                                 <?php elseif ($order['post_status'] === 'wc-processing') : ?>
-                                    <form method="post" style="display: inline-block;">
+                                    <!-- DEBUG: Show form info -->
+                                    <div style="font-size: 11px; color: #666; margin-bottom: 5px;">
+                                        DEBUG: Order #<?php echo $order['ID']; ?> | Status: <?php echo $order['post_status']; ?>
+                                    </div>
+                                    
+                                    <form method="post" style="display: inline-block;" onsubmit="console.log('Form submitting for order <?php echo $order['ID']; ?>'); return true;">
                                         <?php wp_nonce_field('oj_mark_ready_' . $order['ID']); ?>
                                         <input type="hidden" name="order_id" value="<?php echo esc_attr($order['ID']); ?>">
-                                        <button type="submit" name="oj_mark_ready" class="button button-secondary oj-mark-ready-form" style="background: #00a32a; border-color: #00a32a; color: white; font-weight: 600; padding: 6px 12px; font-size: 13px;">
+                                        <button type="submit" name="oj_mark_ready" class="button button-secondary oj-mark-ready-form" style="background: #00a32a; border-color: #00a32a; color: white; font-weight: 600; padding: 6px 12px; font-size: 13px;" onclick="alert('Button clicked for Order #<?php echo $order['ID']; ?>'); console.log('Button clicked');">
                                             <span class="dashicons dashicons-yes-alt" style="font-size: 16px; vertical-align: middle; margin-right: 4px;"></span>
                                             <?php _e('Mark Ready', 'orders-jet'); ?>
                                         </button>
@@ -860,7 +865,8 @@ $currency_symbol = get_woocommerce_currency_symbol();
 jQuery(document).ready(function($) {
     'use strict';
     
-    // Add loading state to Mark Ready form buttons
+    // DISABLED: Add loading state to Mark Ready form buttons (causing form submission issues)
+    /*
     $('button[name="oj_mark_ready"]').on('click', function(e) {
         var $button = $(this);
         var $form = $button.closest('form');
@@ -875,6 +881,7 @@ jQuery(document).ready(function($) {
             $form.submit();
         }, 100);
     });
+    */
     
     // Auto-dismiss success/error notices after 5 seconds
     setTimeout(function() {
