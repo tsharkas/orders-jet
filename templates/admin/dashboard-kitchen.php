@@ -111,27 +111,7 @@ if (isset($error_message)) {
     echo '<div class="notice notice-error is-dismissible"><p>' . esc_html($error_message) . '</p></div>';
 }
 
-// DEBUG: Show diagnostic information if form was submitted
-if (isset($_POST['oj_mark_ready'])) {
-    echo '<div class="notice notice-info"><h3>🔍 DEBUG INFORMATION:</h3>';
-    echo '<p><strong>Form Submitted:</strong> Yes</p>';
-    echo '<p><strong>Order ID:</strong> ' . (isset($_POST['order_id']) ? $_POST['order_id'] : 'NOT SET') . '</p>';
-    echo '<p><strong>Nonce Present:</strong> ' . (isset($_POST['_wpnonce']) ? 'Yes' : 'No') . '</p>';
-    
-    if (isset($_POST['order_id'])) {
-        $debug_order_id = intval($_POST['order_id']);
-        $debug_order = wc_get_order($debug_order_id);
-        echo '<p><strong>Order Found:</strong> ' . ($debug_order ? 'Yes' : 'No') . '</p>';
-        
-        if ($debug_order) {
-            echo '<p><strong>Current Status:</strong> ' . $debug_order->get_status() . '</p>';
-            echo '<p><strong>Table Number:</strong> ' . ($debug_order->get_meta('_oj_table_number') ?: 'NOT SET') . '</p>';
-            echo '<p><strong>User Can Access Kitchen:</strong> ' . (current_user_can('access_oj_kitchen_dashboard') ? 'Yes' : 'No') . '</p>';
-            echo '<p><strong>User Can Manage Options:</strong> ' . (current_user_can('manage_options') ? 'Yes' : 'No') . '</p>';
-        }
-    }
-    echo '</div>';
-}
+// Success/error messages are handled above - no debug info needed in production
 
 // Get user information
 $current_user = wp_get_current_user();
@@ -453,15 +433,10 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                         <?php _e('Start Cooking', 'orders-jet'); ?>
                                     </button>
                                 <?php elseif ($order['post_status'] === 'wc-processing') : ?>
-                                    <!-- DEBUG: Show form info -->
-                                    <div style="font-size: 11px; color: #666; margin-bottom: 5px;">
-                                        DEBUG: Order #<?php echo $order['ID']; ?> | Status: <?php echo $order['post_status']; ?>
-                                    </div>
-                                    
-                                    <form method="post" style="display: inline-block;" onsubmit="console.log('Form submitting for order <?php echo $order['ID']; ?>'); return true;">
+                                    <form method="post" style="display: inline-block;">
                                         <?php wp_nonce_field('oj_mark_ready_' . $order['ID']); ?>
                                         <input type="hidden" name="order_id" value="<?php echo esc_attr($order['ID']); ?>">
-                                        <button type="submit" name="oj_mark_ready" class="button button-secondary oj-mark-ready-form" style="background: #00a32a; border-color: #00a32a; color: white; font-weight: 600; padding: 6px 12px; font-size: 13px;" onclick="alert('Button clicked for Order #<?php echo $order['ID']; ?>'); console.log('Button clicked');">
+                                        <button type="submit" name="oj_mark_ready" class="button button-secondary oj-mark-ready-form" style="background: #00a32a; border-color: #00a32a; color: white; font-weight: 600; padding: 6px 12px; font-size: 13px;">
                                             <span class="dashicons dashicons-yes-alt" style="font-size: 16px; vertical-align: middle; margin-right: 4px;"></span>
                                             <?php _e('Mark Ready', 'orders-jet'); ?>
                                         </button>
@@ -865,23 +840,18 @@ $currency_symbol = get_woocommerce_currency_symbol();
 jQuery(document).ready(function($) {
     'use strict';
     
-    // DISABLED: Add loading state to Mark Ready form buttons (causing form submission issues)
-    /*
+    // Add loading state to Mark Ready form buttons (without preventing form submission)
     $('button[name="oj_mark_ready"]').on('click', function(e) {
         var $button = $(this);
-        var $form = $button.closest('form');
         var originalText = $button.html();
         
-        // Show loading state
+        // Show loading state immediately (form will submit naturally)
         $button.prop('disabled', true);
         $button.html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite; font-size: 16px; vertical-align: middle; margin-right: 4px;"></span><?php _e("Processing...", "orders-jet"); ?>');
         
-        // Submit the form after a brief delay to show the loading state
-        setTimeout(function() {
-            $form.submit();
-        }, 100);
+        // Don't prevent form submission - let it happen naturally
+        // The page will refresh, so no need to restore button state
     });
-    */
     
     // Auto-dismiss success/error notices after 5 seconds
     setTimeout(function() {
