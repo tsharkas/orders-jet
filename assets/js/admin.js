@@ -6,6 +6,15 @@
 jQuery(document).ready(function($) {
     'use strict';
     
+    // Debug: Check if admin variables are loaded
+    console.log('Orders Jet Admin: Script loaded');
+    console.log('Orders Jet Admin: oj_admin object:', typeof oj_admin !== 'undefined' ? oj_admin : 'NOT FOUND');
+    console.log('Orders Jet Admin: OrdersJetAdmin object:', typeof OrdersJetAdmin !== 'undefined' ? OrdersJetAdmin : 'NOT FOUND');
+    
+    // Use the available admin object (prioritize oj_admin for compatibility)
+    var adminConfig = typeof oj_admin !== 'undefined' ? oj_admin : (typeof OrdersJetAdmin !== 'undefined' ? OrdersJetAdmin : null);
+    console.log('Orders Jet Admin: Using config:', adminConfig);
+    
     // Auto-refresh dashboards every 30 seconds
     var dashboardRefreshInterval;
     
@@ -63,12 +72,12 @@ jQuery(document).ready(function($) {
         $button.prop('disabled', true).text('Regenerating...');
         
         $.ajax({
-            url: oj_admin.ajax_url,
+            url: adminConfig.ajax_url || adminConfig.ajaxUrl,
             type: 'POST',
             data: {
                 action: 'oj_regenerate_qr_code',
                 table_id: tableId,
-                nonce: oj_admin.nonce
+                nonce: adminConfig.nonce
             },
             success: function(response) {
                 if (response.success) {
@@ -164,12 +173,12 @@ jQuery(document).ready(function($) {
         $button.html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite; font-size: 16px; vertical-align: middle; margin-right: 4px;"></span>Marking Ready...');
         
         $.ajax({
-            url: OrdersJetAdmin.ajaxUrl,
+            url: adminConfig.ajax_url || adminConfig.ajaxUrl,
             type: 'POST',
             data: {
                 action: 'oj_mark_order_ready',
                 order_id: orderId,
-                nonce: OrdersJetAdmin.nonce
+                nonce: adminConfig.nonce
             },
             success: function(response) {
                 if (response.success) {
@@ -214,12 +223,12 @@ jQuery(document).ready(function($) {
         $button.html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite; font-size: 14px; vertical-align: middle; margin-right: 4px;"></span>Delivering...');
         
         $.ajax({
-            url: OrdersJetAdmin.ajaxUrl,
+            url: adminConfig.ajax_url || adminConfig.ajaxUrl,
             type: 'POST',
             data: {
                 action: 'oj_mark_order_delivered',
                 order_id: orderId,
-                nonce: OrdersJetAdmin.nonce
+                nonce: adminConfig.nonce
             },
             success: function(response) {
                 if (response.success) {
@@ -254,11 +263,11 @@ jQuery(document).ready(function($) {
         $button.prop('disabled', true).text('Flushing...');
         
         $.ajax({
-            url: oj_admin.ajax_url,
+            url: adminConfig.ajax_url || adminConfig.ajaxUrl,
             type: 'POST',
             data: {
                 action: 'oj_flush_rewrite_rules',
-                nonce: oj_admin.nonce
+                nonce: adminConfig.nonce
             },
             success: function(response) {
                 if (response.success) {
