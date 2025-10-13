@@ -13,6 +13,67 @@ if (!current_user_can('access_oj_kitchen_dashboard') && !current_user_can('manag
     wp_die(__('You do not have permission to access this page.', 'orders-jet'));
 }
 
+// Handle Mark Ready form submission (non-AJAX)
+if (isset($_POST['oj_mark_ready']) && isset($_POST['order_id']) && isset($_POST['_wpnonce'])) {
+    // Verify nonce
+    if (wp_verify_nonce($_POST['_wpnonce'], 'oj_mark_ready_' . $_POST['order_id'])) {
+        // Check permissions
+        if (current_user_can('access_oj_kitchen_dashboard') || current_user_can('manage_options')) {
+            $order_id = intval($_POST['order_id']);
+            $order = wc_get_order($order_id);
+            
+            if ($order && $order->get_meta('_oj_table_number')) {
+                $current_status = $order->get_status();
+                
+                if (in_array($current_status, array('pending', 'processing'))) {
+                    try {
+                        // Mark order as ready (on-hold status means ready for pickup)
+                        $order->set_status('on-hold');
+                        
+                        // Add order note
+                        $order->add_order_note(sprintf(
+                            __('Order marked as ready by kitchen staff (%s)', 'orders-jet'), 
+                            wp_get_current_user()->display_name
+                        ));
+                        
+                        // Save the order
+                        $order->save();
+                        
+                        error_log('Orders Jet Kitchen: Order #' . $order_id . ' marked as ready (on-hold) by user #' . get_current_user_id());
+                        
+                        // Store success message
+                        $success_message = sprintf(__('Order #%d marked as ready for pickup!', 'orders-jet'), $order_id);
+                        
+                        // Redirect to avoid resubmission
+                        wp_redirect(add_query_arg('success', urlencode($success_message), $_SERVER['REQUEST_URI']));
+                        exit;
+                        
+                    } catch (Exception $e) {
+                        error_log('Orders Jet Kitchen: Error marking order ready: ' . $e->getMessage());
+                        $error_message = __('Failed to mark order as ready. Please try again.', 'orders-jet');
+                    }
+                } else {
+                    $error_message = sprintf(__('Order cannot be marked ready from status: %s', 'orders-jet'), $current_status);
+                }
+            } else {
+                $error_message = __('Order not found or not a table order.', 'orders-jet');
+            }
+        } else {
+            $error_message = __('You do not have permission to perform this action.', 'orders-jet');
+        }
+    } else {
+        $error_message = __('Security check failed. Please refresh the page and try again.', 'orders-jet');
+    }
+}
+
+// Show success/error messages
+if (isset($_GET['success'])) {
+    echo '<div class="notice notice-success is-dismissible"><p>' . esc_html(urldecode($_GET['success'])) . '</p></div>';
+}
+if (isset($error_message)) {
+    echo '<div class="notice notice-error is-dismissible"><p>' . esc_html($error_message) . '</p></div>';
+}
+
 // Get user information
 $current_user = wp_get_current_user();
 $today = date('Y-m-d');
@@ -333,10 +394,14 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                         <?php _e('Start Cooking', 'orders-jet'); ?>
                                     </button>
                                 <?php elseif ($order['post_status'] === 'wc-processing') : ?>
-                                    <button class="button button-secondary oj-complete-order" data-order-id="<?php echo esc_attr($order['ID']); ?>" style="background: #00a32a; border-color: #00a32a; color: white; font-weight: 600; padding: 6px 12px; font-size: 13px;">
-                                        <span class="dashicons dashicons-yes-alt" style="font-size: 16px; vertical-align: middle; margin-right: 4px;"></span>
-                                        <?php _e('Mark Ready', 'orders-jet'); ?>
-                                    </button>
+                                    <form method="post" style="display: inline-block;">
+                                        <?php wp_nonce_field('oj_mark_ready_' . $order['ID']); ?>
+                                        <input type="hidden" name="order_id" value="<?php echo esc_attr($order['ID']); ?>">
+                                        <button type="submit" name="oj_mark_ready" class="button button-secondary oj-mark-ready-form" style="background: #00a32a; border-color: #00a32a; color: white; font-weight: 600; padding: 6px 12px; font-size: 13px;">
+                                            <span class="dashicons dashicons-yes-alt" style="font-size: 16px; vertical-align: middle; margin-right: 4px;"></span>
+                                            <?php _e('Mark Ready', 'orders-jet'); ?>
+                                        </button>
+                                    </form>
                                 <?php else : ?>
                                     <button class="button oj-resume-order" data-order-id="<?php echo esc_attr($order['ID']); ?>" style="background: #dba617; border-color: #dba617; color: white; font-weight: 600; padding: 6px 12px; font-size: 13px;">
                                         <span class="dashicons dashicons-controls-repeat" style="font-size: 14px; vertical-align: middle; margin-right: 4px;"></span>
@@ -731,3 +796,30 @@ $currency_symbol = get_woocommerce_currency_symbol();
     font-style: italic;
 }
 </style>
+
+<script>
+jQuery(document).ready(function($) {
+    'use strict';
+    
+    // Add loading state to Mark Ready form buttons
+    $('button[name="oj_mark_ready"]').on('click', function(e) {
+        var $button = $(this);
+        var $form = $button.closest('form');
+        var originalText = $button.html();
+        
+        // Show loading state
+        $button.prop('disabled', true);
+        $button.html('<span class="dashicons dashicons-update" style="animation: spin 1s linear infinite; font-size: 16px; vertical-align: middle; margin-right: 4px;"></span><?php _e("Processing...", "orders-jet"); ?>');
+        
+        // Submit the form after a brief delay to show the loading state
+        setTimeout(function() {
+            $form.submit();
+        }, 100);
+    });
+    
+    // Auto-dismiss success/error notices after 5 seconds
+    setTimeout(function() {
+        $('.notice.is-dismissible').fadeOut();
+    }, 5000);
+});
+</script>
