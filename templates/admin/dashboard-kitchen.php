@@ -111,6 +111,28 @@ if (isset($error_message)) {
     echo '<div class="notice notice-error is-dismissible"><p>' . esc_html($error_message) . '</p></div>';
 }
 
+// DEBUG: Show diagnostic information if form was submitted
+if (isset($_POST['oj_mark_ready'])) {
+    echo '<div class="notice notice-info"><h3>🔍 DEBUG INFORMATION:</h3>';
+    echo '<p><strong>Form Submitted:</strong> Yes</p>';
+    echo '<p><strong>Order ID:</strong> ' . (isset($_POST['order_id']) ? $_POST['order_id'] : 'NOT SET') . '</p>';
+    echo '<p><strong>Nonce Present:</strong> ' . (isset($_POST['_wpnonce']) ? 'Yes' : 'No') . '</p>';
+    
+    if (isset($_POST['order_id'])) {
+        $debug_order_id = intval($_POST['order_id']);
+        $debug_order = wc_get_order($debug_order_id);
+        echo '<p><strong>Order Found:</strong> ' . ($debug_order ? 'Yes' : 'No') . '</p>';
+        
+        if ($debug_order) {
+            echo '<p><strong>Current Status:</strong> ' . $debug_order->get_status() . '</p>';
+            echo '<p><strong>Table Number:</strong> ' . ($debug_order->get_meta('_oj_table_number') ?: 'NOT SET') . '</p>';
+            echo '<p><strong>User Can Access Kitchen:</strong> ' . (current_user_can('access_oj_kitchen_dashboard') ? 'Yes' : 'No') . '</p>';
+            echo '<p><strong>User Can Manage Options:</strong> ' . (current_user_can('manage_options') ? 'Yes' : 'No') . '</p>';
+        }
+    }
+    echo '</div>';
+}
+
 // Get user information
 $current_user = wp_get_current_user();
 $today = date('Y-m-d');
