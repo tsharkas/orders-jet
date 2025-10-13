@@ -159,9 +159,12 @@ foreach ($active_orders as $order) {
                     $item_data['addons'] = array_map(function($addon) {
                         // Remove price information from add-ons for kitchen display
                         // Convert "Combo Plus (+90,00 EGP)" to "Combo Plus"
+                        // Convert "Combo + 60 EGP" to "Combo"
                         $addon_clean = strip_tags($addon);
                         // Remove price in parentheses (e.g., "(+90,00 EGP)" or "(+0,00 EGP)")
                         $addon_clean = preg_replace('/\s*\(\+[^)]+\)/', '', $addon_clean);
+                        // Remove price in format "+ XX EGP" (e.g., "+ 60 EGP")
+                        $addon_clean = preg_replace('/\s*\+\s*\d+[.,]?\d*\s*EGP/', '', $addon_clean);
                         return trim($addon_clean);
                     }, $addons);
                 }
