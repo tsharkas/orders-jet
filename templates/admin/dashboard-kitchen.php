@@ -124,62 +124,70 @@ global $wpdb;
 // Get active orders using a more precise approach to avoid duplicates
 $active_orders = array();
 
-// Use WooCommerce's native method directly (more reliable)
+// Get ALL in-progress/processing orders - ultra simple
 if (function_exists('wc_get_orders')) {
-    error_log('Orders Jet Kitchen: Using WooCommerce native method...');
+    error_log('Orders Jet Kitchen: Using ultra-simple approach...');
     
     $wc_orders = wc_get_orders(array(
-        'status' => array('pending', 'processing'), // Exclude on-hold (ready orders)
-        'meta_key' => '_oj_table_number',
+        'status' => array('processing', 'in-progress'), // Cover both possible status names
         'limit' => -1,
         'orderby' => 'date',
         'order' => 'ASC'
     ));
     
-    error_log('Orders Jet Kitchen: Found ' . count($wc_orders) . ' orders with WooCommerce method');
+    error_log('Orders Jet Kitchen: Found ' . count($wc_orders) . ' orders');
     
-    // Convert WC_Order objects to the format we need
+    // Convert to simple format
+    $active_orders = array();
     foreach ($wc_orders as $wc_order) {
+        $table_number = $wc_order->get_meta('_oj_table_number');
+        
         $active_orders[] = array(
             'ID' => $wc_order->get_id(),
             'post_date' => $wc_order->get_date_created()->format('Y-m-d H:i:s'),
             'post_status' => 'wc-' . $wc_order->get_status(),
             'order_total' => $wc_order->get_total(),
-            'table_number' => $wc_order->get_meta('_oj_table_number'),
+            'table_number' => $table_number,
             'customer_name' => $wc_order->get_billing_first_name(),
-            'session_id' => $wc_order->get_meta('_oj_session_id')
+            'session_id' => $wc_order->get_meta('_oj_session_id'),
+            // Simple badge logic
+            'order_type' => !empty($table_number) ? 'dinein' : 'pickup',
+            'order_type_label' => !empty($table_number) ? __('DINE IN', 'orders-jet') : __('PICK UP', 'orders-jet'),
+            'order_type_icon' => !empty($table_number) ? '🍽️' : '🥡',
+            'order_type_class' => !empty($table_number) ? 'oj-order-type-dinein' : 'oj-order-type-pickup'
         );
     }
 } else {
-    // Fallback to get_posts if WooCommerce functions not available
-    error_log('Orders Jet Kitchen: Falling back to get_posts method...');
+    // Simple fallback
+    error_log('Orders Jet Kitchen: Using simple fallback...');
     
     $active_orders_posts = get_posts(array(
         'post_type' => 'shop_order',
-        'post_status' => array('wc-pending', 'wc-processing'), // Exclude wc-on-hold (ready orders)
-        'meta_query' => array(
-            array(
-                'key' => '_oj_table_number',
-                'compare' => 'EXISTS'
-            )
-        ),
+        'post_status' => array('wc-processing', 'wc-in-progress'),
         'posts_per_page' => -1,
         'orderby' => 'date',
         'order' => 'ASC'
     ));
     
-    // Convert posts to the format we need
+    $active_orders = array();
     foreach ($active_orders_posts as $order_post) {
         $order = wc_get_order($order_post->ID);
-        if ($order && $order->get_meta('_oj_table_number')) {
+        if ($order) {
+            $table_number = $order->get_meta('_oj_table_number');
+            
             $active_orders[] = array(
                 'ID' => $order->get_id(),
                 'post_date' => $order_post->post_date,
                 'post_status' => 'wc-' . $order->get_status(),
                 'order_total' => $order->get_total(),
-                'table_number' => $order->get_meta('_oj_table_number'),
+                'table_number' => $table_number,
                 'customer_name' => $order->get_billing_first_name(),
-                'session_id' => $order->get_meta('_oj_session_id')
+                'session_id' => $order->get_meta('_oj_session_id'),
+                // Simple badge logic
+                'order_type' => !empty($table_number) ? 'dinein' : 'pickup',
+                'order_type_label' => !empty($table_number) ? __('DINE IN', 'orders-jet') : __('PICK UP', 'orders-jet'),
+                'order_type_icon' => !empty($table_number) ? '🍽️' : '🥡',
+                'order_type_class' => !empty($table_number) ? 'oj-order-type-dinein' : 'oj-order-type-pickup'
             );
         }
     }
@@ -205,12 +213,7 @@ $orders_with_items = array();
 foreach ($active_orders as $order) {
     $wc_order = wc_get_order($order['ID']);
     if ($wc_order) {
-        // Get order type information
-        $order_type = oj_get_order_type($wc_order);
-        $order['order_type'] = $order_type;
-        $order['order_type_label'] = oj_get_order_type_label($order_type);
-        $order['order_type_icon'] = oj_get_order_type_icon($order_type);
-        $order['order_type_class'] = oj_get_order_type_class($order_type);
+        // Order type is already set in the simple logic above - no need for complex detection
         
         $order_items = array();
         foreach ($wc_order->get_items() as $item) {
@@ -311,30 +314,18 @@ foreach ($active_orders as $order) {
     }
 }
 
-// Get completed orders (wc-on-hold) using WooCommerce method for consistency
+// Get completed orders (on-hold) - ultra simple
 if (function_exists('wc_get_orders')) {
     $completed_wc_orders = wc_get_orders(array(
         'status' => array('on-hold'), // Ready orders
-        'meta_key' => '_oj_table_number',
-        'limit' => -1,
-        'orderby' => 'date',
-        'order' => 'ASC'
+        'limit' => -1
     ));
     $completed_orders = count($completed_wc_orders);
 } else {
-    // Fallback to get_posts
     $completed_orders_posts = get_posts(array(
         'post_type' => 'shop_order',
-        'post_status' => array('wc-on-hold'), // Ready orders
-        'meta_query' => array(
-            array(
-                'key' => '_oj_table_number',
-                'compare' => 'EXISTS'
-            )
-        ),
-        'posts_per_page' => -1,
-        'orderby' => 'date',
-        'order' => 'ASC'
+        'post_status' => array('wc-on-hold'),
+        'posts_per_page' => -1
     ));
     $completed_orders = count($completed_orders_posts);
 }
@@ -414,11 +405,26 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                 <div class="oj-table-info">
                                     <?php if ($order['table_number']) : ?>
                                         <span class="oj-table-number">Table <?php echo esc_html($order['table_number']); ?></span>
+                                    <?php elseif ($order['order_type'] === 'delivery') : ?>
+                                        <?php 
+                                        // Get delivery address for delivery orders
+                                        $wc_order = wc_get_order($order['ID']);
+                                        $delivery_address = '';
+                                        if ($wc_order) {
+                                            $delivery_address = $wc_order->get_meta('_oj_delivery_address') ?: 
+                                                             $wc_order->get_meta('_exwf_delivery_address') ?: 
+                                                             $wc_order->get_formatted_shipping_address();
+                                        }
+                                        ?>
+                                        <span class="oj-delivery-address">
+                                            <span class="dashicons dashicons-location-alt" style="font-size: 14px; margin-right: 4px;"></span>
+                                            <?php echo esc_html($delivery_address ?: __('Delivery Address', 'orders-jet')); ?>
+                                        </span>
                                     <?php endif; ?>
-                                    <!-- Order Type Badge (replacing order number position) -->
-                                    <div class="oj-order-type-badge <?php echo esc_attr($order['order_type_class'] ?? 'oj-order-type-unknown'); ?>">
-                                        <span class="oj-type-icon"><?php echo esc_html($order['order_type_icon'] ?? '🍽️'); ?></span>
-                                        <span class="oj-type-label"><?php echo esc_html(strtoupper($order['order_type_label'] ?? __('DINE IN', 'orders-jet'))); ?></span>
+                                    <!-- Order Type Badge - SIMPLE VERSION -->
+                                    <div class="oj-order-type-badge <?php echo esc_attr($order['order_type_class']); ?>">
+                                        <span class="oj-type-icon"><?php echo esc_html($order['order_type_icon']); ?></span>
+                                        <span class="oj-type-label"><?php echo esc_html($order['order_type_label']); ?></span>
                                     </div>
                                 </div>
                                 <div class="oj-order-time">
@@ -1019,13 +1025,8 @@ $currency_symbol = get_woocommerce_currency_symbol();
     color: #ffffff;
 }
 
-.oj-order-type-takeaway {
-    background: #FF9800;
-    color: #ffffff;
-}
-
 .oj-order-type-pickup {
-    background: #9C27B0;
+    background: #FF9800;
     color: #ffffff;
 }
 
@@ -1182,6 +1183,22 @@ $currency_symbol = get_woocommerce_currency_symbol();
     border-radius: 20px;
     font-weight: 600;
     font-size: 14px;
+}
+
+.oj-delivery-address {
+    background: #2196F3;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .oj-order-number {

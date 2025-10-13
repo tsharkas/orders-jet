@@ -493,3 +493,67 @@ function Orders_Jet() {
 
 // Initialize the plugin
 Orders_Jet();
+
+/**
+ * Set Orders Jet order status for all new orders
+ * This ensures delivery orders placed from outside the table cart also get the required meta field
+ */
+add_action('woocommerce_new_order', 'oj_set_default_order_status');
+function oj_set_default_order_status($order_id) {
+    $order = wc_get_order($order_id);
+    if ($order && !$order->get_meta('_oj_order_status')) {
+        // Set default status based on order type
+        $order_type = oj_get_order_type($order);
+        $default_status = 'placed';
+        
+        // Log the order status setting for debugging
+        error_log('Orders Jet: Setting default order status for order #' . $order_id . ' - Type: ' . $order_type . ', Status: ' . $default_status);
+        
+        $order->update_meta_data('_oj_order_status', $default_status);
+        $order->save();
+        
+        error_log('Orders Jet: Successfully set order status for order #' . $order_id);
+    }
+}
+
+/**
+ * Set Orders Jet order status for existing orders that don't have it
+ * This handles orders that were created before the hook was added
+ */
+add_action('wp_loaded', 'oj_set_existing_orders_status');
+function oj_set_existing_orders_status() {
+    // Only run this once per day to avoid performance issues
+    $last_run = get_option('oj_last_status_update', 0);
+    if (current_time('timestamp') - $last_run < 86400) { // 24 hours
+        return;
+    }
+    
+    // Get orders without _oj_order_status meta field
+    $orders = wc_get_orders(array(
+        'limit' => 100, // Process in batches
+        'status' => array('pending', 'processing', 'on-hold', 'completed'),
+        'meta_query' => array(
+            array(
+                'key' => '_oj_order_status',
+                'compare' => 'NOT EXISTS'
+            )
+        )
+    ));
+    
+    if (!empty($orders)) {
+        foreach ($orders as $order) {
+            $order_type = oj_get_order_type($order);
+            $default_status = 'placed';
+            
+            $order->update_meta_data('_oj_order_status', $default_status);
+            $order->save();
+            
+            error_log('Orders Jet: Retroactively set order status for order #' . $order->get_id() . ' - Type: ' . $order_type . ', Status: ' . $default_status);
+        }
+        
+        // Update last run time
+        update_option('oj_last_status_update', current_time('timestamp'));
+        
+        error_log('Orders Jet: Retroactively processed ' . count($orders) . ' orders without _oj_order_status');
+    }
+}

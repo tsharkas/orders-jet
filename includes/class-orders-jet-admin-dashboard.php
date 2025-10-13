@@ -276,15 +276,9 @@ class Orders_Jet_Admin_Dashboard {
             'order' => 'DESC',
         );
         
-        // Kitchen sees orders in preparing/ready status
+        // Kitchen sees only processing orders (simplified)
         if ($user_role === 'oj_kitchen') {
-            $args['meta_query'] = array(
-                array(
-                    'key' => '_oj_order_status',
-                    'value' => array('received', 'preparing', 'ready'),
-                    'compare' => 'IN',
-                ),
-            );
+            $args['status'] = array('processing');
         }
         
         // Waiters see orders assigned to them
@@ -312,6 +306,7 @@ class Orders_Jet_Admin_Dashboard {
             $assigned_waiter_id = $order->get_meta('_oj_assigned_waiter');
             $received_time = $order->get_meta('_oj_received_time');
             $preparing_time = $order->get_meta('_oj_preparing_time');
+            $order_type = oj_get_order_type($order);
             
             $waiter_name = '';
             if ($assigned_waiter_id) {
@@ -331,6 +326,9 @@ class Orders_Jet_Admin_Dashboard {
                 'id' => $order->get_id(),
                 'order_number' => $order->get_order_number(),
                 'table_number' => $table_number,
+                'order_type' => $order_type,
+                'order_type_label' => oj_get_order_type_label($order_type),
+                'delivery_address' => ($order_type === 'delivery') ? $order->get_meta('_oj_delivery_address') ?: $order->get_meta('_exwf_delivery_address') : '',
                 'status' => $order_status,
                 'wc_status' => $order->get_status(),
                 'assigned_waiter_id' => $assigned_waiter_id,

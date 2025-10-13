@@ -395,6 +395,7 @@ class Orders_Jet_REST_API {
      */
     private function get_orders_data() {
         $args = array(
+            'status' => array('processing'), // Only processing orders
             'limit' => 50,
             'orderby' => 'date',
             'order' => 'DESC',
@@ -406,11 +407,15 @@ class Orders_Jet_REST_API {
         foreach ($orders as $order) {
             $order_status = $order->get_meta('_oj_order_status') ?: 'placed';
             $table_number = $order->get_meta('_oj_table_number');
+            $order_type = oj_get_order_type($order);
             
             $order_data[] = array(
                 'id' => $order->get_id(),
                 'orderNumber' => $order->get_order_number(),
                 'tableNumber' => $table_number,
+                'orderType' => $order_type,
+                'orderTypeLabel' => oj_get_order_type_label($order_type),
+                'deliveryAddress' => ($order_type === 'delivery') ? $order->get_meta('_oj_delivery_address') ?: $order->get_meta('_exwf_delivery_address') : '',
                 'status' => $order_status,
                 'total' => $order->get_total(),
                 'date' => $order->get_date_created()->format('Y-m-d H:i:s'),
