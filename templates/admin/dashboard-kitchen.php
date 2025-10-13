@@ -407,90 +407,87 @@ $currency_symbol = get_woocommerce_currency_symbol();
         <?php if (!empty($active_orders)) : ?>
             <div class="oj-kitchen-cards-container">
                 <?php foreach ($active_orders as $order) : ?>
-                    <div class="oj-kitchen-card" data-order-id="<?php echo esc_attr($order['ID']); ?>">
-                        <!-- Order Header Section -->
-                        <div class="oj-order-header-section">
-                            <div class="oj-order-meta">
-                                <!-- Order Type Badge -->
-                                <div class="oj-order-type-badge <?php echo esc_attr($order['order_type_class'] ?? 'oj-order-type-unknown'); ?>">
-                                    <span class="oj-type-icon"><?php echo esc_html($order['order_type_icon'] ?? '🍽️'); ?></span>
-                                    <span class="oj-type-label"><?php echo esc_html(strtoupper($order['order_type_label'] ?? __('DINE IN', 'orders-jet'))); ?></span>
-                                </div>
-                                
-                                <!-- Location Info -->
-                                <div class="oj-location-badges">
+                    <div class="oj-kitchen-card <?php echo esc_attr($order['order_type_class'] ?? ''); ?>" data-order-id="<?php echo esc_attr($order['ID']); ?>">
+                        <!-- Card Header -->
+                        <div class="oj-card-header">
+                            <div class="oj-card-info">
+                                <div class="oj-table-info">
                                     <?php if ($order['table_number']) : ?>
-                                        <span class="oj-table-badge">Table <?php echo esc_html($order['table_number']); ?></span>
-                                    <?php elseif (isset($order['order_type']) && $order['order_type'] !== 'dinein') : ?>
-                                        <span class="oj-customer-badge"><?php echo esc_html($order['customer_name'] ?: __('Customer', 'orders-jet')); ?></span>
+                                        <span class="oj-table-number">Table <?php echo esc_html($order['table_number']); ?></span>
                                     <?php endif; ?>
-                                    <span class="oj-order-id-badge">#<?php echo esc_html($order['ID']); ?></span>
+                                    <!-- Order Type Badge (replacing order number position) -->
+                                    <div class="oj-order-type-badge <?php echo esc_attr($order['order_type_class'] ?? 'oj-order-type-unknown'); ?>">
+                                        <span class="oj-type-icon"><?php echo esc_html($order['order_type_icon'] ?? '🍽️'); ?></span>
+                                        <span class="oj-type-label"><?php echo esc_html(strtoupper($order['order_type_label'] ?? __('DINE IN', 'orders-jet'))); ?></span>
+                                    </div>
                                 </div>
-                                
-                                <!-- Cooking Status -->
-                                <div class="oj-cooking-status-badge">
-                                    <span class="oj-status-icon">🔧</span>
-                                    <span class="oj-status-text"><?php _e('COOKING', 'orders-jet'); ?></span>
+                                <div class="oj-order-time">
+                                    <span class="dashicons dashicons-clock"></span>
+                                    <?php echo esc_html(date('g:i A', strtotime($order['post_date']))); ?>
                                 </div>
                             </div>
-                            
-                            <!-- Order Time -->
-                            <div class="oj-order-time">
-                                <span class="oj-time-icon">🕐</span>
-                                <span class="oj-time-text"><?php echo esc_html(date('g:i A', strtotime($order['post_date']))); ?></span>
+                            <div class="oj-card-status">
+                                <?php if ($order['post_status'] === 'wc-pending') : ?>
+                                    <span class="oj-status-badge pending">
+                                        <span class="dashicons dashicons-hourglass"></span>
+                                        <?php _e('Pending', 'orders-jet'); ?>
+                                    </span>
+                                <?php elseif ($order['post_status'] === 'wc-processing') : ?>
+                                    <span class="oj-status-badge processing">
+                                        <span class="dashicons dashicons-admin-tools"></span>
+                                        <?php _e('Cooking', 'orders-jet'); ?>
+                                    </span>
+                                <?php endif; ?>
                             </div>
                         </div>
 
-                        <!-- Order Details Card -->
-                        <div class="oj-order-details-card">
+                        <!-- Customer Info -->
+                        <div class="oj-customer-info">
+                            <?php if ($order['customer_name']) : ?>
+                                <div class="oj-customer-name"><?php echo esc_html($order['customer_name']); ?></div>
+                            <?php else : ?>
+                                <div class="oj-customer-name">Guest</div>
+                            <?php endif; ?>
+                            <div class="oj-order-number">#<?php echo esc_html($order['ID']); ?></div>
+                        </div>
+
+                        <!-- Card Body - Items -->
+                        <div class="oj-card-body">
                             <?php if (!empty($order['items'])) : ?>
-                                <?php foreach ($order['items'] as $item) : ?>
-                                    <div class="oj-order-item">
-                                        <div class="oj-item-main">
-                                            <span class="oj-item-qty-badge"><?php echo esc_html($item['quantity']); ?>×</span>
-                                            <span class="oj-item-name"><?php echo esc_html($item['name']); ?></span>
-                                        </div>
-                                        
-                                        <?php if (!empty($item['variations'])) : ?>
-                                            <div class="oj-item-details">
-                                                <?php foreach ($item['variations'] as $variation_name => $variation_value) : ?>
-                                                    <span class="oj-detail-tag"><?php echo esc_html(ucfirst($variation_name)); ?>: <?php echo esc_html($variation_value); ?></span>
-                                                <?php endforeach; ?>
+                                <div class="oj-card-items">
+                                    <?php foreach ($order['items'] as $item) : ?>
+                                        <div class="oj-card-item">
+                                            <div class="oj-item-header">
+                                                <span class="oj-item-qty"><?php echo esc_html($item['quantity']); ?>×</span>
+                                                <span class="oj-item-name"><?php echo esc_html($item['name']); ?></span>
                                             </div>
-                                        <?php endif; ?>
-                                        
-                                        <?php if (!empty($item['addons'])) : ?>
-                                            <div class="oj-item-addons">
-                                                <span class="oj-addon-icon">+</span>
-                                                <div class="oj-addon-tags">
+                                            
+                                            <?php if (!empty($item['variations'])) : ?>
+                                                <div class="oj-item-variations">
+                                                    <?php foreach ($item['variations'] as $variation_name => $variation_value) : ?>
+                                                        <span class="oj-variation-tag"><?php echo esc_html($variation_name); ?>: <?php echo esc_html($variation_value); ?></span>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            <?php endif; ?>
+                                            
+                                            <?php if (!empty($item['addons'])) : ?>
+                                                <div class="oj-item-addons">
+                                                    <span class="oj-addons-label">+</span>
                                                     <?php foreach ($item['addons'] as $addon) : ?>
                                                         <span class="oj-addon-tag"><?php echo esc_html($addon); ?></span>
                                                     <?php endforeach; ?>
                                                 </div>
-                                            </div>
-                                        <?php endif; ?>
-                                    </div>
-                                <?php endforeach; ?>
-                                
-                                <!-- Special Instructions Section -->
-                                <?php
-                                $has_notes = false;
-                                $all_notes = array();
-                                foreach ($order['items'] as $item) {
-                                    if (!empty($item['notes'])) {
-                                        $has_notes = true;
-                                        $all_notes[] = $item['notes'];
-                                    }
-                                }
-                                ?>
-                                <?php if ($has_notes) : ?>
-                                    <div class="oj-special-instructions">
-                                        <span class="oj-instructions-icon">"</span>
-                                        <span class="oj-instructions-text">
-                                            <?php echo esc_html(implode('; ', $all_notes)); ?>
-                                        </span>
-                                    </div>
-                                <?php endif; ?>
+                                            <?php endif; ?>
+                                            
+                                            <?php if (!empty($item['notes'])) : ?>
+                                                <div class="oj-item-notes">
+                                                    <span class="dashicons dashicons-format-quote"></span>
+                                                    <span class="oj-notes-text"><?php echo esc_html($item['notes']); ?></span>
+                                                </div>
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
                             <?php else : ?>
                                 <div class="oj-no-items"><?php _e('No items found', 'orders-jet'); ?></div>
                             <?php endif; ?>
@@ -941,67 +938,77 @@ $currency_symbol = get_woocommerce_currency_symbol();
 /* Kitchen Cards Layout */
 .oj-kitchen-cards-container {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-    gap: 24px;
-    margin-top: 24px;
-    padding: 0 20px;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
 }
 
 .oj-kitchen-card {
     background: #ffffff;
-    border: none;
-    border-radius: 16px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border: 2px solid #e1e5e9;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     transition: all 0.3s ease;
     overflow: hidden;
-    position: relative;
 }
 
 .oj-kitchen-card:hover {
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-    transform: translateY(-4px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
 }
 
-/* Order Header Section */
-.oj-order-header-section {
-    background: #f8f9fa;
-    padding: 20px;
-    border-bottom: 1px solid #e9ecef;
-}
-
-.oj-order-meta {
+/* Card Header */
+.oj-card-header {
     display: flex;
-    flex-direction: column;
-    gap: 12px;
-    margin-bottom: 16px;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-bottom: 1px solid #dee2e6;
 }
 
-/* Order Type Badge */
+.oj-card-info {
+    flex: 1;
+}
+
+.oj-table-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.oj-table-number {
+    background: #007cba;
+    color: #ffffff;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* Order Type Badge - styled like order number */
 .oj-order-type-badge {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
-    border-radius: 24px;
-    font-size: 13px;
-    font-weight: 700;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    align-self: flex-start;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    letter-spacing: 0.5px;
 }
 
 .oj-order-type-badge .oj-type-icon {
-    font-size: 16px;
-    opacity: 0.9;
+    font-size: 12px;
 }
 
 .oj-order-type-badge .oj-type-label {
-    font-size: 12px;
-    font-weight: 700;
+    font-size: 11px;
 }
 
-/* Order Type Colors - Professional Restaurant Style */
+/* Order Type Colors */
 .oj-order-type-dinein {
     background: #4CAF50;
     color: #ffffff;
@@ -1027,93 +1034,64 @@ $currency_symbol = get_woocommerce_currency_symbol();
     color: #ffffff;
 }
 
-/* Location Badges */
-.oj-location-badges {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
+/* Customer Info */
+.oj-customer-info {
+    padding: 12px 20px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
 }
 
-.oj-table-badge, .oj-customer-badge, .oj-order-id-badge {
-    padding: 6px 12px;
-    border-radius: 16px;
-    font-size: 12px;
-    font-weight: 600;
-    color: #ffffff;
+.oj-customer-name {
+    font-weight: 500;
+    color: #495057;
+    margin-bottom: 4px;
 }
 
-.oj-table-badge {
-    background: #2196F3;
-}
-
-.oj-customer-badge {
-    background: #FF9800;
-}
-
-.oj-order-id-badge {
+.oj-order-number {
     background: #6c757d;
-}
-
-/* Cooking Status Badge */
-.oj-cooking-status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    background: #87CEEB;
     color: #ffffff;
-    border-radius: 16px;
+    padding: 4px 8px;
+    border-radius: 12px;
     font-size: 12px;
     font-weight: 600;
-    text-transform: uppercase;
-    align-self: flex-start;
+    display: inline-block;
 }
 
-.oj-cooking-status-badge .oj-status-icon {
-    font-size: 14px;
-}
-
-.oj-cooking-status-badge .oj-status-text {
-    font-size: 11px;
-}
-
-/* Order Time */
 .oj-order-time {
     display: flex;
     align-items: center;
     gap: 6px;
     color: #6c757d;
     font-size: 14px;
-    font-weight: 500;
 }
 
-.oj-order-time .oj-time-icon {
-    font-size: 16px;
+/* Card Body */
+.oj-card-body {
+    padding: 20px;
 }
 
-/* Order Details Card */
-.oj-order-details-card {
-    background: #ffffff;
-    padding: 24px;
+.oj-card-items {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
 }
 
-.oj-order-item {
-    margin-bottom: 20px;
+.oj-card-item {
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 3px solid #007cba;
 }
 
-.oj-order-item:last-child {
-    margin-bottom: 0;
-}
-
-.oj-item-main {
+.oj-item-header {
     display: flex;
     align-items: center;
     gap: 12px;
     margin-bottom: 8px;
 }
 
-.oj-item-qty-badge {
-    background: #2196F3;
+.oj-item-qty {
+    background: #007cba;
     color: #ffffff;
     padding: 4px 8px;
     border-radius: 12px;
@@ -1130,46 +1108,38 @@ $currency_symbol = get_woocommerce_currency_symbol();
     flex: 1;
 }
 
-.oj-item-details {
+.oj-item-variations {
     margin-left: 44px;
     margin-bottom: 8px;
 }
 
-.oj-detail-tag {
+.oj-variation-tag {
     background: #87CEEB;
     color: #ffffff;
     padding: 4px 8px;
-    border-radius: 8px;
-    font-size: 11px;
+    border-radius: 12px;
+    font-size: 12px;
     font-weight: 500;
     margin-right: 6px;
 }
 
 .oj-item-addons {
-    display: flex;
-    align-items: center;
-    gap: 8px;
     margin-left: 44px;
     margin-bottom: 8px;
 }
 
-.oj-addon-icon {
+.oj-addons-label {
     background: #4CAF50;
     color: #ffffff;
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     font-size: 12px;
     font-weight: 600;
-}
-
-.oj-addon-tags {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
+    margin-right: 8px;
 }
 
 .oj-addon-tag {
@@ -1177,27 +1147,21 @@ $currency_symbol = get_woocommerce_currency_symbol();
     color: #856404;
     padding: 4px 8px;
     border-radius: 12px;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 500;
+    margin-right: 6px;
 }
 
-/* Special Instructions */
-.oj-special-instructions {
+.oj-item-notes {
     background: #F8D7DA;
     color: #721C24;
-    padding: 16px;
-    border-radius: 12px;
-    margin-top: 16px;
-    border-left: 4px solid #DC3545;
+    padding: 12px;
+    border-radius: 8px;
+    margin-left: 44px;
+    border-left: 3px solid #DC3545;
 }
 
-.oj-instructions-icon {
-    font-size: 18px;
-    font-weight: bold;
-    margin-right: 8px;
-}
-
-.oj-instructions-text {
+.oj-notes-text {
     font-style: italic;
     font-size: 14px;
     line-height: 1.4;
@@ -1514,51 +1478,37 @@ $currency_symbol = get_woocommerce_currency_symbol();
         padding: 12px;
     }
     
-    .oj-order-header-section {
-        padding: 16px;
+    .oj-card-header {
+        padding: 12px 16px;
     }
     
-    .oj-order-meta {
-        gap: 8px;
-        margin-bottom: 12px;
+    .oj-customer-info {
+        padding: 8px 16px;
+    }
+    
+    .oj-card-body {
+        padding: 16px;
     }
     
     .oj-order-type-badge {
-        padding: 6px 12px;
-        font-size: 11px;
+        padding: 3px 6px;
+        font-size: 10px;
     }
     
     .oj-order-type-badge .oj-type-icon {
-        font-size: 14px;
+        font-size: 10px;
     }
     
     .oj-order-type-badge .oj-type-label {
+        font-size: 9px;
+    }
+    
+    .oj-order-number {
+        padding: 3px 6px;
         font-size: 10px;
     }
     
-    .oj-location-badges {
-        gap: 6px;
-    }
-    
-    .oj-table-badge, .oj-customer-badge, .oj-order-id-badge {
-        padding: 4px 8px;
-        font-size: 11px;
-    }
-    
-    .oj-cooking-status-badge {
-        padding: 4px 8px;
-        font-size: 10px;
-    }
-    
-    .oj-order-details-card {
-        padding: 16px;
-    }
-    
-    .oj-item-main {
-        gap: 8px;
-    }
-    
-    .oj-item-qty-badge {
+    .oj-item-qty {
         padding: 3px 6px;
         font-size: 11px;
         min-width: 28px;
@@ -1568,17 +1518,8 @@ $currency_symbol = get_woocommerce_currency_symbol();
         font-size: 14px;
     }
     
-    .oj-item-details, .oj-item-addons {
+    .oj-item-variations, .oj-item-addons, .oj-item-notes {
         margin-left: 36px;
-    }
-    
-    .oj-special-instructions {
-        padding: 12px;
-        margin-top: 12px;
-    }
-    
-    .oj-instructions-text {
-        font-size: 12px;
     }
     
     .oj-table-number,
