@@ -293,17 +293,9 @@ foreach ($active_orders as $order) {
 // Replace the original array with the new one
 $active_orders = $orders_with_items;
 
-// Kitchen stats (matching actual workflow)
-$pending_orders = $wpdb->get_var($wpdb->prepare("
-    SELECT COUNT(*) 
-    FROM {$wpdb->posts} p
-    INNER JOIN {$wpdb->postmeta} pm_table ON p.ID = pm_table.post_id AND pm_table.meta_key = '_oj_table_number'
-    WHERE p.post_type = 'shop_order'
-    AND p.post_status = 'wc-pending'
-    AND pm_table.meta_value IS NOT NULL
-"));
-
-$processing_orders = $wpdb->get_var($wpdb->prepare("
+// Kitchen stats (simplified to match workflow)
+// In Progress: Orders being cooked (wc-processing)
+$in_progress_orders = $wpdb->get_var($wpdb->prepare("
     SELECT COUNT(*) 
     FROM {$wpdb->posts} p
     INNER JOIN {$wpdb->postmeta} pm_table ON p.ID = pm_table.post_id AND pm_table.meta_key = '_oj_table_number'
@@ -312,15 +304,15 @@ $processing_orders = $wpdb->get_var($wpdb->prepare("
     AND pm_table.meta_value IS NOT NULL
 "));
 
-$completed_today = $wpdb->get_var($wpdb->prepare("
+// Completed: Orders ready for pickup (wc-on-hold)
+$completed_orders = $wpdb->get_var($wpdb->prepare("
     SELECT COUNT(*) 
     FROM {$wpdb->posts} p
     INNER JOIN {$wpdb->postmeta} pm_table ON p.ID = pm_table.post_id AND pm_table.meta_key = '_oj_table_number'
     WHERE p.post_type = 'shop_order'
-    AND p.post_status = 'wc-completed'
+    AND p.post_status = 'wc-on-hold'
     AND pm_table.meta_value IS NOT NULL
-    AND DATE(p.post_date) = %s
-", $today));
+"));
 
 // Format currency
 $currency_symbol = get_woocommerce_currency_symbol();
@@ -344,17 +336,13 @@ $currency_symbol = get_woocommerce_currency_symbol();
         <h2><?php echo sprintf(__('Kitchen Overview - %s', 'orders-jet'), $today_formatted); ?></h2>
         
         <div class="oj-stats-row">
-            <div class="oj-stat-box pending">
-                <div class="oj-stat-number"><?php echo esc_html($pending_orders ?: 0); ?></div>
-                <div class="oj-stat-label"><?php _e('Pending Orders', 'orders-jet'); ?></div>
-            </div>
             <div class="oj-stat-box processing">
-                <div class="oj-stat-number"><?php echo esc_html($processing_orders ?: 0); ?></div>
+                <div class="oj-stat-number"><?php echo esc_html($in_progress_orders ?: 0); ?></div>
                 <div class="oj-stat-label"><?php _e('In Progress', 'orders-jet'); ?></div>
             </div>
             <div class="oj-stat-box completed">
-                <div class="oj-stat-number"><?php echo esc_html($completed_today ?: 0); ?></div>
-                <div class="oj-stat-label"><?php _e('Completed Today', 'orders-jet'); ?></div>
+                <div class="oj-stat-number"><?php echo esc_html($completed_orders ?: 0); ?></div>
+                <div class="oj-stat-label"><?php _e('Completed', 'orders-jet'); ?></div>
             </div>
         </div>
     </div>
