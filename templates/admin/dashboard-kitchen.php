@@ -29,7 +29,7 @@ if (function_exists('wc_get_orders')) {
     error_log('Orders Jet Kitchen: Using WooCommerce native method...');
     
     $wc_orders = wc_get_orders(array(
-        'status' => array('pending', 'processing', 'on-hold'),
+        'status' => array('pending', 'processing'), // Exclude on-hold (ready orders)
         'meta_key' => '_oj_table_number',
         'limit' => -1,
         'orderby' => 'date',
@@ -56,7 +56,7 @@ if (function_exists('wc_get_orders')) {
     
     $active_orders_posts = get_posts(array(
         'post_type' => 'shop_order',
-        'post_status' => array('wc-pending', 'wc-processing', 'wc-on-hold'),
+        'post_status' => array('wc-pending', 'wc-processing'), // Exclude wc-on-hold (ready orders)
         'meta_query' => array(
             array(
                 'key' => '_oj_table_number',

@@ -361,6 +361,12 @@
     }
 }
 
+/* Loading animation for buttons */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
 @media (max-width: 782px) {
     /* Stack table cells vertically on mobile */
     .wp-list-table.widefat {

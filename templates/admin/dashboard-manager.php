@@ -360,6 +360,93 @@ $table_status = $wpdb->get_results("
         <?php endif; ?>
     </div>
 
+    <!-- Ready Orders (Orders ready for pickup) -->
+    <div class="oj-dashboard-ready-orders">
+        <h2><?php _e('Ready for Pickup', 'orders-jet'); ?> 
+            <span class="dashicons dashicons-bell" style="font-size: 20px; color: #d63384; vertical-align: middle; margin-left: 8px;"></span>
+        </h2>
+        
+        <?php
+        // Get orders that are ready for pickup (on-hold status)
+        $ready_orders_posts = get_posts(array(
+            'post_type' => 'shop_order',
+            'post_status' => array('wc-on-hold'), // Ready orders
+            'meta_query' => array(
+                array(
+                    'key' => '_oj_table_number',
+                    'compare' => 'EXISTS'
+                )
+            ),
+            'posts_per_page' => -1,
+            'orderby' => 'date',
+            'order' => 'ASC'
+        ));
+
+        $ready_orders = array();
+        foreach ($ready_orders_posts as $order_post) {
+            $order = wc_get_order($order_post->ID);
+            if ($order) {
+                $ready_orders[] = array(
+                    'ID' => $order->get_id(),
+                    'post_date' => $order_post->post_date,
+                    'post_status' => $order_post->post_status,
+                    'order_total' => $order->get_total(),
+                    'table_number' => $order->get_meta('_oj_table_number'),
+                    'customer_name' => $order->get_billing_first_name(),
+                    'session_id' => $order->get_meta('_oj_session_id')
+                );
+            }
+        }
+        ?>
+        
+        <?php if (!empty($ready_orders)) : ?>
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th style="width: 15%;"><?php _e('Order #', 'orders-jet'); ?></th>
+                        <th style="width: 20%;"><?php _e('Customer/Table', 'orders-jet'); ?></th>
+                        <th style="width: 15%;"><?php _e('Date', 'orders-jet'); ?></th>
+                        <th style="width: 15%;"><?php _e('Total', 'orders-jet'); ?></th>
+                        <th style="width: 20%;"><?php _e('Status', 'orders-jet'); ?></th>
+                        <th style="width: 15%;"><?php _e('Action', 'orders-jet'); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($ready_orders as $order) : ?>
+                        <tr style="background: #fff3cd; border-left: 4px solid #ffc107;">
+                            <td><strong>#<?php echo esc_html($order['ID']); ?></strong></td>
+                            <td>
+                                <?php if ($order['customer_name']) : ?>
+                                    <?php echo esc_html($order['customer_name']); ?><br>
+                                <?php endif; ?>
+                                <strong><?php echo esc_html($order['table_number'] ?: __('N/A', 'orders-jet')); ?></strong>
+                            </td>
+                            <td><?php echo esc_html(date('M j, Y g:i A', strtotime($order['post_date']))); ?></td>
+                            <td><strong><?php echo wc_price($order['order_total']); ?></strong></td>
+                            <td>
+                                <span class="status-badge" style="background: #ffc107; color: #856404; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">
+                                    <span class="dashicons dashicons-clock" style="font-size: 12px; vertical-align: middle; margin-right: 4px;"></span>
+                                    <?php _e('Ready for Pickup', 'orders-jet'); ?>
+                                </span>
+                            </td>
+                            <td>
+                                <button class="button button-primary oj-deliver-order" data-order-id="<?php echo esc_attr($order['ID']); ?>" style="background: #00a32a; border-color: #00a32a; font-size: 12px; padding: 4px 8px;">
+                                    <span class="dashicons dashicons-yes" style="font-size: 14px; vertical-align: middle; margin-right: 4px;"></span>
+                                    <?php _e('Mark Delivered', 'orders-jet'); ?>
+                                </button>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        <?php else : ?>
+            <div class="oj-no-orders" style="text-align: center; padding: 20px; color: #666; background: #f8f9fa; border-radius: 4px;">
+                <span class="dashicons dashicons-yes-alt" style="font-size: 32px; margin-bottom: 10px; color: #00a32a;"></span>
+                <p><?php _e('No orders ready for pickup.', 'orders-jet'); ?></p>
+            </div>
+        <?php endif; ?>
+    </div>
+
     <!-- Table Status -->
     <div class="oj-dashboard-tables">
         <h2><?php _e('Table Status', 'orders-jet'); ?></h2>

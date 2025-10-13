@@ -18,6 +18,8 @@ class Orders_Jet_AJAX_Handlers {
         add_action('wp_ajax_oj_get_product_details', array($this, 'get_product_details'));
         add_action('wp_ajax_oj_get_table_orders', array($this, 'get_table_orders'));
         add_action('wp_ajax_oj_close_table', array($this, 'close_table'));
+        add_action('wp_ajax_oj_mark_order_ready', array($this, 'mark_order_ready'));
+        add_action('wp_ajax_oj_mark_order_delivered', array($this, 'mark_order_delivered'));
         
         // AJAX handlers for non-logged in users (guests)
         add_action('wp_ajax_nopriv_oj_submit_table_order', array($this, 'submit_table_order'));
@@ -1321,6 +1323,167 @@ class Orders_Jet_AJAX_Handlers {
         
         // Create new session ID
         return 'session_' . $table_number . '_' . time();
+    }
+    
+    /**
+     * Mark order as ready (Kitchen Dashboard)
+     */
+    public function mark_order_ready() {
+        // Check nonce for security
+        check_ajax_referer('oj_dashboard_nonce', 'nonce');
+        
+        // Check user permissions
+        if (!current_user_can('access_oj_kitchen_dashboard') && !current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('You do not have permission to perform this action.', 'orders-jet')));
+        }
+        
+        $order_id = intval($_POST['order_id']);
+        
+        if (!$order_id) {
+            wp_send_json_error(array('message' => __('Order ID is required.', 'orders-jet')));
+        }
+        
+        // Get the order
+        $order = wc_get_order($order_id);
+        
+        if (!$order) {
+            wp_send_json_error(array('message' => __('Order not found.', 'orders-jet')));
+        }
+        
+        // Check if this is a table order
+        $table_number = $order->get_meta('_oj_table_number');
+        if (!$table_number) {
+            wp_send_json_error(array('message' => __('This is not a table order.', 'orders-jet')));
+        }
+        
+        // Check current status
+        $current_status = $order->get_status();
+        if (!in_array($current_status, array('pending', 'processing'))) {
+            wp_send_json_error(array('message' => sprintf(__('Order cannot be marked ready from status: %s', 'orders-jet'), $current_status)));
+        }
+        
+        try {
+            // Mark order as ready (on-hold status means ready for pickup)
+            $order->set_status('on-hold');
+            
+            // Add order note
+            $order->add_order_note(sprintf(
+                __('Order marked as ready by kitchen staff (%s)', 'orders-jet'), 
+                wp_get_current_user()->display_name
+            ));
+            
+            // Save the order
+            $order->save();
+            
+            error_log('Orders Jet Kitchen: Order #' . $order_id . ' marked as ready (on-hold) by user #' . get_current_user_id());
+            
+            // Send notifications to manager and waiter dashboards
+            $this->send_ready_notifications($order, $table_number);
+            
+            wp_send_json_success(array(
+                'message' => sprintf(__('Order #%d marked as ready for pickup!', 'orders-jet'), $order_id),
+                'order_id' => $order_id,
+                'table_number' => $table_number,
+                'new_status' => 'on-hold'
+            ));
+            
+        } catch (Exception $e) {
+            error_log('Orders Jet Kitchen: Error marking order ready: ' . $e->getMessage());
+            wp_send_json_error(array('message' => __('Failed to mark order as ready. Please try again.', 'orders-jet')));
+        }
+    }
+    
+    /**
+     * Send notifications when order is ready
+     */
+    private function send_ready_notifications($order, $table_number) {
+        // Store notification in transient for manager/waiter dashboards to pick up
+        $notification = array(
+            'type' => 'order_ready',
+            'order_id' => $order->get_id(),
+            'table_number' => $table_number,
+            'message' => sprintf(__('Table %s - Order #%d is ready for pickup!', 'orders-jet'), $table_number, $order->get_id()),
+            'timestamp' => current_time('timestamp'),
+            'staff_name' => wp_get_current_user()->display_name
+        );
+        
+        // Store notification for 5 minutes (manager/waiter dashboards will pick it up)
+        $existing_notifications = get_transient('oj_ready_notifications') ?: array();
+        $existing_notifications[] = $notification;
+        
+        // Keep only last 10 notifications
+        if (count($existing_notifications) > 10) {
+            $existing_notifications = array_slice($existing_notifications, -10);
+        }
+        
+        set_transient('oj_ready_notifications', $existing_notifications, 300); // 5 minutes
+        
+        error_log('Orders Jet Kitchen: Ready notification stored for Table ' . $table_number . ' Order #' . $order->get_id());
+    }
+    
+    /**
+     * Mark order as delivered (Manager Dashboard)
+     */
+    public function mark_order_delivered() {
+        // Check nonce for security
+        check_ajax_referer('oj_dashboard_nonce', 'nonce');
+        
+        // Check user permissions
+        if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('You do not have permission to perform this action.', 'orders-jet')));
+        }
+        
+        $order_id = intval($_POST['order_id']);
+        
+        if (!$order_id) {
+            wp_send_json_error(array('message' => __('Order ID is required.', 'orders-jet')));
+        }
+        
+        // Get the order
+        $order = wc_get_order($order_id);
+        
+        if (!$order) {
+            wp_send_json_error(array('message' => __('Order not found.', 'orders-jet')));
+        }
+        
+        // Check if this is a table order
+        $table_number = $order->get_meta('_oj_table_number');
+        if (!$table_number) {
+            wp_send_json_error(array('message' => __('This is not a table order.', 'orders-jet')));
+        }
+        
+        // Check current status (should be on-hold)
+        $current_status = $order->get_status();
+        if ($current_status !== 'on-hold') {
+            wp_send_json_error(array('message' => sprintf(__('Order cannot be marked delivered from status: %s', 'orders-jet'), $current_status)));
+        }
+        
+        try {
+            // Mark order as delivered (completed status)
+            $order->set_status('completed');
+            
+            // Add order note
+            $order->add_order_note(sprintf(
+                __('Order marked as delivered by staff (%s)', 'orders-jet'), 
+                wp_get_current_user()->display_name
+            ));
+            
+            // Save the order
+            $order->save();
+            
+            error_log('Orders Jet Manager: Order #' . $order_id . ' marked as delivered (completed) by user #' . get_current_user_id());
+            
+            wp_send_json_success(array(
+                'message' => sprintf(__('Order #%d marked as delivered!', 'orders-jet'), $order_id),
+                'order_id' => $order_id,
+                'table_number' => $table_number,
+                'new_status' => 'completed'
+            ));
+            
+        } catch (Exception $e) {
+            error_log('Orders Jet Manager: Error marking order delivered: ' . $e->getMessage());
+            wp_send_json_error(array('message' => __('Failed to mark order as delivered. Please try again.', 'orders-jet')));
+        }
     }
     
 }
