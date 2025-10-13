@@ -1816,6 +1816,14 @@ $products = wc_get_products(array(
             // Add to cart
             elements.popupAddToCart.addEventListener('click', addToCart);
             
+            // Event delegation for variation changes (since variations are loaded dynamically)
+            document.addEventListener('change', function(e) {
+                if (e.target.matches('input[name^="variation-"]')) {
+                    console.log('Variation changed via event delegation:', e.target);
+                    updateVariationPrice();
+                }
+            });
+            
             // Cart events
             elements.clearCart.addEventListener('click', clearCart);
             elements.placeOrder.addEventListener('click', placeOrder);
@@ -2042,14 +2050,23 @@ $products = wc_get_products(array(
         
         // Display product details - Clean implementation
         function displayProductDetails(data) {
+            console.log('=== DISPLAY PRODUCT DETAILS ===');
+            console.log('Product details received:', data);
+            
             // Handle price information for variable products
             if (data.price_info) {
+                console.log('Price info found:', data.price_info);
                 handleProductPricing(data.price_info);
+            } else {
+                console.log('No price info received');
             }
             
             // Display variations first (most important)
             if (data.variations && Object.keys(data.variations).length > 0) {
+                console.log('Variations found:', data.variations);
                 displayVariations(data.variations);
+            } else {
+                console.log('No variations found');
             }
             
             // Display add-ons
@@ -2088,32 +2105,57 @@ $products = wc_get_products(array(
         
         // Display variations
         function displayVariations(variations) {
+            console.log('=== DISPLAY VARIATIONS ===');
             const variationsSection = document.getElementById('variations-section');
             const variationsContent = document.getElementById('variations-content');
             
+            // Mark product as variable when variations are displayed
+            if (currentProduct) {
+                currentProduct.isVariable = true;
+                console.log('Product marked as variable');
+                
+                // Calculate price range from variations if not available
+                if (!currentProduct.priceInfo) {
+                    const priceRange = calculatePriceRangeFromVariations(variations);
+                    if (priceRange) {
+                        elements.popupPrice.innerHTML = priceRange;
+                        console.log('Set price range from variations:', priceRange);
+                    }
+                }
+                
+                // Disable add to cart button for variable products
+                elements.popupAddToCart.disabled = true;
+                elements.popupAddToCart.textContent = '<?php _e('Select Options', 'orders-jet'); ?>';
+                elements.popupAddToCart.classList.add('disabled');
+                console.log('Add to cart button disabled');
+            }
+            
             let variationsHTML = '';
             for (const [attributeName, options] of Object.entries(variations)) {
+                console.log(`Processing attribute: ${attributeName} with ${options.length} options`);
                 variationsHTML += `
                     <div class="exrow-group ex-radio">
                         <span class="exfood-label">
                             <span class="exwo-otitle">${attributeName}</span>
                         </span>
                         <div class="exwo-container">
-                            ${options.map(option => `
+                            ${options.map(option => {
+                                console.log(`Option: ${option.label}, Price: ${option.price}, ID: ${option.variation_id}`);
+                                return `
                                 <div class="addon-option-item">
                                     <div class="addon-option-content">
                                         <input type="radio" class="ex-options variation-option" name="variation-${attributeName}" 
                                                id="variation-${option.value}" value="${option.value}" 
                                                data-price="${option.price || 0}" 
-                                               data-variation-id="${option.variation_id || 0}"
-                                               onchange="updateVariationPrice()">
+                                               data-variation-id="${option.variation_id || 0}">
                                         <label class="addon-option-label" for="variation-${option.value}">
                                             <span class="exwo-op-name">${option.label}</span>
                                             <!-- Price removed for native WooCommerce behavior -->
                                         </label>
                                     </div>
                                 </div>
-                            `).join('')}
+                                `;
+                            }).join('')}
                         </div>
                     </div>
                 `;
@@ -2121,6 +2163,8 @@ $products = wc_get_products(array(
             
             variationsContent.innerHTML = variationsHTML;
             variationsSection.style.display = 'block';
+            
+            console.log('Variations HTML generated and displayed');
         }
         
         // Display add-ons
@@ -2563,29 +2607,75 @@ $products = wc_get_products(array(
         
         // Update price when variation is selected (Native WooCommerce behavior)
         function updateVariationPrice() {
-            if (!currentProduct || !currentProduct.isVariable) return;
+            console.log('=== UPDATE VARIATION PRICE ===');
+            console.log('Current product:', currentProduct);
+            
+            if (!currentProduct) {
+                console.log('No current product');
+                return;
+            }
+            
+            console.log('Product isVariable:', currentProduct.isVariable);
             
             const selectedVariation = document.querySelector('input[name^="variation-"]:checked');
+            console.log('Selected variation element:', selectedVariation);
             
             if (selectedVariation) {
                 const variationPrice = parseFloat(selectedVariation.dataset.price) || 0;
-                const formattedPrice = formatPrice(variationPrice);
+                const variationId = selectedVariation.dataset.variationId;
+                console.log('Variation price:', variationPrice);
+                console.log('Variation ID:', variationId);
                 
-                // Update price display
-                elements.popupPrice.innerHTML = formattedPrice;
-                
-                // Enable add to cart button
-                elements.popupAddToCart.disabled = false;
-                elements.popupAddToCart.textContent = '<?php _e('Add to Cart', 'orders-jet'); ?>';
-                elements.popupAddToCart.classList.remove('disabled');
-            } else {
-                // No variation selected, show price range and disable button
-                if (currentProduct.priceInfo) {
-                    elements.popupPrice.innerHTML = currentProduct.priceInfo.price_range;
+                if (variationPrice > 0) {
+                    const formattedPrice = formatPrice(variationPrice);
+                    console.log('Formatted price:', formattedPrice);
+                    
+                    // Update price display
+                    elements.popupPrice.innerHTML = formattedPrice;
+                    
+                    // Enable add to cart button
+                    elements.popupAddToCart.disabled = false;
+                    elements.popupAddToCart.textContent = '<?php _e('Add to Cart', 'orders-jet'); ?>';
+                    elements.popupAddToCart.classList.remove('disabled');
+                    
+                    console.log('Price updated and button enabled');
+                } else {
+                    console.log('Invalid variation price:', variationPrice);
                 }
+            } else {
+                console.log('No variation selected');
+                
+                // No variation selected, show price range and disable button
+                let priceRange = null;
+                if (currentProduct.priceInfo && currentProduct.priceInfo.price_range) {
+                    priceRange = currentProduct.priceInfo.price_range;
+                } else {
+                    // Fallback: calculate from current variations
+                    const variationInputs = document.querySelectorAll('input[name^="variation-"]');
+                    if (variationInputs.length > 0) {
+                        const variations = {};
+                        variationInputs.forEach(input => {
+                            const attributeName = input.name.replace('variation-', '');
+                            if (!variations[attributeName]) variations[attributeName] = [];
+                            variations[attributeName].push({
+                                price: parseFloat(input.dataset.price) || 0,
+                                label: input.value
+                            });
+                        });
+                        priceRange = calculatePriceRangeFromVariations(variations);
+                    }
+                }
+                
+                if (priceRange) {
+                    elements.popupPrice.innerHTML = priceRange;
+                    console.log('Price range restored:', priceRange);
+                }
+                
                 elements.popupAddToCart.disabled = true;
                 elements.popupAddToCart.textContent = '<?php _e('Select Options', 'orders-jet'); ?>';
                 elements.popupAddToCart.classList.add('disabled');
+                
+                console.log('Button disabled, waiting for selection');
             }
         }
         
@@ -2593,6 +2683,36 @@ $products = wc_get_products(array(
         function formatPrice(price) {
             const currencySymbol = '<?php echo get_woocommerce_currency_symbol(); ?>';
             return price.toFixed(2) + ' ' + currencySymbol;
+        }
+        
+        // Calculate price range from variations data
+        function calculatePriceRangeFromVariations(variations) {
+            console.log('Calculating price range from variations:', variations);
+            let minPrice = Infinity;
+            let maxPrice = 0;
+            
+            Object.values(variations).forEach(options => {
+                options.forEach(option => {
+                    const price = parseFloat(option.price) || 0;
+                    if (price > 0) {
+                        minPrice = Math.min(minPrice, price);
+                        maxPrice = Math.max(maxPrice, price);
+                    }
+                });
+            });
+            
+            if (minPrice === Infinity) {
+                console.log('No valid prices found in variations');
+                return null;
+            }
+            
+            console.log(`Price range: ${minPrice} - ${maxPrice}`);
+            
+            if (minPrice === maxPrice) {
+                return formatPrice(minPrice);
+            } else {
+                return formatPrice(minPrice) + ' - ' + formatPrice(maxPrice);
+            }
         }
         
         // Validate required variations
