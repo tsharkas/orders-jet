@@ -1,6 +1,7 @@
 /**
  * Orders Jet - Admin Styles
  * Styles for admin interface
+ * Supports both LTR and RTL languages
  */
 
 /* Admin Table List Styles */
@@ -215,7 +216,7 @@
     color: #1976d2;
     padding: 2px 6px;
     border-radius: 3px;
-    margin-right: 5px;
+    margin-inline-end: 5px; /* RTL-friendly spacing */
     display: inline-block;
     margin-bottom: 2px;
 }
@@ -228,7 +229,7 @@
 .oj-addons-label {
     font-weight: 600;
     color: #e67e22;
-    margin-right: 5px;
+    margin-inline-end: 5px; /* RTL-friendly spacing */
 }
 
 .oj-addon {
@@ -236,7 +237,7 @@
     color: #856404;
     padding: 2px 6px;
     border-radius: 3px;
-    margin-right: 5px;
+    margin-inline-end: 5px; /* RTL-friendly spacing */
     display: inline-block;
     margin-bottom: 2px;
 }
@@ -252,7 +253,7 @@
 
 .oj-notes-label {
     font-weight: 600;
-    margin-right: 5px;
+    margin-inline-end: 5px; /* RTL-friendly spacing */
 }
 
 .oj-notes-text {
@@ -291,7 +292,7 @@
     font-weight: bold;
     min-width: 18px;
     text-align: center;
-    margin-right: 5px;
+    margin-inline-end: 5px; /* RTL-friendly spacing */
 }
 
 .oj-manager-item .oj-item-name {
@@ -310,7 +311,7 @@
     color: #1976d2;
     padding: 1px 4px;
     border-radius: 2px;
-    margin-right: 3px;
+    margin-inline-end: 3px; /* RTL-friendly spacing */
     display: inline-block;
     margin-bottom: 1px;
     font-size: 10px;
@@ -326,7 +327,7 @@
     color: #856404;
     padding: 1px 4px;
     border-radius: 2px;
-    margin-right: 3px;
+    margin-inline-end: 3px; /* RTL-friendly spacing */
     display: inline-block;
     margin-bottom: 1px;
     font-size: 10px;
@@ -458,7 +459,7 @@
     .oj-variation,
     .oj-addon {
         padding: 3px 8px;
-        margin-right: 6px;
+        margin-inline-end: 6px; /* RTL-friendly spacing */
         margin-bottom: 4px;
         font-size: 12px;
     }
@@ -483,7 +484,7 @@
     .oj-complete-order .dashicons,
     .oj-resume-order .dashicons {
         font-size: 20px;
-        margin-right: 8px;
+        margin-inline-end: 8px; /* RTL-friendly spacing */
     }
 }
 

@@ -100,6 +100,8 @@ class Orders_Jet_Admin_Dashboard {
             'userRole' => oj_get_user_role(),
             'userId' => get_current_user_id(),
             'userName' => wp_get_current_user()->display_name,
+            'isRTL' => is_rtl(), // Add RTL detection for JavaScript
+            'language' => get_user_locale(), // Add current language
         ));
     }
     
