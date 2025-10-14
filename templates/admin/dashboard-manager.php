@@ -2408,7 +2408,8 @@ jQuery(document).ready(function($) {
     });
     
     function filterOrders(filter) {
-        const today = new Date().toISOString().split('T')[0];
+        // Get today's date in server timezone using PHP-generated value
+        const today = '<?php echo date('Y-m-d'); ?>';
         
         orderCards.each(function() {
             const card = $(this);
@@ -2439,12 +2440,14 @@ jQuery(document).ready(function($) {
                 case 'pickup-today':
                     if (orderType === 'pickup_timed') {
                         const deliveryDateFormatted = card.data('delivery-date-formatted');
+                        console.log('Manager Dashboard - Checking pickup-today:', deliveryDateFormatted, 'vs', today, 'match:', deliveryDateFormatted === today);
                         show = deliveryDateFormatted === today && card.find('.oj-status-badge.completed').length === 0;
                     }
                     break;
                 case 'pickup-upcoming':
                     if (orderType === 'pickup_timed') {
                         const deliveryDateFormatted = card.data('delivery-date-formatted');
+                        console.log('Manager Dashboard - Checking pickup-upcoming:', deliveryDateFormatted, 'vs', today, 'future:', deliveryDateFormatted > today);
                         show = deliveryDateFormatted > today && card.find('.oj-status-badge.completed').length === 0;
                     }
                     break;
@@ -2486,7 +2489,8 @@ jQuery(document).ready(function($) {
     }
     
     function updateFilterCounts() {
-        const today = new Date().toISOString().split('T')[0];
+        // Get today's date in server timezone using PHP-generated value
+        const today = '<?php echo date('Y-m-d'); ?>';
         
         filterBtns.each(function() {
             const btn = $(this);
@@ -2590,7 +2594,8 @@ jQuery(document).ready(function($) {
     }
     
     function applyUpcomingOrderStyling() {
-        const today = new Date().toISOString().split('T')[0];
+        // Get today's date in server timezone using PHP-generated value
+        const today = '<?php echo date('Y-m-d'); ?>';
         
         orderCards.each(function() {
             const card = $(this);
