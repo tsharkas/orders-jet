@@ -113,8 +113,8 @@ if (function_exists('wc_get_orders')) {
             'table_number' => $table_number,
             'customer_name' => $wc_order->get_billing_first_name(),
             'session_id' => $wc_order->get_meta('_oj_session_id'),
-            'delivery_date' => $delivery_date,
-            'delivery_time' => $delivery_time,
+            'delivery_date' => $has_delivery_time ? $delivery_info['datetime'] : '',
+            'delivery_time' => $has_delivery_time ? $delivery_info['time_only'] : '',
             // Enhanced badge logic
             'order_type' => $order_type,
             'order_type_label' => $order_type_label,
@@ -187,8 +187,8 @@ if (function_exists('wc_get_orders')) {
                 'table_number' => $table_number,
                     'customer_name' => $order->get_billing_first_name(),
                 'session_id' => $order->get_meta('_oj_session_id'),
-                'delivery_date' => $delivery_date,
-                'delivery_time' => $delivery_time,
+                'delivery_date' => $has_delivery_time ? $delivery_info['datetime'] : '',
+                'delivery_time' => $has_delivery_time ? $delivery_info['time_only'] : '',
                 // Enhanced badge logic
                 'order_type' => $order_type,
                 'order_type_label' => $order_type_label,
