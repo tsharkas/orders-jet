@@ -455,7 +455,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
         <div class="oj-stats-row oj-secondary-stats">
             <div class="oj-stat-box pending">
                 <div class="oj-stat-number"><?php echo esc_html($pending_orders); ?></div>
-                <div class="oj-stat-label"><?php _e('Delivered', 'orders-jet'); ?></div>
+                <div class="oj-stat-label"><?php _e('Served', 'orders-jet'); ?></div>
             </div>
             <div class="oj-stat-box tables">
                 <div class="oj-stat-number"><?php echo esc_html($active_tables ?: 0); ?>/<?php echo esc_html($total_tables ?: 0); ?></div>
@@ -501,7 +501,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
         </button>
         <button class="oj-filter-btn" data-filter="pending">
             <span class="oj-filter-icon">⏳</span>
-            <span class="oj-filter-label"><?php _e('Delivered', 'orders-jet'); ?></span>
+            <span class="oj-filter-label"><?php _e('Served', 'orders-jet'); ?></span>
         </button>
         <button class="oj-filter-btn" data-filter="completed">
             <span class="oj-filter-icon">🎉</span>
@@ -615,12 +615,12 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                     <?php if (!empty($order['table_number'])) : ?>
                                         <span class="oj-status-badge pending-payment-table">
                                             <span class="dashicons dashicons-yes-alt"></span>
-                                            <?php _e('Delivered - Awaiting Payment', 'orders-jet'); ?>
+                                            <?php _e('Served - Awaiting Payment', 'orders-jet'); ?>
                                         </span>
                                     <?php else : ?>
                                         <span class="oj-status-badge pending-payment-pickup">
                                             <span class="dashicons dashicons-yes-alt"></span>
-                                            <?php _e('Delivered for Pickup', 'orders-jet'); ?>
+                                            <?php _e('Served for Pickup', 'orders-jet'); ?>
                                         </span>
                                     <?php endif; ?>
                                 <?php elseif ($order['post_status'] === 'wc-on-hold') : ?>
@@ -2557,7 +2557,7 @@ jQuery(document).ready(function($) {
             'pickup-immediate': '<?php _e('immediate pickup orders', 'orders-jet'); ?>',
             'pickup-upcoming': '<?php _e('upcoming pickup orders', 'orders-jet'); ?>',
             'ready': '<?php _e('ready orders', 'orders-jet'); ?>',
-            'pending': '<?php _e('delivered orders', 'orders-jet'); ?>',
+            'pending': '<?php _e('served orders', 'orders-jet'); ?>',
             'completed': '<?php _e('completed orders', 'orders-jet'); ?>',
             'cancelled': '<?php _e('cancelled orders', 'orders-jet'); ?>'
         };

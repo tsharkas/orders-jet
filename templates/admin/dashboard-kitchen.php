@@ -51,13 +51,13 @@ if (isset($_POST['oj_mark_ready']) && isset($_POST['order_id']) && isset($_POST[
                         // Add context-aware order note
                         if (!empty($table_number)) {
                             $order->add_order_note(sprintf(
-                                __('Order delivered to Table %s - ready for payment by kitchen staff (%s)', 'orders-jet'),
+                                __('Order served to Table %s - ready for payment by kitchen staff (%s)', 'orders-jet'),
                                 $table_number,
                                 wp_get_current_user()->display_name
                             ));
                         } else {
                             $order->add_order_note(sprintf(
-                                __('Order delivered and ready for pickup - customer notified by kitchen staff (%s)', 'orders-jet'),
+                                __('Order served and ready for pickup - customer notified by kitchen staff (%s)', 'orders-jet'),
                                 wp_get_current_user()->display_name
                             ));
                         }
@@ -75,9 +75,9 @@ if (isset($_POST['oj_mark_ready']) && isset($_POST['order_id']) && isset($_POST[
                             
                             // Context-aware success message
                             if (!empty($table_number)) {
-                                $success_message = sprintf(__('Order #%d delivered to Table %s - ready for payment!', 'orders-jet'), $order_id, $table_number);
+                                $success_message = sprintf(__('Order #%d served to Table %s - ready for payment!', 'orders-jet'), $order_id, $table_number);
                             } else {
-                                $success_message = sprintf(__('Order #%d delivered and ready for pickup!', 'orders-jet'), $order_id);
+                                $success_message = sprintf(__('Order #%d served and ready for pickup!', 'orders-jet'), $order_id);
                             }
                             
                             // Redirect to avoid resubmission
