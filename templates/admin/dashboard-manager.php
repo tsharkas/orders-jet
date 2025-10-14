@@ -2386,26 +2386,26 @@ jQuery(document).ready(function($) {
                 case 'all':
                     show = true;
                     break;
-                // Kitchen-style operational filters
+                // Kitchen-style operational filters (exclude completed orders)
                 case 'dinein':
-                    show = orderType === 'dinein';
+                    show = orderType === 'dinein' && card.find('.oj-status-badge.completed').length === 0;
                     break;
                 case 'pickup-all':
-                    show = orderType === 'pickup' || orderType === 'pickup_timed';
+                    show = (orderType === 'pickup' || orderType === 'pickup_timed') && card.find('.oj-status-badge.completed').length === 0;
                     break;
                 case 'pickup-immediate':
-                    show = orderType === 'pickup';
+                    show = orderType === 'pickup' && card.find('.oj-status-badge.completed').length === 0;
                     break;
                 case 'pickup-today':
                     if (orderType === 'pickup_timed') {
                         const deliveryDateFormatted = card.data('delivery-date-formatted');
-                        show = deliveryDateFormatted === today;
+                        show = deliveryDateFormatted === today && card.find('.oj-status-badge.completed').length === 0;
                     }
                     break;
                 case 'pickup-upcoming':
                     if (orderType === 'pickup_timed') {
                         const deliveryDateFormatted = card.data('delivery-date-formatted');
-                        show = deliveryDateFormatted > today;
+                        show = deliveryDateFormatted > today && card.find('.oj-status-badge.completed').length === 0;
                     }
                     break;
                 // Additional Manager Status filters
@@ -2463,24 +2463,24 @@ jQuery(document).ready(function($) {
                         matches = true;
                         break;
                     case 'dinein':
-                        matches = orderType === 'dinein';
+                        matches = orderType === 'dinein' && card.find('.oj-status-badge.completed').length === 0;
                         break;
                     case 'pickup-all':
-                        matches = orderType === 'pickup' || orderType === 'pickup_timed';
+                        matches = (orderType === 'pickup' || orderType === 'pickup_timed') && card.find('.oj-status-badge.completed').length === 0;
                         break;
                     case 'pickup-immediate':
-                        matches = orderType === 'pickup';
+                        matches = orderType === 'pickup' && card.find('.oj-status-badge.completed').length === 0;
                         break;
                     case 'pickup-today':
                         if (orderType === 'pickup_timed') {
                             const deliveryDateFormatted = card.data('delivery-date-formatted');
-                            matches = deliveryDateFormatted === today;
+                            matches = deliveryDateFormatted === today && card.find('.oj-status-badge.completed').length === 0;
                         }
                         break;
                     case 'pickup-upcoming':
                         if (orderType === 'pickup_timed') {
                             const deliveryDateFormatted = card.data('delivery-date-formatted');
-                            matches = deliveryDateFormatted > today;
+                            matches = deliveryDateFormatted > today && card.find('.oj-status-badge.completed').length === 0;
                         }
                         break;
                     // Additional Manager Status filters
