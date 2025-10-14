@@ -60,60 +60,49 @@ if (function_exists('wc_get_orders')) {
             }
         }
         
-        // Get delivery date/time for WooFood orders (using correct field names)
-        $delivery_date = $wc_order->get_meta('exwfood_date_deli'); // "October 13, 2025" format
-        $delivery_time = $wc_order->get_meta('exwfood_time_deli'); // "11:30 PM" format
-        $delivery_unix = $wc_order->get_meta('exwfood_datetime_deli_unix'); // Unix timestamp
-        $order_method = $wc_order->get_meta('exwfood_order_method'); // "delivery"
+        // Import WooFood delivery time to our custom fields (for existing orders)
+        OJ_Delivery_Time_Manager::import_woofood_time($wc_order);
         
-        error_log('Orders Jet Kitchen DEBUG: Order #' . $wc_order->get_id() . ' - Found delivery_date: ' . ($delivery_date ?: 'NONE') . ', delivery_time: ' . ($delivery_time ?: 'NONE') . ', order_method: ' . ($order_method ?: 'NONE'));
+        // Get delivery/pickup time using our new manager
+        $delivery_info = OJ_Delivery_Time_Manager::get_delivery_time($wc_order);
+        $has_delivery_time = $delivery_info !== false;
         
-        // For pickup orders with delivery date/time, show all orders (timezone-aware)
-        if (empty($table_number) && !empty($delivery_date)) {
-            // Use timezone-aware analysis
-            $delivery_analysis = OJ_Time_Helper::analyze_woofood_delivery($delivery_date, $delivery_time, $delivery_unix);
-            $today = OJ_Time_Helper::get_local_date('Y-m-d');
-            $order_date = $delivery_analysis['local_date'];
+        error_log('Orders Jet Manager DEBUG: Order #' . $wc_order->get_id() . ' - Delivery info: ' . ($has_delivery_time ? json_encode($delivery_info) : 'NONE'));
+        
+        // Determine order type and badge
+        if (!empty($table_number)) {
+            // Dine-in order
+            $order_type = 'dinein';
+            $order_type_label = __('DINE IN', 'orders-jet');
+            $order_type_icon = '🍽️';
+            $order_type_class = 'oj-order-type-dinein';
+        } elseif ($has_delivery_time) {
+            // Pickup order with scheduled time
+            $order_type = 'pickup_timed';
+            $order_type_icon = '🕒';
+            $order_type_class = 'oj-order-type-pickup-timed';
             
-            error_log('Orders Jet Kitchen DEBUG: Order #' . $wc_order->get_id() . ' - Today: ' . $today . ', Order date: ' . $order_date . ' (from: ' . $delivery_date . ')');
+            // Check if it's today or upcoming
+            $today = date('Y-m-d');
+            $delivery_date = date('Y-m-d', $delivery_info['timestamp']);
             
-            // Show all orders - let JavaScript filters handle the date filtering
-            // (Removed the continue statement to include upcoming orders)
-            
-            // CHECK IF IT HAS DELIVERY TIME - this is the key difference!
-            if (!empty($delivery_time)) {
-                // Enhanced badge for timed pickup orders (HAS TIME)
-                $order_type = 'pickup_timed';
-                $time_display = date('g:i A', strtotime($delivery_time));
-                
-                // Show date + time for upcoming orders, only time for today's orders
-                if ($order_date === $today) {
-                    $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $time_display;
-                } else {
-                    // For upcoming orders, show date + time
-                    $date_display = date('M j', strtotime($delivery_date)); // e.g., "Oct 15"
-                    $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $date_display . ' ' . $time_display;
-                }
-                
-                $order_type_icon = '🕒';
-                $order_type_class = 'oj-order-type-pickup-timed'; // ORANGE
-                
-                error_log('Orders Jet Kitchen: Including TIMED pickup order #' . $wc_order->get_id() . ' for ' . $order_date . ' at ' . $time_display);
+            if ($delivery_date === $today) {
+                // Today's pickup - show only time
+                $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $delivery_info['time_only'];
             } else {
-                // Regular pickup for today but no specific time
-                $order_type = 'pickup';
-                $order_type_label = __('PICK UP', 'orders-jet');
-                $order_type_icon = '🥡';
-                $order_type_class = 'oj-order-type-pickup'; // PURPLE
-                
-                error_log('Orders Jet Kitchen: Including REGULAR pickup order #' . $wc_order->get_id() . ' for ' . $order_date . ' (no specific time)');
+                // Upcoming pickup - show date + time
+                $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $delivery_info['formatted'];
             }
+            
+            error_log('Orders Jet Manager: TIMED pickup order #' . $wc_order->get_id() . ' - ' . $order_type_label);
         } else {
-            // Regular logic for table orders and pickup orders without delivery dates
-            $order_type = !empty($table_number) ? 'dinein' : 'pickup';
-            $order_type_label = !empty($table_number) ? __('DINE IN', 'orders-jet') : __('PICK UP', 'orders-jet');
-            $order_type_icon = !empty($table_number) ? '🍽️' : '🥡';
-            $order_type_class = !empty($table_number) ? 'oj-order-type-dinein' : 'oj-order-type-pickup';
+            // Regular pickup order (no scheduled time)
+            $order_type = 'pickup';
+            $order_type_label = __('PICK UP', 'orders-jet');
+            $order_type_icon = '🥡';
+            $order_type_class = 'oj-order-type-pickup';
+            
+            error_log('Orders Jet Manager: REGULAR pickup order #' . $wc_order->get_id());
         }
         
         $active_orders[] = array(
@@ -151,49 +140,43 @@ if (function_exists('wc_get_orders')) {
             if ($order) {
             $table_number = $order->get_meta('_oj_table_number');
             
-            // Get delivery date/time for WooFood orders (using correct field names)
-            $delivery_date = $order->get_meta('exwfood_date_deli'); // "October 13, 2025" format
-            $delivery_time = $order->get_meta('exwfood_time_deli'); // "11:30 PM" format
-            $order_method = $order->get_meta('exwfood_order_method'); // "delivery"
+            // Import WooFood delivery time to our custom fields (for existing orders)
+            OJ_Delivery_Time_Manager::import_woofood_time($order);
             
-            // For pickup orders with delivery date/time, show all orders (timezone-aware)
-            if (empty($table_number) && !empty($delivery_date)) {
-                // Use timezone-aware analysis
-                $delivery_analysis = OJ_Time_Helper::analyze_woofood_delivery($delivery_date, $delivery_time, $order->get_meta('exwfood_datetime_deli_unix'));
-                $today = OJ_Time_Helper::get_local_date('Y-m-d');
-                $order_date = $delivery_analysis['local_date'];
+            // Get delivery/pickup time using our new manager
+            $delivery_info = OJ_Delivery_Time_Manager::get_delivery_time($order);
+            $has_delivery_time = $delivery_info !== false;
+            
+            // Determine order type and badge
+            if (!empty($table_number)) {
+                // Dine-in order
+                $order_type = 'dinein';
+                $order_type_label = __('DINE IN', 'orders-jet');
+                $order_type_icon = '🍽️';
+                $order_type_class = 'oj-order-type-dinein';
+            } elseif ($has_delivery_time) {
+                // Pickup order with scheduled time
+                $order_type = 'pickup_timed';
+                $order_type_icon = '🕒';
+                $order_type_class = 'oj-order-type-pickup-timed';
                 
-                // Show all orders - let JavaScript filters handle the date filtering
-                // (Removed the continue statement to include upcoming orders)
+                // Check if it's today or upcoming
+                $today = date('Y-m-d');
+                $delivery_date = date('Y-m-d', $delivery_info['timestamp']);
                 
-                // CHECK IF IT HAS DELIVERY TIME - this is the key difference!
-                if (!empty($delivery_time)) {
-                    // Enhanced badge for timed pickup orders (HAS TIME)
-                    $order_type = 'pickup_timed';
-                    
-                    // Show date + time for upcoming orders, only time for today's orders
-                    if ($delivery_analysis['is_today']) {
-                        $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $delivery_analysis['display_time'];
-                    } else {
-                        // For upcoming orders, show date + time
-                        $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $delivery_analysis['display_datetime'];
-                    }
-                    
-                    $order_type_icon = '🕒';
-                    $order_type_class = 'oj-order-type-pickup-timed'; // ORANGE
+                if ($delivery_date === $today) {
+                    // Today's pickup - show only time
+                    $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $delivery_info['time_only'];
                 } else {
-                    // Regular pickup for today but no specific time
-                    $order_type = 'pickup';
-                    $order_type_label = __('PICK UP', 'orders-jet');
-                    $order_type_icon = '🥡';
-                    $order_type_class = 'oj-order-type-pickup'; // PURPLE
+                    // Upcoming pickup - show date + time
+                    $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $delivery_info['formatted'];
                 }
             } else {
-                // Regular logic for table orders and pickup orders without delivery dates
-                $order_type = !empty($table_number) ? 'dinein' : 'pickup';
-                $order_type_label = !empty($table_number) ? __('DINE IN', 'orders-jet') : __('PICK UP', 'orders-jet');
-                $order_type_icon = !empty($table_number) ? '🍽️' : '🥡';
-                $order_type_class = !empty($table_number) ? 'oj-order-type-dinein' : 'oj-order-type-pickup';
+                // Regular pickup order (no scheduled time)
+                $order_type = 'pickup';
+                $order_type_label = __('PICK UP', 'orders-jet');
+                $order_type_icon = '🥡';
+                $order_type_class = 'oj-order-type-pickup';
             }
             
             $active_orders[] = array(
@@ -527,17 +510,46 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                     <?php
                                     // Enhanced COOKING badge with countdown for timed pickup orders
                                     $wc_order = wc_get_order($order['ID']);
-                                    $delivery_date = $wc_order->get_meta('exwfood_date_deli');
-                                    $delivery_time = $wc_order->get_meta('exwfood_time_deli');
-                                    $delivery_unix = $wc_order->get_meta('exwfood_datetime_deli_unix');
+                                    $delivery_info = OJ_Delivery_Time_Manager::get_delivery_time($wc_order);
                                     
-                                    // Simple COOKING badge without countdown
-                                    ?>
-                                    <span class="oj-status-badge processing">
-                                        <span class="dashicons dashicons-admin-tools"></span>
-                                        <?php _e('COOKING', 'orders-jet'); ?>
-                                    </span>
-                                    <?php
+                                    if ($delivery_info) {
+                                        // Get countdown information
+                                        $countdown_info = OJ_Delivery_Time_Manager::get_time_remaining($wc_order);
+                                        
+                                        if ($countdown_info) {
+                                            $countdown_text = $countdown_info['short_text'];
+                                            $countdown_class = $countdown_info['class'];
+                                            
+                                            // Debug the countdown calculation
+                                            error_log('Orders Jet Manager: Order #' . $order['ID'] . ' Countdown Debug:');
+                                            error_log('- Current time: ' . date('Y-m-d H:i:s', $countdown_info['current_time']));
+                                            error_log('- Delivery time: ' . date('Y-m-d H:i:s', $countdown_info['delivery_time']));
+                                            error_log('- Diff seconds: ' . $countdown_info['diff_seconds']);
+                                            error_log('- Status: ' . $countdown_info['status']);
+                                            error_log('- Text: ' . $countdown_text);
+                                            ?>
+                                            <span class="oj-status-badge processing <?php echo esc_attr($countdown_class); ?>">
+                                                <span class="dashicons dashicons-admin-tools"></span>
+                                                <?php echo esc_html($countdown_text); ?>
+                                            </span>
+                                            <?php
+                                        } else {
+                                            ?>
+                                            <span class="oj-status-badge processing">
+                                                <span class="dashicons dashicons-admin-tools"></span>
+                                                <?php _e('COOKING', 'orders-jet'); ?>
+                                            </span>
+                                            <?php
+                                        }
+                                    } else {
+                                        // Regular COOKING badge for orders without delivery time
+                                        ?>
+                                        <span class="oj-status-badge processing">
+                                            <span class="dashicons dashicons-admin-tools"></span>
+                                            <?php _e('COOKING', 'orders-jet'); ?>
+                                        </span>
+                                        <?php
+                                    }
                                     ?>
                                 
         <?php endif; ?>
@@ -1465,6 +1477,43 @@ $currency_symbol = get_woocommerce_currency_symbol();
     background: #d1ecf1;
     color: #0c5460;
     border: 1px solid #bee5eb;
+}
+
+/* Countdown Status Classes */
+.oj-status-badge.oj-countdown-upcoming {
+    background: #e3f2fd;
+    color: #1565c0;
+    border: 1px solid #bbdefb;
+}
+
+.oj-status-badge.oj-countdown-soon {
+    background: #fff3e0;
+    color: #ef6c00;
+    border: 1px solid #ffcc02;
+}
+
+.oj-status-badge.oj-countdown-urgent {
+    background: #ffebee;
+    color: #c62828;
+    border: 1px solid #ffcdd2;
+    animation: pulse-urgent 2s infinite;
+}
+
+.oj-status-badge.oj-countdown-overdue {
+    background: #ffcdd2;
+    color: #b71c1c;
+    border: 1px solid #f44336;
+    animation: pulse-overdue 1s infinite;
+}
+
+@keyframes pulse-urgent {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+@keyframes pulse-overdue {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
 }
 
 /* Enhanced countdown badge styles */
