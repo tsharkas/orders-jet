@@ -648,10 +648,24 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                     
                                     // Check if it's a timed pickup order
                                     if (!empty($delivery_date) && !empty($delivery_time)) {
-                                        // Use Universal Time Manager for accurate countdown
-                                        $delivery_timestamp = OJ_Universal_Time_Manager::parse_woofood_delivery($delivery_date, $delivery_time, $delivery_unix);
-                                        $time_remaining = OJ_Universal_Time_Manager::time_remaining($delivery_timestamp);
-                                        $countdown_data = OJ_Universal_Time_Manager::get_countdown_data($delivery_timestamp);
+                                        // SIMPLE CALCULATION: Current time vs Pickup time
+                                        $current_time = current_time('timestamp'); // Local time
+                                        $pickup_datetime = $delivery_date . ' ' . $delivery_time;
+                                        $pickup_timestamp = strtotime($pickup_datetime);
+                                        
+                                        $diff_seconds = $pickup_timestamp - $current_time;
+                                        $hours = floor($diff_seconds / 3600);
+                                        $minutes = floor(($diff_seconds % 3600) / 60);
+                                        
+                                        $time_remaining = array(
+                                            'short_text' => $hours > 0 ? $hours . 'h ' . $minutes . 'm' : $minutes . 'm',
+                                            'class' => $diff_seconds <= 1800 ? 'oj-time-urgent' : ($diff_seconds <= 3600 ? 'oj-time-soon' : 'oj-time-normal')
+                                        );
+                                        
+                                        $countdown_data = array(
+                                            'target_timestamp' => $pickup_timestamp,
+                                            'diff_seconds' => $diff_seconds
+                                        );
                                         ?>
                                         <span class="oj-status-badge processing oj-countdown-badge <?php echo esc_attr($time_remaining['class']); ?>" 
                                               data-countdown-target="<?php echo esc_attr($countdown_data['target_timestamp']); ?>"
