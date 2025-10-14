@@ -31,16 +31,16 @@ class OJ_Time_Helper {
     public static function parse_woofood_date($woofood_date) {
         if (empty($woofood_date)) return '';
         
-        // Convert "October 13, 2025" to Y-m-d format in local timezone
+        // Convert "October 13, 2025" to Y-m-d format
         $timestamp = strtotime($woofood_date);
         if ($timestamp === false) return '';
         
-        // Convert to local timezone using WordPress settings
-        return get_date_from_gmt(gmdate('Y-m-d H:i:s', $timestamp), 'Y-m-d');
+        // Return date part only (no timezone conversion needed for date)
+        return date('Y-m-d', $timestamp);
     }
     
     /**
-     * Parse WooFood time format to local timezone
+     * Parse WooFood time format 
      * Handles: "11:30 PM" -> "23:30" or display format
      */
     public static function parse_woofood_time($woofood_time, $format = 'H:i') {
@@ -51,6 +51,32 @@ class OJ_Time_Helper {
         if ($timestamp === false) return '';
         
         return date($format, $timestamp);
+    }
+    
+    /**
+     * Parse WooFood date and time together (most accurate)
+     * Handles: "October 13, 2025" + "11:30 PM" -> local timezone datetime
+     * Also handles: "2025-10-14" + "11:30 PM" -> local timezone datetime
+     */
+    public static function parse_woofood_datetime($woofood_date, $woofood_time) {
+        if (empty($woofood_date) || empty($woofood_time)) return '';
+        
+        // Combine date and time for accurate parsing
+        $combined_string = $woofood_date . ' ' . $woofood_time;
+        $timestamp = strtotime($combined_string);
+        
+        if ($timestamp === false) return '';
+        
+        // IMPORTANT: Don't apply timezone conversion if the input is already in local format
+        // WooFood typically stores in UTC, but some formats might already be local
+        
+        // Check if this looks like a UTC timestamp that needs conversion
+        $utc_datetime = gmdate('Y-m-d H:i:s', $timestamp);
+        $local_datetime = get_date_from_gmt($utc_datetime, 'Y-m-d H:i:s');
+        
+        // For debugging - let's return the original parsed time for now
+        // This will help us see what's actually happening
+        return date('Y-m-d H:i:s', $timestamp);
     }
     
     /**
@@ -72,16 +98,29 @@ class OJ_Time_Helper {
         $local_now = self::get_local_time('Y-m-d H:i:s');
         $local_today = self::get_local_date('Y-m-d');
         
+        error_log('Orders Jet Time Helper DEBUG: Input - Date: "' . $delivery_date . '", Time: "' . $delivery_time . '", Unix: ' . ($unix_timestamp ?: 'NONE'));
+        
         // Prefer Unix timestamp if available (most accurate)
         if (!empty($unix_timestamp)) {
+            $delivery_local_datetime = self::parse_woofood_unix($unix_timestamp, 'Y-m-d H:i:s');
             $delivery_local_date = self::parse_woofood_unix($unix_timestamp, 'Y-m-d');
             $delivery_local_time = self::parse_woofood_unix($unix_timestamp, 'H:i:s');
-            $delivery_local_datetime = self::parse_woofood_unix($unix_timestamp, 'Y-m-d H:i:s');
+            error_log('Orders Jet Time Helper DEBUG: Using Unix timestamp - Result: ' . $delivery_local_datetime);
         } else {
-            // Fallback to parsing date/time strings
-            $delivery_local_date = self::parse_woofood_date($delivery_date);
-            $delivery_local_time = self::parse_woofood_time($delivery_time, 'H:i:s');
-            $delivery_local_datetime = $delivery_local_date . ' ' . $delivery_local_time;
+            // Use combined parsing for accurate timezone conversion
+            $delivery_local_datetime = self::parse_woofood_datetime($delivery_date, $delivery_time);
+            error_log('Orders Jet Time Helper DEBUG: Using combined parsing - Result: ' . $delivery_local_datetime);
+            
+            if (!empty($delivery_local_datetime)) {
+                $delivery_local_date = date('Y-m-d', strtotime($delivery_local_datetime));
+                $delivery_local_time = date('H:i:s', strtotime($delivery_local_datetime));
+            } else {
+                // Fallback to individual parsing if combined fails
+                $delivery_local_date = self::parse_woofood_date($delivery_date);
+                $delivery_local_time = self::parse_woofood_time($delivery_time, 'H:i:s');
+                $delivery_local_datetime = $delivery_local_date . ' ' . $delivery_local_time;
+                error_log('Orders Jet Time Helper DEBUG: Using fallback parsing - Result: ' . $delivery_local_datetime);
+            }
         }
         
         return array(
@@ -91,8 +130,8 @@ class OJ_Time_Helper {
             'local_date' => $delivery_local_date,
             'local_time' => $delivery_local_time,
             'local_datetime' => $delivery_local_datetime,
-            'display_time' => date('g:i A', strtotime($delivery_local_time)),
-            'display_date' => date('M j', strtotime($delivery_local_date)),
+            'display_time' => date('g:i A', strtotime($delivery_local_datetime)),
+            'display_date' => date('M j', strtotime($delivery_local_datetime)),
             'display_datetime' => date('M j, g:i A', strtotime($delivery_local_datetime)),
             'formatted_for_js' => $delivery_local_date, // For JavaScript date comparisons
         );

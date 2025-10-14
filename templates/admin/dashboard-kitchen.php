@@ -161,6 +161,13 @@ if (function_exists('wc_get_orders')) {
         
         error_log('Orders Jet Kitchen DEBUG: Order #' . $wc_order->get_id() . ' - Found delivery_date: ' . ($delivery_date ?: 'NONE') . ', delivery_time: ' . ($delivery_time ?: 'NONE') . ', order_method: ' . ($order_method ?: 'NONE'));
         
+        // Debug the parsing process
+        if (!empty($delivery_date) && !empty($delivery_time)) {
+            $combined_test = $delivery_date . ' ' . $delivery_time;
+            $timestamp_test = strtotime($combined_test);
+            error_log('Orders Jet Kitchen DEBUG: Order #' . $wc_order->get_id() . ' - Combined string: "' . $combined_test . '" → timestamp: ' . $timestamp_test . ' → formatted: ' . date('Y-m-d H:i:s', $timestamp_test));
+        }
+        
         // For pickup orders with delivery date/time, show all orders (let filters handle date filtering)
         if (empty($table_number) && !empty($delivery_date)) {
             // Use timezone-aware analysis
