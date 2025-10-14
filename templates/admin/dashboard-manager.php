@@ -1601,8 +1601,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
 }
 
 /* Manager Dashboard - Order ID Section Styling */
-.oj-kitchen-card .oj-customer-info-section,
-.oj-kitchen-card .oj-customer-info-section .oj-customer-details {
+.oj-kitchen-card .oj-customer-info:not(.oj-action-btn) {
     background: #f8f9fa !important;
     background-color: #f8f9fa !important;
     color: #495057 !important;
@@ -1610,20 +1609,16 @@ $currency_symbol = get_woocommerce_currency_symbol();
     border-bottom: 1px solid #dee2e6;
 }
 
-/* Override any inherited background colors */
-.oj-kitchen-card .oj-customer-info-section * {
-    background-color: transparent !important;
-}
-
-.oj-kitchen-card .oj-customer-name {
+.oj-kitchen-card .oj-customer-info:not(.oj-action-btn) .oj-customer-name {
     color: #495057 !important;
     font-weight: 600;
 }
 
-.oj-kitchen-card .oj-order-number {
+.oj-kitchen-card .oj-customer-info:not(.oj-action-btn) .oj-order-number {
     color: #6c757d !important;
     font-weight: 500;
 }
+
 
 /* Manager Actions */
 .oj-manager-actions {
@@ -1661,11 +1656,11 @@ $currency_symbol = get_woocommerce_currency_symbol();
     background: #6a4190;
 }
 
-.oj-customer-info {
+.oj-customer-info.oj-action-btn {
     background: #11998e;
 }
 
-.oj-customer-info:hover {
+.oj-customer-info.oj-action-btn:hover {
     background: #0e8078;
 }
 
