@@ -495,10 +495,6 @@ $currency_symbol = get_woocommerce_currency_symbol();
             <span class="oj-filter-label"><?php _e('Upcoming Pickup', 'orders-jet'); ?></span>
         </button>
         <!-- Additional Manager Status Filters -->
-        <button class="oj-filter-btn" data-filter="ready">
-            <span class="oj-filter-icon">✅</span>
-            <span class="oj-filter-label"><?php _e('Ready', 'orders-jet'); ?></span>
-        </button>
         <button class="oj-filter-btn" data-filter="pending">
             <span class="oj-filter-icon">⏳</span>
             <span class="oj-filter-label"><?php _e('Served', 'orders-jet'); ?></span>
@@ -564,7 +560,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                 <?php if ($order['post_status'] === 'wc-pending') : ?>
                                     <span class="oj-status-badge pending">
                                         <span class="dashicons dashicons-clock"></span>
-                                        <?php _e('Pending Payment', 'orders-jet'); ?>
+                                        <?php _e('Served', 'orders-jet'); ?>
                                     </span>
                                 <?php elseif ($order['post_status'] === 'wc-processing') : ?>
                                     <?php
@@ -2441,11 +2437,6 @@ jQuery(document).ready(function($) {
                     }
                     break;
                 // Additional Manager Status filters
-                case 'ready':
-                    show = card.find('.oj-status-badge.ready').length > 0 || 
-                           card.find('.oj-status-badge.pending-payment-table').length > 0 || 
-                           card.find('.oj-status-badge.pending-payment-pickup').length > 0;
-                    break;
                 case 'pending':
                     show = card.find('.oj-status-badge.pending').length > 0;
                     break;
@@ -2513,11 +2504,6 @@ jQuery(document).ready(function($) {
                         }
                         break;
                     // Additional Manager Status filters
-                    case 'ready':
-                        matches = card.find('.oj-status-badge.ready').length > 0 || 
-                                  card.find('.oj-status-badge.pending-payment-table').length > 0 || 
-                                  card.find('.oj-status-badge.pending-payment-pickup').length > 0;
-                        break;
                     case 'pending':
                         matches = card.find('.oj-status-badge.pending').length > 0;
                         break;
@@ -2556,7 +2542,6 @@ jQuery(document).ready(function($) {
             'pickup-all': '<?php _e('pickup orders', 'orders-jet'); ?>',
             'pickup-immediate': '<?php _e('immediate pickup orders', 'orders-jet'); ?>',
             'pickup-upcoming': '<?php _e('upcoming pickup orders', 'orders-jet'); ?>',
-            'ready': '<?php _e('ready orders', 'orders-jet'); ?>',
             'pending': '<?php _e('served orders', 'orders-jet'); ?>',
             'completed': '<?php _e('completed orders', 'orders-jet'); ?>',
             'cancelled': '<?php _e('cancelled orders', 'orders-jet'); ?>'

@@ -596,7 +596,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                 <?php if ($order['post_status'] === 'wc-pending') : ?>
                                     <span class="oj-status-badge pending">
                                         <span class="dashicons dashicons-hourglass"></span>
-                                        <?php _e('Pending', 'orders-jet'); ?>
+                                        <?php _e('Served', 'orders-jet'); ?>
                                     </span>
                 <?php elseif ($order['post_status'] === 'wc-processing') : ?>
                     <?php
