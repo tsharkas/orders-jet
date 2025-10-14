@@ -20,8 +20,8 @@ include ORDERS_JET_PLUGIN_DIR . 'templates/admin/manager-navigation.php';
 
 // Get user information
 $current_user = wp_get_current_user();
-$today = OJ_Time_Helper::get_local_date('Y-m-d');
-$today_formatted = OJ_Time_Helper::get_local_time('F j, Y');
+$today = OJ_Universal_Time_Manager::now_formatted('Y-m-d');
+$today_formatted = OJ_Universal_Time_Manager::now_formatted('F j, Y');
 
 // Get real data from WooCommerce orders
 global $wpdb;
@@ -118,7 +118,7 @@ if (function_exists('wc_get_orders')) {
         
         $active_orders[] = array(
             'ID' => $wc_order->get_id(),
-            'post_date' => get_date_from_gmt($wc_order->get_date_created()->format('Y-m-d H:i:s'), 'Y-m-d H:i:s'),
+            'post_date' => OJ_Universal_Time_Manager::format(OJ_Universal_Time_Manager::get_order_created_timestamp($wc_order), 'Y-m-d H:i:s'),
             'post_status' => 'wc-' . $wc_order->get_status(),
             'order_total' => $wc_order->get_total(),
             'table_number' => $table_number,
@@ -198,7 +198,7 @@ if (function_exists('wc_get_orders')) {
             
             $active_orders[] = array(
                     'ID' => $order->get_id(),
-                    'post_date' => get_date_from_gmt($order_post->post_date, 'Y-m-d H:i:s'),
+                    'post_date' => OJ_Universal_Time_Manager::format(OJ_Universal_Time_Manager::parse_to_local_timestamp($order_post->post_date, 'wordpress_utc'), 'Y-m-d H:i:s'),
                     'post_status' => 'wc-' . $order->get_status(),
                     'order_total' => $order->get_total(),
                 'table_number' => $table_number,
@@ -429,7 +429,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
             </h2>
             <p class="oj-last-updated">
                 <span class="dashicons dashicons-clock" style="font-size: 14px; vertical-align: middle; margin-right: 4px;"></span>
-                       <strong><?php _e('Last Updated:', 'orders-jet'); ?></strong> <?php echo esc_html(OJ_Time_Helper::get_local_time('g:i:s A')); ?>
+                       <strong><?php _e('Last Updated:', 'orders-jet'); ?></strong> <?php echo esc_html(OJ_Universal_Time_Manager::now_formatted('g:i:s A')); ?>
             </p>
         </div>
         <div class="oj-header-right">
@@ -538,7 +538,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
             </div>
                                 <div class="oj-order-time">
                                     <span class="dashicons dashicons-clock"></span>
-                                    <?php echo esc_html(OJ_Time_Helper::get_order_display_time($order['post_date'])); ?>
+                                    <?php echo esc_html(OJ_Universal_Time_Manager::format(strtotime($order['post_date']), 'g:i A')); ?>
             </div>
             </div>
                             <div class="oj-card-status">
@@ -557,8 +557,10 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                     
                                     // Check if it's a timed pickup order
                                     if (!empty($delivery_date) && !empty($delivery_time)) {
-                                        $time_remaining = OJ_Time_Helper::get_time_remaining($delivery_date, $delivery_time, $delivery_unix);
-                                        $countdown_data = OJ_Time_Helper::get_countdown_data($delivery_date, $delivery_time, $delivery_unix);
+                                        // Use Universal Time Manager for accurate countdown
+                                        $delivery_timestamp = OJ_Universal_Time_Manager::parse_woofood_delivery($delivery_date, $delivery_time, $delivery_unix);
+                                        $time_remaining = OJ_Universal_Time_Manager::time_remaining($delivery_timestamp);
+                                        $countdown_data = OJ_Universal_Time_Manager::get_countdown_data($delivery_timestamp);
                                         ?>
                                         <span class="oj-status-badge processing oj-countdown-badge <?php echo esc_attr($time_remaining['class']); ?>" 
                                               data-countdown-target="<?php echo esc_attr($countdown_data['target_timestamp']); ?>"

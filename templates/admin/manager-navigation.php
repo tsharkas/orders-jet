@@ -67,7 +67,7 @@ if ($current_page === 'manager-screen') {
             <div class="manager-header-right">
                 <div class="manager-quick-stats">
                        <div class="quick-stat">
-                           <span class="stat-value"><?php echo OJ_Time_Helper::get_local_time('g:i A'); ?></span>
+                           <span class="stat-value"><?php echo OJ_Universal_Time_Manager::now_formatted('g:i A'); ?></span>
                            <span class="stat-label"><?php _e('Current Time', 'orders-jet'); ?></span>
                        </div>
                 </div>

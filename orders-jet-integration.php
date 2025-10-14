@@ -107,6 +107,7 @@ class Orders_Jet_Integration {
      */
     private function includes() {
         // Core classes
+        include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-universal-time-manager.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-time-helper.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-user-roles.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-admin-dashboard.php';
