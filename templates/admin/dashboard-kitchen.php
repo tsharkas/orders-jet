@@ -179,7 +179,7 @@ if (function_exists('wc_get_orders')) {
             $order_type = 'pickup_timed';
             // Convert WooFood time format "11:30 PM" to display format
             $time_display = !empty($delivery_time) ? date('g:i A', strtotime($delivery_time)) : '';
-            $order_type_label = !empty($time_display) ? __('PICK UP', 'orders-jet') . ' ' . $time_display : __('PICK UP TODAY', 'orders-jet');
+            $order_type_label = !empty($time_display) ? __('PICK UP', 'orders-jet') . ' ' . $time_display : __('PICK UP', 'orders-jet');
             $order_type_icon = '🕒';
             $order_type_class = 'oj-order-type-pickup-timed';
             
@@ -247,7 +247,7 @@ if (function_exists('wc_get_orders')) {
                 $order_type = 'pickup_timed';
                 // Convert WooFood time format "11:30 PM" to display format
                 $time_display = !empty($delivery_time) ? date('g:i A', strtotime($delivery_time)) : '';
-                $order_type_label = !empty($time_display) ? __('PICK UP', 'orders-jet') . ' ' . $time_display : __('PICK UP TODAY', 'orders-jet');
+                $order_type_label = !empty($time_display) ? __('PICK UP', 'orders-jet') . ' ' . $time_display : __('PICK UP', 'orders-jet');
                 $order_type_icon = '🕒';
                 $order_type_class = 'oj-order-type-pickup-timed';
             } else {
@@ -1128,8 +1128,9 @@ $currency_symbol = get_woocommerce_currency_symbol();
 }
 
 .oj-order-type-pickup {
-    background: #FF9800;
+    background: #9C27B0;
     color: #ffffff;
+    font-weight: bold;
 }
 
 .oj-order-type-pickup-timed {
