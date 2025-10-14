@@ -34,15 +34,15 @@ class Orders_Jet_Admin_Dashboard {
                 __('Manager Screen', 'orders-jet'),
                 __('Manager Screen', 'orders-jet'),
                 'manage_options', // Use WordPress admin capability as fallback
-                'manager-screen',
+                'manager-overview', // Point directly to overview
                 array($this, 'render_manager_overview'), // Default to overview
                 'dashicons-businessman',
                 3
             );
             
-            // Manager Screen Child Pages
+            // Manager Screen Child Pages - Overview becomes the first item
             add_submenu_page(
-                'manager-screen',
+                'manager-overview',
                 __('Overview', 'orders-jet'),
                 __('Overview', 'orders-jet'),
                 'manage_options',
@@ -51,7 +51,7 @@ class Orders_Jet_Admin_Dashboard {
             );
             
             add_submenu_page(
-                'manager-screen',
+                'manager-overview',
                 __('Orders Management', 'orders-jet'),
                 __('Orders Management', 'orders-jet'),
                 'manage_options',
@@ -60,7 +60,7 @@ class Orders_Jet_Admin_Dashboard {
             );
             
             add_submenu_page(
-                'manager-screen',
+                'manager-overview',
                 __('Tables Management', 'orders-jet'),
                 __('Tables Management', 'orders-jet'),
                 'manage_options',
@@ -69,7 +69,7 @@ class Orders_Jet_Admin_Dashboard {
             );
             
             add_submenu_page(
-                'manager-screen',
+                'manager-overview',
                 __('Staff Management', 'orders-jet'),
                 __('Staff Management', 'orders-jet'),
                 'manage_options',
@@ -78,7 +78,7 @@ class Orders_Jet_Admin_Dashboard {
             );
             
             add_submenu_page(
-                'manager-screen',
+                'manager-overview',
                 __('Reports', 'orders-jet'),
                 __('Reports', 'orders-jet'),
                 'manage_options',
@@ -87,7 +87,7 @@ class Orders_Jet_Admin_Dashboard {
             );
             
             add_submenu_page(
-                'manager-screen',
+                'manager-overview',
                 __('Settings', 'orders-jet'),
                 __('Settings', 'orders-jet'),
                 'manage_options',
@@ -129,13 +129,12 @@ class Orders_Jet_Admin_Dashboard {
     public function enqueue_dashboard_assets($hook) {
         // Manager Screen pages
         $manager_pages = array(
-            'toplevel_page_manager-screen',
-            'manager-screen_page_manager-overview',
-            'manager-screen_page_manager-orders',
-            'manager-screen_page_manager-tables',
-            'manager-screen_page_manager-staff',
-            'manager-screen_page_manager-reports',
-            'manager-screen_page_manager-settings'
+            'toplevel_page_manager-overview',
+            'manager-overview_page_manager-orders',
+            'manager-overview_page_manager-tables',
+            'manager-overview_page_manager-staff',
+            'manager-overview_page_manager-reports',
+            'manager-overview_page_manager-settings'
         );
         
         // Other dashboard pages
