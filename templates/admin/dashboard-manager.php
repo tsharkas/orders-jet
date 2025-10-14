@@ -80,6 +80,108 @@ foreach ($active_tables_posts as $order_post) {
 
 $active_tables = count($active_table_numbers);
 
+// Enhanced Analytics Data Collection
+// 1. Revenue trend data (last 7 days)
+$revenue_trend = array();
+for ($i = 6; $i >= 0; $i--) {
+    $date = date('Y-m-d', strtotime("-$i days"));
+    $daily_revenue = $wpdb->get_var($wpdb->prepare("
+        SELECT COALESCE(SUM(meta_value), 0)
+        FROM {$wpdb->postmeta} pm
+        INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
+        WHERE pm.meta_key = '_order_total'
+        AND p.post_type = 'shop_order'
+        AND p.post_status IN ('wc-completed', 'wc-processing')
+        AND DATE(p.post_date) = %s
+    ", $date));
+    
+    $revenue_trend[] = array(
+        'date' => $date,
+        'formatted_date' => date('M j', strtotime($date)),
+        'revenue' => floatval($daily_revenue ?: 0)
+    );
+}
+
+// 2. Order type breakdown (today)
+$order_types = array(
+    'dinein' => 0,
+    'pickup' => 0,
+    'delivery' => 0
+);
+
+$todays_orders = $wpdb->get_results($wpdb->prepare("
+    SELECT p.ID
+    FROM {$wpdb->posts} p
+    WHERE p.post_type = 'shop_order'
+    AND p.post_status IN ('wc-pending', 'wc-processing', 'wc-on-hold', 'wc-completed')
+    AND DATE(p.post_date) = %s
+", $today));
+
+foreach ($todays_orders as $order_post) {
+    $order = wc_get_order($order_post->ID);
+    if ($order) {
+        $table_number = $order->get_meta('_oj_table_number');
+        $delivery_date = $order->get_meta('exwfood_date_deli');
+        $order_method = $order->get_meta('exwfood_order_method');
+        
+        if (!empty($table_number)) {
+            $order_types['dinein']++;
+        } elseif (!empty($delivery_date) || $order_method === 'delivery') {
+            $order_types['pickup']++; // WooFood orders are pickup with delivery time
+        } else {
+            $order_types['pickup']++; // Regular pickup orders
+        }
+    }
+}
+
+// 3. Peak hours analysis (today's orders by hour)
+$peak_hours = array();
+for ($hour = 0; $hour < 24; $hour++) {
+    $peak_hours[$hour] = 0;
+}
+
+foreach ($todays_orders as $order_post) {
+    $order_hour = intval(date('H', strtotime($order_post->post_date ?? date('Y-m-d H:i:s'))));
+    if (isset($peak_hours[$order_hour])) {
+        $peak_hours[$order_hour]++;
+    }
+}
+
+// 4. Top selling products (last 7 days)
+$top_products = $wpdb->get_results("
+    SELECT 
+        oi.order_item_name as product_name,
+        SUM(oim_qty.meta_value) as total_quantity,
+        SUM(oim_total.meta_value) as total_revenue
+    FROM {$wpdb->prefix}woocommerce_order_items oi
+    INNER JOIN {$wpdb->prefix}woocommerce_order_itemmeta oim_qty ON oi.order_item_id = oim_qty.order_item_id AND oim_qty.meta_key = '_qty'
+    INNER JOIN {$wpdb->prefix}woocommerce_order_itemmeta oim_total ON oi.order_item_id = oim_total.order_item_id AND oim_total.meta_key = '_line_total'
+    INNER JOIN {$wpdb->posts} p ON oi.order_id = p.ID
+    WHERE oi.order_item_type = 'line_item'
+    AND p.post_type = 'shop_order'
+    AND p.post_status IN ('wc-completed', 'wc-processing')
+    AND p.post_date >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+    GROUP BY oi.order_item_name
+    ORDER BY total_quantity DESC
+    LIMIT 5
+");
+
+// 5. Performance metrics
+$avg_order_value = $today_orders > 0 ? ($today_revenue / $today_orders) : 0;
+$yesterday_revenue = $wpdb->get_var($wpdb->prepare("
+    SELECT COALESCE(SUM(meta_value), 0)
+    FROM {$wpdb->postmeta} pm
+    INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
+    WHERE pm.meta_key = '_order_total'
+    AND p.post_type = 'shop_order'
+    AND p.post_status IN ('wc-completed', 'wc-processing')
+    AND DATE(p.post_date) = %s
+", date('Y-m-d', strtotime('-1 day'))));
+
+$revenue_change = $yesterday_revenue > 0 ? (($today_revenue - $yesterday_revenue) / $yesterday_revenue) * 100 : 0;
+
+$active_tables = count($active_table_numbers);
+
 // Format revenue
 $currency_symbol = get_woocommerce_currency_symbol();
 $formatted_revenue = $currency_symbol . number_format($today_revenue ?: 0, 2);
@@ -284,11 +386,87 @@ $table_status = $wpdb->get_results($table_status_query, ARRAY_A);
             </div>
             <div class="oj-stat-box">
                 <div class="oj-stat-number"><?php echo esc_html($formatted_revenue); ?></div>
-                <div class="oj-stat-label"><?php _e('Revenue Today', 'orders-jet'); ?></div>
+                <div class="oj-stat-label">
+                    <?php _e('Revenue Today', 'orders-jet'); ?>
+                    <?php if ($revenue_change != 0): ?>
+                        <span class="oj-trend <?php echo $revenue_change > 0 ? 'positive' : 'negative'; ?>">
+                            <?php echo $revenue_change > 0 ? '↗' : '↘'; ?> <?php echo abs(round($revenue_change, 1)); ?>%
+                        </span>
+                    <?php endif; ?>
+                </div>
             </div>
             <div class="oj-stat-box">
                 <div class="oj-stat-number"><?php echo esc_html($active_tables ?: 0); ?>/<?php echo esc_html($total_tables ?: 0); ?></div>
                 <div class="oj-stat-label"><?php _e('Tables Available', 'orders-jet'); ?></div>
+            </div>
+            <div class="oj-stat-box">
+                <div class="oj-stat-number"><?php echo $currency_symbol . number_format($avg_order_value, 2); ?></div>
+                <div class="oj-stat-label"><?php _e('Avg Order Value', 'orders-jet'); ?></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enhanced Analytics Dashboard -->
+    <div class="oj-analytics-dashboard">
+        <h2><?php _e('Business Analytics', 'orders-jet'); ?></h2>
+        
+        <div class="oj-analytics-row">
+            <!-- Revenue Trend Chart -->
+            <div class="oj-analytics-card oj-chart-card">
+                <h3><?php _e('Revenue Trend (7 Days)', 'orders-jet'); ?></h3>
+                <canvas id="revenueChart" width="400" height="200"></canvas>
+            </div>
+            
+            <!-- Order Types Breakdown -->
+            <div class="oj-analytics-card oj-chart-card">
+                <h3><?php _e('Today\'s Order Types', 'orders-jet'); ?></h3>
+                <canvas id="orderTypesChart" width="300" height="200"></canvas>
+            </div>
+        </div>
+        
+        <div class="oj-analytics-row">
+            <!-- Peak Hours Heatmap -->
+            <div class="oj-analytics-card">
+                <h3><?php _e('Peak Hours Today', 'orders-jet'); ?></h3>
+                <div class="oj-peak-hours-grid">
+                    <?php for ($hour = 0; $hour < 24; $hour++): ?>
+                        <?php 
+                        $order_count = $peak_hours[$hour];
+                        $max_orders = max($peak_hours);
+                        $intensity = $max_orders > 0 ? ($order_count / $max_orders) : 0;
+                        $opacity = 0.1 + ($intensity * 0.9); // 0.1 to 1.0
+                        ?>
+                        <div class="oj-hour-cell" 
+                             style="background-color: rgba(0, 123, 186, <?php echo $opacity; ?>);"
+                             title="<?php echo sprintf(__('%d orders at %02d:00', 'orders-jet'), $order_count, $hour); ?>">
+                            <div class="oj-hour-label"><?php echo sprintf('%02d:00', $hour); ?></div>
+                            <div class="oj-hour-count"><?php echo $order_count; ?></div>
+                        </div>
+                    <?php endfor; ?>
+                </div>
+            </div>
+            
+            <!-- Top Products -->
+            <div class="oj-analytics-card">
+                <h3><?php _e('Top Products (7 Days)', 'orders-jet'); ?></h3>
+                <div class="oj-top-products">
+                    <?php if (!empty($top_products)): ?>
+                        <?php foreach ($top_products as $index => $product): ?>
+                            <div class="oj-product-item">
+                                <div class="oj-product-rank">#<?php echo $index + 1; ?></div>
+                                <div class="oj-product-info">
+                                    <div class="oj-product-name"><?php echo esc_html($product->product_name); ?></div>
+                                    <div class="oj-product-stats">
+                                        <span class="oj-product-qty"><?php echo esc_html($product->total_quantity); ?> sold</span>
+                                        <span class="oj-product-revenue"><?php echo $currency_symbol . number_format($product->total_revenue, 2); ?></span>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <p class="oj-no-data"><?php _e('No sales data available for the last 7 days.', 'orders-jet'); ?></p>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
     </div>
@@ -969,4 +1147,368 @@ $table_status = $wpdb->get_results($table_status_query, ARRAY_A);
         font-size: 2em;
     }
 }
+
+/* Enhanced Analytics Dashboard Styles */
+.oj-analytics-dashboard {
+    margin: 30px 0;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.oj-analytics-dashboard h2 {
+    margin-bottom: 20px;
+    color: #333;
+    border-bottom: 2px solid #007cba;
+    padding-bottom: 10px;
+}
+
+.oj-analytics-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.oj-analytics-card {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    transition: all 0.3s ease;
+}
+
+.oj-analytics-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.oj-analytics-card h3 {
+    margin-bottom: 15px;
+    color: #333;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.oj-chart-card canvas {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Trend indicators */
+.oj-trend {
+    font-size: 12px;
+    font-weight: bold;
+    margin-left: 8px;
+}
+
+.oj-trend.positive {
+    color: #4CAF50;
+}
+
+.oj-trend.negative {
+    color: #f44336;
+}
+
+/* Peak Hours Heatmap */
+.oj-peak-hours-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 4px;
+    margin-top: 10px;
+}
+
+.oj-hour-cell {
+    aspect-ratio: 1;
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #333;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-height: 50px;
+}
+
+.oj-hour-cell:hover {
+    transform: scale(1.05);
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.oj-hour-label {
+    font-weight: bold;
+    margin-bottom: 2px;
+}
+
+.oj-hour-count {
+    font-size: 12px;
+    font-weight: bold;
+}
+
+/* Top Products */
+.oj-top-products {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.oj-product-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.2s ease;
+}
+
+.oj-product-item:hover {
+    background-color: #f8f9fa;
+}
+
+.oj-product-item:last-child {
+    border-bottom: none;
+}
+
+.oj-product-rank {
+    width: 30px;
+    height: 30px;
+    background: #007cba;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 12px;
+    margin-right: 15px;
+    flex-shrink: 0;
+}
+
+.oj-product-info {
+    flex: 1;
+}
+
+.oj-product-name {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.oj-product-stats {
+    display: flex;
+    gap: 15px;
+    font-size: 12px;
+    color: #666;
+}
+
+.oj-product-qty {
+    color: #4CAF50;
+    font-weight: 500;
+}
+
+.oj-product-revenue {
+    color: #007cba;
+    font-weight: 500;
+}
+
+.oj-no-data {
+    text-align: center;
+    color: #666;
+    font-style: italic;
+    padding: 20px;
+}
+
+/* Enhanced stat boxes */
+.oj-stat-box {
+    position: relative;
+}
+
+.oj-stat-box .oj-stat-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .oj-analytics-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .oj-peak-hours-grid {
+        grid-template-columns: repeat(6, 1fr);
+    }
+    
+    .oj-hour-cell {
+        min-height: 40px;
+        font-size: 9px;
+    }
+    
+    .oj-product-stats {
+        flex-direction: column;
+        gap: 5px;
+    }
+}
+
+@media (max-width: 480px) {
+    .oj-analytics-dashboard {
+        padding: 15px;
+        margin: 15px 0;
+    }
+    
+    .oj-analytics-card {
+        padding: 15px;
+    }
+    
+    .oj-peak-hours-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
 </style>
+
+<!-- Chart.js Library -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+jQuery(document).ready(function($) {
+    'use strict';
+    
+    // Refresh button functionality
+    $('.oj-refresh-dashboard').on('click', function() {
+        location.reload();
+    });
+    
+    // Initialize Charts
+    initializeCharts();
+    
+    function initializeCharts() {
+        // Revenue Trend Chart
+        const revenueCtx = document.getElementById('revenueChart');
+        if (revenueCtx) {
+            const revenueData = <?php echo json_encode($revenue_trend); ?>;
+            
+            new Chart(revenueCtx, {
+                type: 'line',
+                data: {
+                    labels: revenueData.map(item => item.formatted_date),
+                    datasets: [{
+                        label: '<?php _e('Revenue', 'orders-jet'); ?>',
+                        data: revenueData.map(item => item.revenue),
+                        borderColor: '#007cba',
+                        backgroundColor: 'rgba(0, 123, 186, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#007cba',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        pointRadius: 6,
+                        pointHoverRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return '<?php echo $currency_symbol; ?>' + value.toFixed(2);
+                                }
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    },
+                    elements: {
+                        point: {
+                            hoverBackgroundColor: '#007cba'
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Order Types Pie Chart
+        const orderTypesCtx = document.getElementById('orderTypesChart');
+        if (orderTypesCtx) {
+            const orderTypesData = <?php echo json_encode($order_types); ?>;
+            
+            new Chart(orderTypesCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: [
+                        '<?php _e('Dine In', 'orders-jet'); ?>',
+                        '<?php _e('Pickup', 'orders-jet'); ?>'
+                    ],
+                    datasets: [{
+                        data: [orderTypesData.dinein, orderTypesData.pickup],
+                        backgroundColor: [
+                            '#4CAF50',
+                            '#9C27B0'
+                        ],
+                        borderColor: [
+                            '#ffffff',
+                            '#ffffff'
+                        ],
+                        borderWidth: 3,
+                        hoverOffset: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                usePointStyle: true,
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        }
+                    },
+                    cutout: '60%'
+                }
+            });
+        }
+    }
+    
+    // Enhanced hover effects for analytics cards
+    $('.oj-analytics-card').hover(
+        function() {
+            $(this).find('h3').css('color', '#007cba');
+        },
+        function() {
+            $(this).find('h3').css('color', '#333');
+        }
+    );
+    
+    // Peak hours cell click functionality
+    $('.oj-hour-cell').on('click', function() {
+        const hour = $(this).find('.oj-hour-label').text();
+        const count = $(this).find('.oj-hour-count').text();
+        
+        if (count > 0) {
+            alert('<?php _e('Orders at', 'orders-jet'); ?> ' + hour + ': ' + count + ' <?php _e('orders', 'orders-jet'); ?>');
+        }
+    });
+});
+</script>
