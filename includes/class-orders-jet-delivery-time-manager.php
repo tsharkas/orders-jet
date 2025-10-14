@@ -130,8 +130,9 @@ class OJ_Delivery_Time_Manager {
         
         $diff_seconds = $delivery_timestamp - $current_time;
         
-        // Calculate hours and minutes
-        $hours = floor(abs($diff_seconds) / 3600);
+        // Calculate days, hours and minutes
+        $days = floor(abs($diff_seconds) / 86400); // 86400 seconds in a day
+        $hours = floor((abs($diff_seconds) % 86400) / 3600);
         $minutes = floor((abs($diff_seconds) % 3600) / 60);
         
         // Determine status
@@ -149,13 +150,21 @@ class OJ_Delivery_Time_Manager {
             $class = 'oj-countdown-soon';
         }
         
-        // Format text
-        if ($hours > 0) {
-            $text = $hours . 'h ' . $minutes . 'm';
-            $short_text = $hours . 'h ' . $minutes . 'm';
+        // Format text with days support
+        if ($days > 0) {
+            if ($hours > 0) {
+                $text = $days . 'D ' . $hours . 'H ' . $minutes . 'M';
+                $short_text = $days . 'D ' . $hours . 'H';
+            } else {
+                $text = $days . 'D ' . $minutes . 'M';
+                $short_text = $days . 'D ' . $minutes . 'M';
+            }
+        } elseif ($hours > 0) {
+            $text = $hours . 'H ' . $minutes . 'M';
+            $short_text = $hours . 'H ' . $minutes . 'M';
         } else {
-            $text = $minutes . 'm';
-            $short_text = $minutes . 'm';
+            $text = $minutes . 'M';
+            $short_text = $minutes . 'M';
         }
         
         if ($status === 'overdue') {

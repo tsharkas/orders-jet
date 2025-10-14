@@ -1549,12 +1549,14 @@ $currency_symbol = get_woocommerce_currency_symbol();
 .oj-status-badge {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     padding: 6px 12px;
     border-radius: 20px;
     font-size: 12px;
     font-weight: 600;
     text-transform: uppercase;
+    line-height: 1;
 }
 
 .oj-status-badge.pending {
@@ -1693,6 +1695,8 @@ $currency_symbol = get_woocommerce_currency_symbol();
 
 .oj-status-badge .dashicons {
     font-size: 14px;
+    line-height: 1;
+    vertical-align: middle;
 }
 
 /* Card Body */
