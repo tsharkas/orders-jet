@@ -1615,7 +1615,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
 }
 
 .oj-kitchen-card .oj-customer-info:not(.oj-action-btn) .oj-order-number {
-    color: #495057 !important;
+    color: #FFFFFF !important;
     font-weight: 500;
 }
 
