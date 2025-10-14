@@ -118,7 +118,7 @@ if (function_exists('wc_get_orders')) {
         
         $active_orders[] = array(
             'ID' => $wc_order->get_id(),
-            'post_date' => $wc_order->get_date_created()->format('Y-m-d H:i:s'),
+            'post_date' => get_date_from_gmt($wc_order->get_date_created()->format('Y-m-d H:i:s'), 'Y-m-d H:i:s'),
             'post_status' => 'wc-' . $wc_order->get_status(),
             'order_total' => $wc_order->get_total(),
             'table_number' => $table_number,
@@ -198,7 +198,7 @@ if (function_exists('wc_get_orders')) {
             
             $active_orders[] = array(
                     'ID' => $order->get_id(),
-                    'post_date' => $order_post->post_date,
+                    'post_date' => get_date_from_gmt($order_post->post_date, 'Y-m-d H:i:s'),
                     'post_status' => 'wc-' . $order->get_status(),
                     'order_total' => $order->get_total(),
                 'table_number' => $table_number,
