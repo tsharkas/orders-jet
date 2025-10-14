@@ -1601,11 +1601,18 @@ $currency_symbol = get_woocommerce_currency_symbol();
 }
 
 /* Manager Dashboard - Order ID Section Styling */
-.oj-kitchen-card .oj-customer-info-section {
+.oj-kitchen-card .oj-customer-info-section,
+.oj-kitchen-card .oj-customer-info-section .oj-customer-details {
     background: #f8f9fa !important;
+    background-color: #f8f9fa !important;
     color: #495057 !important;
     border-radius: 8px 8px 0 0;
     border-bottom: 1px solid #dee2e6;
+}
+
+/* Override any inherited background colors */
+.oj-kitchen-card .oj-customer-info-section * {
+    background-color: transparent !important;
 }
 
 .oj-kitchen-card .oj-customer-name {
