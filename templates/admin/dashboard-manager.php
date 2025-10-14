@@ -20,8 +20,8 @@ include ORDERS_JET_PLUGIN_DIR . 'templates/admin/manager-navigation.php';
 
 // Get user information
 $current_user = wp_get_current_user();
-$today = date('Y-m-d');
-$today_formatted = date('F j, Y');
+$today = OJ_Time_Helper::get_local_date('Y-m-d');
+$today_formatted = OJ_Time_Helper::get_local_time('F j, Y');
 
 // Get real data from WooCommerce orders
 global $wpdb;
@@ -68,11 +68,12 @@ if (function_exists('wc_get_orders')) {
         
         error_log('Orders Jet Kitchen DEBUG: Order #' . $wc_order->get_id() . ' - Found delivery_date: ' . ($delivery_date ?: 'NONE') . ', delivery_time: ' . ($delivery_time ?: 'NONE') . ', order_method: ' . ($order_method ?: 'NONE'));
         
-        // For pickup orders with delivery date/time, show all orders (let filters handle date filtering)
+        // For pickup orders with delivery date/time, show all orders (timezone-aware)
         if (empty($table_number) && !empty($delivery_date)) {
-            $today = date('Y-m-d');
-            // Convert WooFood date format "October 13, 2025" to Y-m-d
-            $order_date = date('Y-m-d', strtotime($delivery_date));
+            // Use timezone-aware analysis
+            $delivery_analysis = OJ_Time_Helper::analyze_woofood_delivery($delivery_date, $delivery_time, $delivery_unix);
+            $today = OJ_Time_Helper::get_local_date('Y-m-d');
+            $order_date = $delivery_analysis['local_date'];
             
             error_log('Orders Jet Kitchen DEBUG: Order #' . $wc_order->get_id() . ' - Today: ' . $today . ', Order date: ' . $order_date . ' (from: ' . $delivery_date . ')');
             
@@ -146,8 +147,8 @@ if (function_exists('wc_get_orders')) {
     
     $active_orders = array();
     foreach ($active_orders_posts as $order_post) {
-        $order = wc_get_order($order_post->ID);
-        if ($order) {
+            $order = wc_get_order($order_post->ID);
+            if ($order) {
             $table_number = $order->get_meta('_oj_table_number');
             
             // Get delivery date/time for WooFood orders (using correct field names)
@@ -155,11 +156,12 @@ if (function_exists('wc_get_orders')) {
             $delivery_time = $order->get_meta('exwfood_time_deli'); // "11:30 PM" format
             $order_method = $order->get_meta('exwfood_order_method'); // "delivery"
             
-            // For pickup orders with delivery date/time, show all orders (let filters handle date filtering)
+            // For pickup orders with delivery date/time, show all orders (timezone-aware)
             if (empty($table_number) && !empty($delivery_date)) {
-                $today = date('Y-m-d');
-                // Convert WooFood date format "October 13, 2025" to Y-m-d
-                $order_date = date('Y-m-d', strtotime($delivery_date));
+                // Use timezone-aware analysis
+                $delivery_analysis = OJ_Time_Helper::analyze_woofood_delivery($delivery_date, $delivery_time, $order->get_meta('exwfood_datetime_deli_unix'));
+                $today = OJ_Time_Helper::get_local_date('Y-m-d');
+                $order_date = $delivery_analysis['local_date'];
                 
                 // Show all orders - let JavaScript filters handle the date filtering
                 // (Removed the continue statement to include upcoming orders)
@@ -168,15 +170,13 @@ if (function_exists('wc_get_orders')) {
                 if (!empty($delivery_time)) {
                     // Enhanced badge for timed pickup orders (HAS TIME)
                     $order_type = 'pickup_timed';
-                    $time_display = date('g:i A', strtotime($delivery_time));
                     
                     // Show date + time for upcoming orders, only time for today's orders
-                    if ($order_date === $today) {
-                        $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $time_display;
+                    if ($delivery_analysis['is_today']) {
+                        $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $delivery_analysis['display_time'];
                     } else {
                         // For upcoming orders, show date + time
-                        $date_display = date('M j', strtotime($delivery_date)); // e.g., "Oct 15"
-                        $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $date_display . ' ' . $time_display;
+                        $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $delivery_analysis['display_datetime'];
                     }
                     
                     $order_type_icon = '🕒';
@@ -197,12 +197,12 @@ if (function_exists('wc_get_orders')) {
             }
             
             $active_orders[] = array(
-                'ID' => $order->get_id(),
-                'post_date' => $order_post->post_date,
-                'post_status' => 'wc-' . $order->get_status(),
-                'order_total' => $order->get_total(),
+                    'ID' => $order->get_id(),
+                    'post_date' => $order_post->post_date,
+                    'post_status' => 'wc-' . $order->get_status(),
+                    'order_total' => $order->get_total(),
                 'table_number' => $table_number,
-                'customer_name' => $order->get_billing_first_name(),
+                    'customer_name' => $order->get_billing_first_name(),
                 'session_id' => $order->get_meta('_oj_session_id'),
                 'delivery_date' => $delivery_date,
                 'delivery_time' => $delivery_time,
@@ -286,28 +286,28 @@ foreach ($active_orders as $order) {
         $order_items = array();
         foreach ($wc_order->get_items() as $item) {
             // Get basic item info
-            $item_data = array(
-                'name' => $item->get_name(),
-                'quantity' => $item->get_quantity(),
-                'total' => $item->get_total(),
-                'variations' => array(),
-                'addons' => array(),
-                'notes' => ''
-            );
-            
-            // Get variations using WooCommerce native methods
-            $product = $item->get_product();
-            if ($product && $product->is_type('variation')) {
-                // For variation products, get variation attributes directly
-                $variation_attributes = $product->get_variation_attributes();
-                foreach ($variation_attributes as $attribute_name => $attribute_value) {
-                    if (!empty($attribute_value)) {
-                        // Clean attribute name and get proper label
-                        $clean_attribute_name = str_replace('attribute_', '', $attribute_name);
-                        $attribute_label = wc_attribute_label($clean_attribute_name);
-                        $item_data['variations'][$attribute_label] = $attribute_value;
-                    }
-                }
+                    $item_data = array(
+                        'name' => $item->get_name(),
+                        'quantity' => $item->get_quantity(),
+                        'total' => $item->get_total(),
+                        'variations' => array(),
+                        'addons' => array(),
+                        'notes' => ''
+                    );
+                    
+                    // Get variations using WooCommerce native methods
+                    $product = $item->get_product();
+                    if ($product && $product->is_type('variation')) {
+                        // For variation products, get variation attributes directly
+                        $variation_attributes = $product->get_variation_attributes();
+                        foreach ($variation_attributes as $attribute_name => $attribute_value) {
+                            if (!empty($attribute_value)) {
+                                // Clean attribute name and get proper label
+                                $clean_attribute_name = str_replace('attribute_', '', $attribute_name);
+                                $attribute_label = wc_attribute_label($clean_attribute_name);
+                                $item_data['variations'][$attribute_label] = $attribute_value;
+                            }
+                        }
                 
             } else {
                 // For non-variation products, still check meta for any variation info
@@ -323,33 +323,33 @@ foreach ($active_orders as $order) {
                         $item_data['variations'][$attribute_label] = $meta_value;
                     }
                 }
-            }
-            
-            // Get add-ons and notes from item meta
-            $item_meta = $item->get_meta_data();
-            foreach ($item_meta as $meta) {
-                $meta_key = $meta->key;
-                $meta_value = $meta->value;
-                
-                // Get add-ons
-                if ($meta_key === '_oj_item_addons') {
-                    $addons = explode(', ', $meta_value);
-                    $item_data['addons'] = array_map(function($addon) {
+                    }
+                    
+                    // Get add-ons and notes from item meta
+                    $item_meta = $item->get_meta_data();
+                    foreach ($item_meta as $meta) {
+                        $meta_key = $meta->key;
+                        $meta_value = $meta->value;
+                        
+                        // Get add-ons
+                        if ($meta_key === '_oj_item_addons') {
+                            $addons = explode(', ', $meta_value);
+                            $item_data['addons'] = array_map(function($addon) {
                         // Remove price information from add-ons for kitchen display
-                        // Convert "Combo Plus (+90,00 EGP)" to "Combo Plus"
-                        // Convert "Combo + 60 EGP" to "Combo"
-                        $addon_clean = strip_tags($addon);
-                        // Remove price in parentheses (e.g., "(+90,00 EGP)" or "(+0,00 EGP)")
-                        $addon_clean = preg_replace('/\s*\(\+[^)]+\)/', '', $addon_clean);
-                        // Remove price in format "+ XX EGP" (e.g., "+ 60 EGP")
-                        $addon_clean = preg_replace('/\s*\+\s*\d+[.,]?\d*\s*EGP/', '', $addon_clean);
-                        return trim($addon_clean);
-                    }, $addons);
-                }
-                
-                // Get notes
-                if ($meta_key === '_oj_item_notes') {
-                    $item_data['notes'] = $meta_value;
+                                // Convert "Combo Plus (+90,00 EGP)" to "Combo Plus"
+                                // Convert "Combo + 60 EGP" to "Combo"
+                                $addon_clean = strip_tags($addon);
+                                // Remove price in parentheses (e.g., "(+90,00 EGP)" or "(+0,00 EGP)")
+                                $addon_clean = preg_replace('/\s*\(\+[^)]+\)/', '', $addon_clean);
+                                // Remove price in format "+ XX EGP" (e.g., "+ 60 EGP")
+                                $addon_clean = preg_replace('/\s*\+\s*\d+[.,]?\d*\s*EGP/', '', $addon_clean);
+                                return trim($addon_clean);
+                            }, $addons);
+                        }
+                        
+                        // Get notes
+                        if ($meta_key === '_oj_item_notes') {
+                            $item_data['notes'] = $meta_value;
                 }
             }
             
@@ -429,15 +429,15 @@ $currency_symbol = get_woocommerce_currency_symbol();
             </h2>
             <p class="oj-last-updated">
                 <span class="dashicons dashicons-clock" style="font-size: 14px; vertical-align: middle; margin-right: 4px;"></span>
-                <strong><?php _e('Last Updated:', 'orders-jet'); ?></strong> <?php echo esc_html(date('g:i:s A')); ?>
+                       <strong><?php _e('Last Updated:', 'orders-jet'); ?></strong> <?php echo esc_html(OJ_Time_Helper::get_local_time('g:i:s A')); ?>
             </p>
         </div>
         <div class="oj-header-right">
             <button type="button" class="oj-check-orders-btn" onclick="location.reload();">
                 <span class="dashicons dashicons-update"></span>
                 <?php _e('Refresh Orders', 'orders-jet'); ?>
-            </button>
-        </div>
+    </button>
+    </div>
     </div>
     
     <hr class="wp-header-end">
@@ -493,7 +493,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
             <span class="oj-filter-label"><?php _e('Completed', 'orders-jet'); ?></span>
         </button>
     </div>
-
+    
     <!-- Order Queue -->
     <div class="oj-dashboard-orders">
         <h2><?php _e('Order Management', 'orders-jet'); ?></h2>
@@ -515,7 +515,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                     <?php if ($order['table_number']) : ?>
                                         <span class="oj-table-number">Table <?php echo esc_html($order['table_number']); ?></span>
                                     <?php elseif ($order['order_type'] === 'delivery') : ?>
-                                        <?php 
+        <?php
                                         // Get delivery address for delivery orders
                                         $wc_order = wc_get_order($order['ID']);
                                         $delivery_address = '';
@@ -534,13 +534,13 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                     <div class="oj-order-type-badge <?php echo esc_attr($order['order_type_class']); ?>">
                                         <span class="oj-type-icon"><?php echo esc_html($order['order_type_icon']); ?></span>
                                         <span class="oj-type-label"><?php echo esc_html($order['order_type_label']); ?></span>
-                                    </div>
-                                </div>
+            </div>
+            </div>
                                 <div class="oj-order-time">
                                     <span class="dashicons dashicons-clock"></span>
-                                    <?php echo esc_html(date('g:i A', strtotime($order['post_date']))); ?>
-                                </div>
-                            </div>
+                                    <?php echo esc_html(OJ_Time_Helper::get_order_display_time($order['post_date'])); ?>
+            </div>
+            </div>
                             <div class="oj-card-status">
                                 <?php if ($order['post_status'] === 'wc-pending') : ?>
                                     <span class="oj-status-badge pending">
@@ -552,23 +552,23 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                         <span class="dashicons dashicons-admin-tools"></span>
                                         <?php _e('Cooking', 'orders-jet'); ?>
                                     </span>
-                                <?php endif; ?>
-                            </div>
+        <?php endif; ?>
+    </div>
                         </div>
 
                         <!-- Customer Info -->
                         <div class="oj-customer-info">
-                            <?php if ($order['customer_name']) : ?>
+                                <?php if ($order['customer_name']) : ?>
                                 <div class="oj-customer-name"><?php echo esc_html($order['customer_name']); ?></div>
-                            <?php else : ?>
+                                <?php else : ?>
                                 <div class="oj-customer-name">Guest</div>
-                            <?php endif; ?>
+                                <?php endif; ?>
                             <div class="oj-order-number">#<?php echo esc_html($order['ID']); ?></div>
                         </div>
 
                         <!-- Card Body - Items -->
                         <div class="oj-card-body">
-                            <?php if (!empty($order['items'])) : ?>
+                                <?php if (!empty($order['items'])) : ?>
                                 <div class="oj-card-items">
                                     <?php foreach ($order['items'] as $item) : ?>
                                         <div class="oj-card-item">
@@ -603,9 +603,9 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                         </div>
                                     <?php endforeach; ?>
                                 </div>
-                            <?php else : ?>
+                                <?php else : ?>
                                 <div class="oj-no-items"><?php _e('No items found', 'orders-jet'); ?></div>
-                            <?php endif; ?>
+                                <?php endif; ?>
                         </div>
 
                         <!-- Card Footer - Manager Actions -->
@@ -628,7 +628,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
                             </div>
                         </div>
                     </div>
-                <?php endforeach; ?>
+                    <?php endforeach; ?>
             </div>
         <?php else : ?>
             <div class="oj-no-orders">

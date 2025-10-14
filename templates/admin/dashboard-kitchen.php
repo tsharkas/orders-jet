@@ -113,8 +113,8 @@ if (isset($error_message)) {
 
 // Get user information
 $current_user = wp_get_current_user();
-$today = date('Y-m-d');
-$today_formatted = date('F j, Y');
+$today = OJ_Time_Helper::get_local_date('Y-m-d');
+$today_formatted = OJ_Time_Helper::get_local_time('F j, Y');
 
 // Get real data from WooCommerce orders
 global $wpdb;
@@ -163,9 +163,10 @@ if (function_exists('wc_get_orders')) {
         
         // For pickup orders with delivery date/time, show all orders (let filters handle date filtering)
         if (empty($table_number) && !empty($delivery_date)) {
-            $today = date('Y-m-d');
-            // Convert WooFood date format "October 13, 2025" to Y-m-d
-            $order_date = date('Y-m-d', strtotime($delivery_date));
+            // Use timezone-aware analysis
+            $delivery_analysis = OJ_Time_Helper::analyze_woofood_delivery($delivery_date, $delivery_time, $delivery_unix);
+            $today = OJ_Time_Helper::get_local_date('Y-m-d');
+            $order_date = $delivery_analysis['local_date'];
             
             error_log('Orders Jet Kitchen DEBUG: Order #' . $wc_order->get_id() . ' - Today: ' . $today . ', Order date: ' . $order_date . ' (from: ' . $delivery_date . ')');
             
@@ -176,21 +177,19 @@ if (function_exists('wc_get_orders')) {
             if (!empty($delivery_time)) {
                 // Enhanced badge for timed pickup orders (HAS TIME)
                 $order_type = 'pickup_timed';
-                $time_display = date('g:i A', strtotime($delivery_time));
                 
                 // Show date + time for upcoming orders, only time for today's orders
-                if ($order_date === $today) {
-                    $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $time_display;
+                if ($delivery_analysis['is_today']) {
+                    $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $delivery_analysis['display_time'];
                 } else {
                     // For upcoming orders, show date + time
-                    $date_display = date('M j', strtotime($delivery_date)); // e.g., "Oct 15"
-                    $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $date_display . ' ' . $time_display;
+                    $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $delivery_analysis['display_datetime'];
                 }
                 
                 $order_type_icon = '🕒';
                 $order_type_class = 'oj-order-type-pickup-timed'; // ORANGE
                 
-                error_log('Orders Jet Kitchen: Including TIMED pickup order #' . $wc_order->get_id() . ' for ' . $order_date . ' at ' . $time_display);
+                error_log('Orders Jet Kitchen: Including TIMED pickup order #' . $wc_order->get_id() . ' for ' . $order_date . ' at ' . $delivery_analysis['display_time']);
             } else {
                 // Regular pickup for today but no specific time
                 $order_type = 'pickup';
@@ -250,9 +249,10 @@ if (function_exists('wc_get_orders')) {
             
             // For pickup orders with delivery date/time, show all orders (let filters handle date filtering)
             if (empty($table_number) && !empty($delivery_date)) {
-                $today = date('Y-m-d');
-                // Convert WooFood date format "October 13, 2025" to Y-m-d
-                $order_date = date('Y-m-d', strtotime($delivery_date));
+                // Use timezone-aware analysis
+                $delivery_analysis = OJ_Time_Helper::analyze_woofood_delivery($delivery_date, $delivery_time, $order->get_meta('exwfood_datetime_deli_unix'));
+                $today = OJ_Time_Helper::get_local_date('Y-m-d');
+                $order_date = $delivery_analysis['local_date'];
                 
                 // Show all orders - let JavaScript filters handle the date filtering
                 // (Removed the continue statement to include upcoming orders)
@@ -261,15 +261,13 @@ if (function_exists('wc_get_orders')) {
                 if (!empty($delivery_time)) {
                     // Enhanced badge for timed pickup orders (HAS TIME)
                     $order_type = 'pickup_timed';
-                    $time_display = date('g:i A', strtotime($delivery_time));
                     
                     // Show date + time for upcoming orders, only time for today's orders
-                    if ($order_date === $today) {
-                        $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $time_display;
+                    if ($delivery_analysis['is_today']) {
+                        $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $delivery_analysis['display_time'];
                     } else {
                         // For upcoming orders, show date + time
-                        $date_display = date('M j', strtotime($delivery_date)); // e.g., "Oct 15"
-                        $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $date_display . ' ' . $time_display;
+                        $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $delivery_analysis['display_datetime'];
                     }
                     
                     $order_type_icon = '🕒';
@@ -523,7 +521,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
             <p class="description"><?php echo sprintf(__('Welcome to the kitchen, %s!', 'orders-jet'), $current_user->display_name); ?></p>
             <p class="oj-last-updated">
                 <span class="dashicons dashicons-clock" style="font-size: 14px; vertical-align: middle; margin-right: 4px;"></span>
-                <strong><?php _e('Last Updated:', 'orders-jet'); ?></strong> <?php echo esc_html(date('g:i:s A')); ?>
+                       <strong><?php _e('Last Updated:', 'orders-jet'); ?></strong> <?php echo esc_html(OJ_Time_Helper::get_local_time('g:i:s A')); ?>
             </p>
         </div>
         <div class="oj-header-right">
@@ -624,7 +622,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                 </div>
                                 <div class="oj-order-time">
                                     <span class="dashicons dashicons-clock"></span>
-                                    <?php echo esc_html(date('g:i A', strtotime($order['post_date']))); ?>
+                                    <?php echo esc_html(OJ_Time_Helper::get_order_display_time($order['post_date'])); ?>
                                 </div>
                             </div>
                             <div class="oj-card-status">
