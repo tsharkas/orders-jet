@@ -1128,22 +1128,15 @@ $currency_symbol = get_woocommerce_currency_symbol();
 }
 
 .oj-order-type-pickup {
-    background: #9C27B0;
-    color: #ffffff;
+    background: #9C27B0 !important;
+    color: #ffffff !important;
     font-weight: bold;
 }
 
 .oj-order-type-pickup-timed {
-    background: #FF5722;
-    color: #ffffff;
+    background: #FF5722 !important;
+    color: #ffffff !important;
     font-weight: bold;
-    animation: pulse-timed 2s infinite;
-}
-
-@keyframes pulse-timed {
-    0% { box-shadow: 0 0 0 0 rgba(255, 87, 34, 0.7); }
-    70% { box-shadow: 0 0 0 10px rgba(255, 87, 34, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(255, 87, 34, 0); }
 }
 
 .oj-order-type-unknown {
