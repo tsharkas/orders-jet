@@ -1117,31 +1117,31 @@ $currency_symbol = get_woocommerce_currency_symbol();
 }
 
 /* Order Type Colors */
-.oj-order-type-dinein {
-    background: #4CAF50;
-    color: #ffffff;
+.oj-order-type-badge.oj-order-type-dinein {
+    background: #4CAF50 !important;
+    color: #ffffff !important;
 }
 
-.oj-order-type-delivery {
-    background: #2196F3;
-    color: #ffffff;
+.oj-order-type-badge.oj-order-type-delivery {
+    background: #2196F3 !important;
+    color: #ffffff !important;
 }
 
-.oj-order-type-pickup {
+.oj-order-type-badge.oj-order-type-pickup {
     background: #9C27B0 !important;
     color: #ffffff !important;
     font-weight: bold;
 }
 
-.oj-order-type-pickup-timed {
+.oj-order-type-badge.oj-order-type-pickup-timed {
     background: #FF5722 !important;
     color: #ffffff !important;
     font-weight: bold;
 }
 
-.oj-order-type-unknown {
-    background: #757575;
-    color: #ffffff;
+.oj-order-type-badge.oj-order-type-unknown {
+    background: #757575 !important;
+    color: #ffffff !important;
 }
 
 /* Customer Info */
