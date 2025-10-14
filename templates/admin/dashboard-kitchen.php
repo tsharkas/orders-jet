@@ -140,14 +140,39 @@ if (function_exists('wc_get_orders')) {
     foreach ($wc_orders as $wc_order) {
         $table_number = $wc_order->get_meta('_oj_table_number');
         
-        // Get delivery date/time for WooFood orders
-        $delivery_date = $wc_order->get_meta('exwf_delivery_date');
-        $delivery_time = $wc_order->get_meta('_exwf_delivery_time') ?: $wc_order->get_meta('_oj_delivery_time');
+        // DEBUG: Log all meta fields for orders without table numbers (pickup/delivery orders)
+        if (empty($table_number)) {
+            error_log('Orders Jet Kitchen DEBUG: Order #' . $wc_order->get_id() . ' - All meta fields:');
+            $all_meta = $wc_order->get_meta_data();
+            foreach ($all_meta as $meta) {
+                $key = $meta->get_data()['key'];
+                $value = $meta->get_data()['value'];
+                if (strpos($key, 'delivery') !== false || strpos($key, 'exwf') !== false || strpos($key, 'date') !== false || strpos($key, 'time') !== false) {
+                    error_log('Orders Jet Kitchen DEBUG: ' . $key . ' = ' . print_r($value, true));
+                }
+            }
+        }
+        
+        // Get delivery date/time for WooFood orders (try multiple possible field names)
+        $delivery_date = $wc_order->get_meta('exwf_delivery_date') ?: 
+                        $wc_order->get_meta('_exwf_delivery_date') ?: 
+                        $wc_order->get_meta('delivery_date') ?: 
+                        $wc_order->get_meta('_delivery_date');
+                        
+        $delivery_time = $wc_order->get_meta('_exwf_delivery_time') ?: 
+                        $wc_order->get_meta('exwf_delivery_time') ?: 
+                        $wc_order->get_meta('_oj_delivery_time') ?: 
+                        $wc_order->get_meta('delivery_time') ?: 
+                        $wc_order->get_meta('_delivery_time');
+        
+        error_log('Orders Jet Kitchen DEBUG: Order #' . $wc_order->get_id() . ' - Found delivery_date: ' . ($delivery_date ?: 'NONE') . ', delivery_time: ' . ($delivery_time ?: 'NONE'));
         
         // For pickup orders with delivery date/time, only show today's orders
         if (empty($table_number) && !empty($delivery_date)) {
             $today = date('Y-m-d');
             $order_date = date('Y-m-d', strtotime($delivery_date));
+            
+            error_log('Orders Jet Kitchen DEBUG: Order #' . $wc_order->get_id() . ' - Today: ' . $today . ', Order date: ' . $order_date);
             
             // Skip if not today's delivery
             if ($order_date !== $today) {
