@@ -175,17 +175,27 @@ if (function_exists('wc_get_orders')) {
                 continue;
             }
             
-            // Enhanced badge for timed pickup orders
-            $order_type = 'pickup_timed';
-            // Convert WooFood time format "11:30 PM" to display format
-            $time_display = !empty($delivery_time) ? date('g:i A', strtotime($delivery_time)) : '';
-            $order_type_label = !empty($time_display) ? __('PICK UP', 'orders-jet') . ' ' . $time_display : __('PICK UP', 'orders-jet');
-            $order_type_icon = '🕒';
-            $order_type_class = 'oj-order-type-pickup-timed';
-            
-            error_log('Orders Jet Kitchen: Including timed pickup order #' . $wc_order->get_id() . ' for today at ' . $time_display);
+            // CHECK IF IT HAS DELIVERY TIME - this is the key difference!
+            if (!empty($delivery_time)) {
+                // Enhanced badge for timed pickup orders (HAS TIME)
+                $order_type = 'pickup_timed';
+                $time_display = date('g:i A', strtotime($delivery_time));
+                $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $time_display;
+                $order_type_icon = '🕒';
+                $order_type_class = 'oj-order-type-pickup-timed'; // ORANGE
+                
+                error_log('Orders Jet Kitchen: Including TIMED pickup order #' . $wc_order->get_id() . ' for today at ' . $time_display);
+            } else {
+                // Regular pickup for today but no specific time
+                $order_type = 'pickup';
+                $order_type_label = __('PICK UP', 'orders-jet');
+                $order_type_icon = '🥡';
+                $order_type_class = 'oj-order-type-pickup'; // PURPLE
+                
+                error_log('Orders Jet Kitchen: Including REGULAR pickup order #' . $wc_order->get_id() . ' for today (no specific time)');
+            }
         } else {
-            // Regular logic for table orders and pickup orders without delivery times
+            // Regular logic for table orders and pickup orders without delivery dates
             $order_type = !empty($table_number) ? 'dinein' : 'pickup';
             $order_type_label = !empty($table_number) ? __('DINE IN', 'orders-jet') : __('PICK UP', 'orders-jet');
             $order_type_icon = !empty($table_number) ? '🍽️' : '🥡';
@@ -243,15 +253,23 @@ if (function_exists('wc_get_orders')) {
                     continue;
                 }
                 
-                // Enhanced badge for timed pickup orders
-                $order_type = 'pickup_timed';
-                // Convert WooFood time format "11:30 PM" to display format
-                $time_display = !empty($delivery_time) ? date('g:i A', strtotime($delivery_time)) : '';
-                $order_type_label = !empty($time_display) ? __('PICK UP', 'orders-jet') . ' ' . $time_display : __('PICK UP', 'orders-jet');
-                $order_type_icon = '🕒';
-                $order_type_class = 'oj-order-type-pickup-timed';
+                // CHECK IF IT HAS DELIVERY TIME - this is the key difference!
+                if (!empty($delivery_time)) {
+                    // Enhanced badge for timed pickup orders (HAS TIME)
+                    $order_type = 'pickup_timed';
+                    $time_display = date('g:i A', strtotime($delivery_time));
+                    $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $time_display;
+                    $order_type_icon = '🕒';
+                    $order_type_class = 'oj-order-type-pickup-timed'; // ORANGE
+                } else {
+                    // Regular pickup for today but no specific time
+                    $order_type = 'pickup';
+                    $order_type_label = __('PICK UP', 'orders-jet');
+                    $order_type_icon = '🥡';
+                    $order_type_class = 'oj-order-type-pickup'; // PURPLE
+                }
             } else {
-                // Regular logic for table orders and pickup orders without delivery times
+                // Regular logic for table orders and pickup orders without delivery dates
                 $order_type = !empty($table_number) ? 'dinein' : 'pickup';
                 $order_type_label = !empty($table_number) ? __('DINE IN', 'orders-jet') : __('PICK UP', 'orders-jet');
                 $order_type_icon = !empty($table_number) ? '🍽️' : '🥡';
