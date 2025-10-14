@@ -1602,18 +1602,19 @@ $currency_symbol = get_woocommerce_currency_symbol();
 
 /* Manager Dashboard - Order ID Section Styling */
 .oj-kitchen-card .oj-customer-info-section {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-    color: white !important;
+    background: #f8f9fa !important;
+    color: #495057 !important;
     border-radius: 8px 8px 0 0;
+    border-bottom: 1px solid #dee2e6;
 }
 
 .oj-kitchen-card .oj-customer-name {
-    color: white !important;
+    color: #495057 !important;
     font-weight: 600;
 }
 
 .oj-kitchen-card .oj-order-number {
-    color: rgba(255, 255, 255, 0.9) !important;
+    color: #6c757d !important;
     font-weight: 500;
 }
 
@@ -1646,31 +1647,31 @@ $currency_symbol = get_woocommerce_currency_symbol();
 }
 
 .oj-view-details {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #764ba2;
 }
 
 .oj-view-details:hover {
-    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+    background: #6a4190;
 }
 
 .oj-customer-info {
-    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    background: #11998e;
 }
 
 .oj-customer-info:hover {
-    background: linear-gradient(135deg, #0e8078 0%, #2dd865 100%);
+    background: #0e8078;
 }
 
 .oj-priority {
-    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+    background: #ee5a24;
 }
 
 .oj-priority:hover {
-    background: linear-gradient(135deg, #ff5252 0%, #d63031 100%);
+    background: #d63031;
 }
 
 .oj-priority.priority-active {
-    background: linear-gradient(135deg, #fd79a8 0%, #fdcb6e 100%);
+    background: #fd79a8;
     animation: pulse-priority 2s infinite;
 }
 
