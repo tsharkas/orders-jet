@@ -1857,16 +1857,10 @@ jQuery(document).ready(function($) {
                     show = orderType === 'pickup'; // No delivery date/time
                     break;
                 case 'pickup-today':
-                    if (orderType === 'pickup_timed' && deliveryDate) {
-                        const orderDateFormatted = new Date(deliveryDate).toISOString().split('T')[0];
-                        show = orderDateFormatted === today;
-                    }
+                    show = orderType === 'pickup_timed'; // All timed pickups are for today already
                     break;
                 case 'pickup-upcoming':
-                    if (orderType === 'pickup_timed' && deliveryDate) {
-                        const orderDateFormatted = new Date(deliveryDate).toISOString().split('T')[0];
-                        show = orderDateFormatted > today;
-                    }
+                    show = false; // No upcoming orders are loaded in the backend
                     break;
             }
             
@@ -1918,16 +1912,10 @@ jQuery(document).ready(function($) {
                         matches = orderType === 'pickup';
                         break;
                     case 'pickup-today':
-                        if (orderType === 'pickup_timed' && deliveryDate) {
-                            const orderDateFormatted = new Date(deliveryDate).toISOString().split('T')[0];
-                            matches = orderDateFormatted === today;
-                        }
+                        matches = orderType === 'pickup_timed'; // All timed pickups are for today already
                         break;
                     case 'pickup-upcoming':
-                        if (orderType === 'pickup_timed' && deliveryDate) {
-                            const orderDateFormatted = new Date(deliveryDate).toISOString().split('T')[0];
-                            matches = orderDateFormatted > today;
-                        }
+                        matches = false; // No upcoming orders are loaded in the backend
                         break;
                 }
                 
