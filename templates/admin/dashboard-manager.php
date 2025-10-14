@@ -472,31 +472,44 @@ $currency_symbol = get_woocommerce_currency_symbol();
         </div>
     </div>
 
-    <!-- Manager Filters -->
+    <!-- Manager Filters (Kitchen-style + Status additions) -->
     <div class="oj-order-filters">
         <button class="oj-filter-btn active" data-filter="all">
             <span class="oj-filter-icon">📋</span>
             <span class="oj-filter-label"><?php _e('All Orders', 'orders-jet'); ?></span>
         </button>
-        <button class="oj-filter-btn" data-filter="pending">
-            <span class="oj-filter-icon">⏳</span>
-            <span class="oj-filter-label"><?php _e('Pending Payment', 'orders-jet'); ?></span>
+        <button class="oj-filter-btn" data-filter="dinein">
+            <span class="oj-filter-icon">🍽️</span>
+            <span class="oj-filter-label"><?php _e('Dining', 'orders-jet'); ?></span>
         </button>
-        <button class="oj-filter-btn" data-filter="processing">
-            <span class="oj-filter-icon">👨‍🍳</span>
-            <span class="oj-filter-label"><?php _e('Cooking', 'orders-jet'); ?></span>
+        <button class="oj-filter-btn" data-filter="pickup-all">
+            <span class="oj-filter-icon">🥡</span>
+            <span class="oj-filter-label"><?php _e('All Pickup', 'orders-jet'); ?></span>
         </button>
+        <button class="oj-filter-btn" data-filter="pickup-immediate">
+            <span class="oj-filter-icon">⚡</span>
+            <span class="oj-filter-label"><?php _e('Immediate Pickup', 'orders-jet'); ?></span>
+        </button>
+        <button class="oj-filter-btn" data-filter="pickup-today">
+            <span class="oj-filter-icon">🕒</span>
+            <span class="oj-filter-label"><?php _e('Today Pickup', 'orders-jet'); ?></span>
+        </button>
+        <button class="oj-filter-btn" data-filter="pickup-upcoming">
+            <span class="oj-filter-icon">📅</span>
+            <span class="oj-filter-label"><?php _e('Upcoming Pickup', 'orders-jet'); ?></span>
+        </button>
+        <!-- Additional Manager Status Filters -->
         <button class="oj-filter-btn" data-filter="ready">
             <span class="oj-filter-icon">✅</span>
             <span class="oj-filter-label"><?php _e('Ready', 'orders-jet'); ?></span>
         </button>
-        <button class="oj-filter-btn" data-filter="completed">
-            <span class="oj-filter-icon">🎉</span>
-            <span class="oj-filter-label"><?php _e('Completed', 'orders-jet'); ?></span>
+        <button class="oj-filter-btn" data-filter="pending">
+            <span class="oj-filter-icon">⏳</span>
+            <span class="oj-filter-label"><?php _e('Pending Payment', 'orders-jet'); ?></span>
         </button>
         <button class="oj-filter-btn" data-filter="cancelled">
             <span class="oj-filter-icon">❌</span>
-            <span class="oj-filter-label"><?php _e('Cancelled/Refunded', 'orders-jet'); ?></span>
+            <span class="oj-filter-label"><?php _e('Cancelled', 'orders-jet'); ?></span>
         </button>
     </div>
     
@@ -2369,21 +2382,34 @@ jQuery(document).ready(function($) {
                 case 'all':
                     show = true;
                     break;
-                case 'pending':
-                    show = card.find('.oj-status-badge.pending').length > 0;
+                // Kitchen-style operational filters
+                case 'dinein':
+                    show = orderType === 'dinein';
                     break;
-                case 'processing':
-                    show = card.find('.oj-status-badge.processing').length > 0 || 
-                           card.find('.oj-status-badge.oj-countdown-upcoming').length > 0 ||
-                           card.find('.oj-status-badge.oj-countdown-soon').length > 0 ||
-                           card.find('.oj-status-badge.oj-countdown-urgent').length > 0 ||
-                           card.find('.oj-status-badge.oj-countdown-overdue').length > 0;
+                case 'pickup-all':
+                    show = orderType === 'pickup' || orderType === 'pickup_timed';
                     break;
+                case 'pickup-immediate':
+                    show = orderType === 'pickup';
+                    break;
+                case 'pickup-today':
+                    if (orderType === 'pickup_timed') {
+                        const deliveryDateFormatted = card.data('delivery-date-formatted');
+                        show = deliveryDateFormatted === today;
+                    }
+                    break;
+                case 'pickup-upcoming':
+                    if (orderType === 'pickup_timed') {
+                        const deliveryDateFormatted = card.data('delivery-date-formatted');
+                        show = deliveryDateFormatted > today;
+                    }
+                    break;
+                // Additional Manager Status filters
                 case 'ready':
                     show = card.find('.oj-status-badge.ready').length > 0;
                     break;
-                case 'completed':
-                    show = card.find('.oj-status-badge.completed').length > 0;
+                case 'pending':
+                    show = card.find('.oj-status-badge.pending').length > 0;
                     break;
                 case 'cancelled':
                     show = card.find('.oj-status-badge.cancelled').length > 0 || 
@@ -2450,6 +2476,17 @@ jQuery(document).ready(function($) {
                             matches = deliveryDateFormatted > today;
                         }
                         break;
+                    // Additional Manager Status filters
+                    case 'ready':
+                        matches = card.find('.oj-status-badge.ready').length > 0;
+                        break;
+                    case 'pending':
+                        matches = card.find('.oj-status-badge.pending').length > 0;
+                        break;
+                    case 'cancelled':
+                        matches = card.find('.oj-status-badge.cancelled').length > 0 || 
+                                 card.find('.oj-status-badge.refunded').length > 0;
+                        break;
                 }
                 
                 if (matches) count++;
@@ -2478,7 +2515,10 @@ jQuery(document).ready(function($) {
             'pickup-all': '<?php _e('pickup orders', 'orders-jet'); ?>',
             'pickup-immediate': '<?php _e('immediate pickup orders', 'orders-jet'); ?>',
             'pickup-today': '<?php _e('today pickup orders', 'orders-jet'); ?>',
-            'pickup-upcoming': '<?php _e('upcoming pickup orders', 'orders-jet'); ?>'
+            'pickup-upcoming': '<?php _e('upcoming pickup orders', 'orders-jet'); ?>',
+            'ready': '<?php _e('ready orders', 'orders-jet'); ?>',
+            'pending': '<?php _e('pending payment orders', 'orders-jet'); ?>',
+            'cancelled': '<?php _e('cancelled orders', 'orders-jet'); ?>'
         };
         
         const emptyState = $('<div class="oj-empty-state" style="text-align: center; padding: 40px; color: #666;">' +
