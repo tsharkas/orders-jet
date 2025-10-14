@@ -177,7 +177,16 @@ if (function_exists('wc_get_orders')) {
                 // Enhanced badge for timed pickup orders (HAS TIME)
                 $order_type = 'pickup_timed';
                 $time_display = date('g:i A', strtotime($delivery_time));
-                $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $time_display;
+                
+                // Show date + time for upcoming orders, only time for today's orders
+                if ($order_date === $today) {
+                    $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $time_display;
+                } else {
+                    // For upcoming orders, show date + time
+                    $date_display = date('M j', strtotime($delivery_date)); // e.g., "Oct 15"
+                    $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $date_display . ' ' . $time_display;
+                }
+                
                 $order_type_icon = '🕒';
                 $order_type_class = 'oj-order-type-pickup-timed'; // ORANGE
                 
@@ -253,7 +262,16 @@ if (function_exists('wc_get_orders')) {
                     // Enhanced badge for timed pickup orders (HAS TIME)
                     $order_type = 'pickup_timed';
                     $time_display = date('g:i A', strtotime($delivery_time));
-                    $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $time_display;
+                    
+                    // Show date + time for upcoming orders, only time for today's orders
+                    if ($order_date === $today) {
+                        $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $time_display;
+                    } else {
+                        // For upcoming orders, show date + time
+                        $date_display = date('M j', strtotime($delivery_date)); // e.g., "Oct 15"
+                        $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $date_display . ' ' . $time_display;
+                    }
+                    
                     $order_type_icon = '🕒';
                     $order_type_class = 'oj-order-type-pickup-timed'; // ORANGE
                 } else {
@@ -291,21 +309,49 @@ if (function_exists('wc_get_orders')) {
     }
 }
 
-// Sort by priority: timed pickups by delivery time, then processing first, then pending, then on-hold
+// Sort by priority: today's orders first, then upcoming orders at the end
 usort($active_orders, function($a, $b) {
-        // First priority: timed pickup orders sorted by delivery time
-        if ($a['order_type'] === 'pickup_timed' && $b['order_type'] === 'pickup_timed') {
-            // Use WooFood time format "11:30 PM"
-            $time_a = !empty($a['delivery_time']) ? strtotime($a['delivery_time']) : 0;
-            $time_b = !empty($b['delivery_time']) ? strtotime($b['delivery_time']) : 0;
-            return $time_a - $time_b;
-        }
+    $today = date('Y-m-d');
     
-    // Timed pickups come before regular orders
-    if ($a['order_type'] === 'pickup_timed' && $b['order_type'] !== 'pickup_timed') {
+    // Get delivery dates for comparison
+    $a_delivery_date = !empty($a['delivery_date']) ? date('Y-m-d', strtotime($a['delivery_date'])) : '';
+    $b_delivery_date = !empty($b['delivery_date']) ? date('Y-m-d', strtotime($b['delivery_date'])) : '';
+    
+    // Determine if orders are for today or upcoming
+    $a_is_upcoming = ($a['order_type'] === 'pickup_timed' && $a_delivery_date && $a_delivery_date > $today);
+    $b_is_upcoming = ($b['order_type'] === 'pickup_timed' && $b_delivery_date && $b_delivery_date > $today);
+    
+    // Upcoming orders go to the end
+    if ($a_is_upcoming && !$b_is_upcoming) {
+        return 1; // a goes after b
+    }
+    if ($b_is_upcoming && !$a_is_upcoming) {
+        return -1; // b goes after a
+    }
+    
+    // If both are upcoming, sort by delivery date then time
+    if ($a_is_upcoming && $b_is_upcoming) {
+        if ($a_delivery_date !== $b_delivery_date) {
+            return strcmp($a_delivery_date, $b_delivery_date);
+        }
+        // Same date, sort by time
+        $time_a = !empty($a['delivery_time']) ? strtotime($a['delivery_time']) : 0;
+        $time_b = !empty($b['delivery_time']) ? strtotime($b['delivery_time']) : 0;
+        return $time_a - $time_b;
+    }
+    
+    // For today's orders: timed pickups sorted by delivery time come first
+    if ($a['order_type'] === 'pickup_timed' && $b['order_type'] === 'pickup_timed' && !$a_is_upcoming && !$b_is_upcoming) {
+        $time_a = !empty($a['delivery_time']) ? strtotime($a['delivery_time']) : 0;
+        $time_b = !empty($b['delivery_time']) ? strtotime($b['delivery_time']) : 0;
+        return $time_a - $time_b;
+    }
+    
+    // Today's timed pickups come before regular orders
+    if ($a['order_type'] === 'pickup_timed' && $b['order_type'] !== 'pickup_timed' && !$a_is_upcoming) {
         return -1;
     }
-    if ($b['order_type'] === 'pickup_timed' && $a['order_type'] !== 'pickup_timed') {
+    if ($b['order_type'] === 'pickup_timed' && $a['order_type'] !== 'pickup_timed' && !$b_is_upcoming) {
         return 1;
     }
     
@@ -1289,12 +1335,18 @@ $currency_symbol = get_woocommerce_currency_symbol();
 
 /* Upcoming orders styling - will be applied via JavaScript */
 .oj-kitchen-card.oj-upcoming-order {
-    border-left-color: #FF9800 !important;
-    opacity: 0.85;
+    border-left-color: #673AB7 !important;
+    opacity: 1;
 }
 
 .oj-kitchen-card.oj-upcoming-order .oj-card-header {
-    background: linear-gradient(135deg, #fff3e0 0%, #ffffff 100%);
+    background: linear-gradient(135deg, #f3e5f5 0%, #ffffff 100%);
+}
+
+.oj-kitchen-card.oj-upcoming-order .oj-order-type-badge {
+    background: #673AB7 !important;
+    color: #ffffff !important;
+    font-weight: bold;
 }
 
 /* Customer Info */
