@@ -97,15 +97,19 @@ if ($current_page === 'manager-screen') {
 .manager-navigation-wrapper {
     background: #f8f9fa;
     border-bottom: 1px solid #dee2e6;
-    margin: 0 -20px 20px -20px;
+    margin: 0 0 20px 0;
     padding: 0;
-    overflow-x: hidden;
+    overflow: hidden;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .manager-header {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     padding: 15px 20px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .manager-header-content {
@@ -113,7 +117,8 @@ if ($current_page === 'manager-screen') {
     justify-content: space-between;
     align-items: center;
     width: 100%;
-    max-width: none;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .manager-title {
@@ -162,17 +167,19 @@ if ($current_page === 'manager-screen') {
     background: white;
     padding: 0;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    overflow-x: auto;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 .manager-nav-tabs {
     display: flex;
     width: 100%;
-    min-width: fit-content;
     overflow-x: auto;
     scrollbar-width: none;
     -ms-overflow-style: none;
     padding: 0 20px;
+    box-sizing: border-box;
 }
 
 .manager-nav-tabs::-webkit-scrollbar {
@@ -257,7 +264,7 @@ if ($current_page === 'manager-screen') {
 
 @media (max-width: 480px) {
     .manager-navigation-wrapper {
-        margin: 0 -10px 20px -10px;
+        margin: 0 0 20px 0;
     }
     
     .manager-header {
