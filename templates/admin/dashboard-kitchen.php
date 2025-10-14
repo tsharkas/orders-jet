@@ -650,8 +650,18 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                     if (!empty($delivery_date) && !empty($delivery_time)) {
                                         // SIMPLE CALCULATION: Current time vs Pickup time
                                         $current_time = current_time('timestamp'); // Local time
-                                        $pickup_datetime = $delivery_date . ' ' . $delivery_time;
+                                        
+                                        // Debug what we're actually getting
+                                        error_log('SIMPLE DEBUG: Current time: ' . date('Y-m-d H:i:s', $current_time) . ' (' . date('g:i A', $current_time) . ')');
+                                        error_log('SIMPLE DEBUG: Delivery date: "' . $delivery_date . '"');
+                                        error_log('SIMPLE DEBUG: Delivery time: "' . $delivery_time . '"');
+                                        
+                                        // For today's orders, use today's date with the delivery time
+                                        $today_date = date('Y-m-d');
+                                        $pickup_datetime = $today_date . ' ' . $delivery_time;
                                         $pickup_timestamp = strtotime($pickup_datetime);
+                                        
+                                        error_log('SIMPLE DEBUG: Pickup datetime: "' . $pickup_datetime . '" → timestamp: ' . $pickup_timestamp . ' (' . date('g:i A', $pickup_timestamp) . ')');
                                         
                                         $diff_seconds = $pickup_timestamp - $current_time;
                                         $hours = floor($diff_seconds / 3600);
