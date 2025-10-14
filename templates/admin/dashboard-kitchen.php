@@ -51,13 +51,13 @@ if (isset($_POST['oj_mark_ready']) && isset($_POST['order_id']) && isset($_POST[
                         // Add context-aware order note
                         if (!empty($table_number)) {
                             $order->add_order_note(sprintf(
-                                __('Order ready for serving at Table %s - awaiting payment by kitchen staff (%s)', 'orders-jet'),
+                                __('Order delivered to Table %s - ready for payment by kitchen staff (%s)', 'orders-jet'),
                                 $table_number,
                                 wp_get_current_user()->display_name
                             ));
                         } else {
                             $order->add_order_note(sprintf(
-                                __('Order ready for pickup - awaiting payment confirmation by kitchen staff (%s)', 'orders-jet'),
+                                __('Order delivered and ready for pickup - customer notified by kitchen staff (%s)', 'orders-jet'),
                                 wp_get_current_user()->display_name
                             ));
                         }
@@ -75,9 +75,9 @@ if (isset($_POST['oj_mark_ready']) && isset($_POST['order_id']) && isset($_POST[
                             
                             // Context-aware success message
                             if (!empty($table_number)) {
-                                $success_message = sprintf(__('Order #%d ready for Table %s - awaiting payment!', 'orders-jet'), $order_id, $table_number);
+                                $success_message = sprintf(__('Order #%d delivered to Table %s - ready for payment!', 'orders-jet'), $order_id, $table_number);
                             } else {
-                                $success_message = sprintf(__('Order #%d ready for pickup - customer will be notified!', 'orders-jet'), $order_id);
+                                $success_message = sprintf(__('Order #%d delivered and ready for pickup!', 'orders-jet'), $order_id);
                             }
                             
                             // Redirect to avoid resubmission
@@ -538,10 +538,6 @@ $currency_symbol = get_woocommerce_currency_symbol();
         <button class="oj-filter-btn" data-filter="pickup-immediate">
             <span class="oj-filter-icon">⚡</span>
             <span class="oj-filter-label"><?php _e('Immediate Pickup', 'orders-jet'); ?></span>
-        </button>
-        <button class="oj-filter-btn" data-filter="pickup-today">
-            <span class="oj-filter-icon">🕒</span>
-            <span class="oj-filter-label"><?php _e('Today Pickup', 'orders-jet'); ?></span>
         </button>
         <button class="oj-filter-btn" data-filter="pickup-upcoming">
             <span class="oj-filter-icon">📅</span>
@@ -2157,13 +2153,6 @@ jQuery(document).ready(function($) {
                 case 'pickup-immediate':
                     show = orderType === 'pickup'; // No delivery date/time
                     break;
-                case 'pickup-today':
-                    if (orderType === 'pickup_timed') {
-                        const deliveryDateFormatted = card.data('delivery-date-formatted');
-                        console.log('Checking pickup-today:', deliveryDateFormatted, 'vs', today, 'match:', deliveryDateFormatted === today);
-                        show = deliveryDateFormatted === today;
-                    }
-                    break;
                 case 'pickup-upcoming':
                     if (orderType === 'pickup_timed') {
                         const deliveryDateFormatted = card.data('delivery-date-formatted');
@@ -2221,12 +2210,6 @@ jQuery(document).ready(function($) {
                     case 'pickup-immediate':
                         matches = orderType === 'pickup';
                         break;
-                    case 'pickup-today':
-                        if (orderType === 'pickup_timed') {
-                            const deliveryDateFormatted = card.data('delivery-date-formatted');
-                            matches = deliveryDateFormatted === today;
-                        }
-                        break;
                     case 'pickup-upcoming':
                         if (orderType === 'pickup_timed') {
                             const deliveryDateFormatted = card.data('delivery-date-formatted');
@@ -2260,7 +2243,6 @@ jQuery(document).ready(function($) {
             'dinein': '<?php _e('dining orders', 'orders-jet'); ?>',
             'pickup-all': '<?php _e('pickup orders', 'orders-jet'); ?>',
             'pickup-immediate': '<?php _e('immediate pickup orders', 'orders-jet'); ?>',
-            'pickup-today': '<?php _e('today pickup orders', 'orders-jet'); ?>',
             'pickup-upcoming': '<?php _e('upcoming pickup orders', 'orders-jet'); ?>'
         };
         

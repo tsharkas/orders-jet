@@ -455,7 +455,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
         <div class="oj-stats-row oj-secondary-stats">
             <div class="oj-stat-box pending">
                 <div class="oj-stat-number"><?php echo esc_html($pending_orders); ?></div>
-                <div class="oj-stat-label"><?php _e('Pending Payment', 'orders-jet'); ?></div>
+                <div class="oj-stat-label"><?php _e('Delivered', 'orders-jet'); ?></div>
             </div>
             <div class="oj-stat-box tables">
                 <div class="oj-stat-number"><?php echo esc_html($active_tables ?: 0); ?>/<?php echo esc_html($total_tables ?: 0); ?></div>
@@ -490,10 +490,6 @@ $currency_symbol = get_woocommerce_currency_symbol();
             <span class="oj-filter-icon">⚡</span>
             <span class="oj-filter-label"><?php _e('Immediate Pickup', 'orders-jet'); ?></span>
         </button>
-        <button class="oj-filter-btn" data-filter="pickup-today">
-            <span class="oj-filter-icon">🕒</span>
-            <span class="oj-filter-label"><?php _e('Today Pickup', 'orders-jet'); ?></span>
-        </button>
         <button class="oj-filter-btn" data-filter="pickup-upcoming">
             <span class="oj-filter-icon">📅</span>
             <span class="oj-filter-label"><?php _e('Upcoming Pickup', 'orders-jet'); ?></span>
@@ -505,7 +501,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
         </button>
         <button class="oj-filter-btn" data-filter="pending">
             <span class="oj-filter-icon">⏳</span>
-            <span class="oj-filter-label"><?php _e('Pending Payment', 'orders-jet'); ?></span>
+            <span class="oj-filter-label"><?php _e('Delivered', 'orders-jet'); ?></span>
         </button>
         <button class="oj-filter-btn" data-filter="completed">
             <span class="oj-filter-icon">🎉</span>
@@ -618,13 +614,13 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                 <?php elseif ($order['post_status'] === 'wc-pending_payment') : ?>
                                     <?php if (!empty($order['table_number'])) : ?>
                                         <span class="oj-status-badge pending-payment-table">
-                                            <span class="dashicons dashicons-money-alt"></span>
-                                            <?php _e('Ready - Awaiting Payment', 'orders-jet'); ?>
+                                            <span class="dashicons dashicons-yes-alt"></span>
+                                            <?php _e('Delivered - Awaiting Payment', 'orders-jet'); ?>
                                         </span>
                                     <?php else : ?>
                                         <span class="oj-status-badge pending-payment-pickup">
-                                            <span class="dashicons dashicons-money-alt"></span>
-                                            <?php _e('Ready for Pickup', 'orders-jet'); ?>
+                                            <span class="dashicons dashicons-yes-alt"></span>
+                                            <?php _e('Delivered for Pickup', 'orders-jet'); ?>
                                         </span>
                                     <?php endif; ?>
                                 <?php elseif ($order['post_status'] === 'wc-on-hold') : ?>
@@ -2437,13 +2433,6 @@ jQuery(document).ready(function($) {
                 case 'pickup-immediate':
                     show = orderType === 'pickup' && card.find('.oj-status-badge.completed').length === 0;
                     break;
-                case 'pickup-today':
-                    if (orderType === 'pickup_timed') {
-                        const deliveryDateFormatted = card.data('delivery-date-formatted');
-                        console.log('Manager Dashboard - Checking pickup-today:', deliveryDateFormatted, 'vs', today, 'match:', deliveryDateFormatted === today);
-                        show = deliveryDateFormatted === today && card.find('.oj-status-badge.completed').length === 0;
-                    }
-                    break;
                 case 'pickup-upcoming':
                     if (orderType === 'pickup_timed') {
                         const deliveryDateFormatted = card.data('delivery-date-formatted');
@@ -2517,12 +2506,6 @@ jQuery(document).ready(function($) {
                     case 'pickup-immediate':
                         matches = orderType === 'pickup' && card.find('.oj-status-badge.completed').length === 0;
                         break;
-                    case 'pickup-today':
-                        if (orderType === 'pickup_timed') {
-                            const deliveryDateFormatted = card.data('delivery-date-formatted');
-                            matches = deliveryDateFormatted === today && card.find('.oj-status-badge.completed').length === 0;
-                        }
-                        break;
                     case 'pickup-upcoming':
                         if (orderType === 'pickup_timed') {
                             const deliveryDateFormatted = card.data('delivery-date-formatted');
@@ -2572,10 +2555,9 @@ jQuery(document).ready(function($) {
             'dinein': '<?php _e('dining orders', 'orders-jet'); ?>',
             'pickup-all': '<?php _e('pickup orders', 'orders-jet'); ?>',
             'pickup-immediate': '<?php _e('immediate pickup orders', 'orders-jet'); ?>',
-            'pickup-today': '<?php _e('today pickup orders', 'orders-jet'); ?>',
             'pickup-upcoming': '<?php _e('upcoming pickup orders', 'orders-jet'); ?>',
             'ready': '<?php _e('ready orders', 'orders-jet'); ?>',
-            'pending': '<?php _e('pending payment orders', 'orders-jet'); ?>',
+            'pending': '<?php _e('delivered orders', 'orders-jet'); ?>',
             'completed': '<?php _e('completed orders', 'orders-jet'); ?>',
             'cancelled': '<?php _e('cancelled orders', 'orders-jet'); ?>'
         };
