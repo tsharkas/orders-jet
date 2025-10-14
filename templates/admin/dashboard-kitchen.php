@@ -511,6 +511,34 @@ $currency_symbol = get_woocommerce_currency_symbol();
         </div>
     </div>
 
+    <!-- Order Filters -->
+    <div class="oj-order-filters">
+        <button class="oj-filter-btn active" data-filter="all">
+            <span class="oj-filter-icon">📋</span>
+            <span class="oj-filter-label"><?php _e('All Orders', 'orders-jet'); ?></span>
+        </button>
+        <button class="oj-filter-btn" data-filter="dinein">
+            <span class="oj-filter-icon">🍽️</span>
+            <span class="oj-filter-label"><?php _e('Dining', 'orders-jet'); ?></span>
+        </button>
+        <button class="oj-filter-btn" data-filter="pickup-all">
+            <span class="oj-filter-icon">🥡</span>
+            <span class="oj-filter-label"><?php _e('All Pickup', 'orders-jet'); ?></span>
+        </button>
+        <button class="oj-filter-btn" data-filter="pickup-immediate">
+            <span class="oj-filter-icon">⚡</span>
+            <span class="oj-filter-label"><?php _e('Immediate Pickup', 'orders-jet'); ?></span>
+        </button>
+        <button class="oj-filter-btn" data-filter="pickup-today">
+            <span class="oj-filter-icon">🕒</span>
+            <span class="oj-filter-label"><?php _e('Today Pickup', 'orders-jet'); ?></span>
+        </button>
+        <button class="oj-filter-btn" data-filter="pickup-upcoming">
+            <span class="oj-filter-icon">📅</span>
+            <span class="oj-filter-label"><?php _e('Upcoming Pickup', 'orders-jet'); ?></span>
+        </button>
+    </div>
+
     <!-- Order Queue -->
     <div class="oj-dashboard-orders">
         <h2><?php _e('Order Queue', 'orders-jet'); ?></h2>
@@ -518,7 +546,12 @@ $currency_symbol = get_woocommerce_currency_symbol();
         <?php if (!empty($active_orders)) : ?>
             <div class="oj-kitchen-cards-container">
                 <?php foreach ($active_orders as $order) : ?>
-                    <div class="oj-kitchen-card" data-order-id="<?php echo esc_attr($order['ID']); ?>">
+                    <div class="oj-kitchen-card" 
+                         data-order-id="<?php echo esc_attr($order['ID']); ?>"
+                         data-order-type="<?php echo esc_attr($order['order_type']); ?>"
+                         data-delivery-date="<?php echo esc_attr($order['delivery_date'] ?? ''); ?>"
+                         data-delivery-time="<?php echo esc_attr($order['delivery_time'] ?? ''); ?>"
+                         data-table-number="<?php echo esc_attr($order['table_number'] ?? ''); ?>">
                         <!-- Card Header -->
                         <div class="oj-card-header">
                             <div class="oj-card-info">
@@ -960,6 +993,21 @@ $currency_symbol = get_woocommerce_currency_symbol();
         width: 100%;
         margin-right: 0;
     }
+    
+    /* Mobile filter styles */
+    .oj-order-filters {
+        padding: 10px;
+        gap: 8px;
+    }
+    
+    .oj-filter-btn {
+        padding: 10px 14px;
+        font-size: 13px;
+    }
+    
+    .oj-filter-icon {
+        font-size: 14px;
+    }
 }
 
 /* Kitchen-specific styles for order items */
@@ -1160,6 +1208,72 @@ $currency_symbol = get_woocommerce_currency_symbol();
 .oj-order-type-badge.oj-order-type-unknown {
     background: #757575 !important;
     color: #ffffff !important;
+}
+
+/* Order Filters - Kitchen Dashboard */
+.oj-order-filters {
+    background: white;
+    border-radius: 15px;
+    padding: 15px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    position: sticky;
+    top: 32px;
+    z-index: 100;
+}
+
+.oj-order-filters::-webkit-scrollbar {
+    display: none;
+}
+
+.oj-filter-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border: 2px solid #e9ecef;
+    background: white;
+    border-radius: 25px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    color: #333;
+    text-decoration: none;
+    min-width: auto;
+    box-shadow: none;
+}
+
+.oj-filter-btn:hover {
+    border-color: #007cba;
+    background: #f8f9fa;
+    color: #007cba;
+    transform: translateY(-1px);
+}
+
+.oj-filter-btn.active {
+    background: #007cba;
+    color: white;
+    border-color: #007cba;
+}
+
+.oj-filter-btn.active:hover {
+    background: #005a87;
+    color: white;
+}
+
+.oj-filter-icon {
+    font-size: 16px;
+}
+
+.oj-filter-label {
+    font-weight: 600;
 }
 
 /* Customer Info */
@@ -1696,5 +1810,155 @@ jQuery(document).ready(function($) {
     setTimeout(function() {
         $('.notice.is-dismissible').fadeOut();
     }, 5000);
+    
+    // Order Filtering Functionality
+    const filterBtns = $('.oj-filter-btn');
+    const orderCards = $('.oj-kitchen-card');
+    
+    // Initialize filter counts
+    updateFilterCounts();
+    
+    filterBtns.on('click', function(e) {
+        e.preventDefault();
+        
+        const filter = $(this).data('filter');
+        
+        // Update active button
+        filterBtns.removeClass('active');
+        $(this).addClass('active');
+        
+        // Filter orders
+        filterOrders(filter);
+    });
+    
+    function filterOrders(filter) {
+        const today = new Date().toISOString().split('T')[0];
+        
+        orderCards.each(function() {
+            const card = $(this);
+            const orderType = card.data('order-type');
+            const deliveryDate = card.data('delivery-date');
+            const deliveryTime = card.data('delivery-time');
+            const tableNumber = card.data('table-number');
+            
+            let show = false;
+            
+            switch(filter) {
+                case 'all':
+                    show = true;
+                    break;
+                case 'dinein':
+                    show = orderType === 'dinein';
+                    break;
+                case 'pickup-all':
+                    show = orderType === 'pickup' || orderType === 'pickup_timed';
+                    break;
+                case 'pickup-immediate':
+                    show = orderType === 'pickup'; // No delivery date/time
+                    break;
+                case 'pickup-today':
+                    show = orderType === 'pickup_timed' && deliveryDate && deliveryDate.includes(today);
+                    break;
+                case 'pickup-upcoming':
+                    show = orderType === 'pickup_timed' && deliveryDate && deliveryDate > today;
+                    break;
+            }
+            
+            if (show) {
+                card.show();
+            } else {
+                card.hide();
+            }
+        });
+        
+        // Update counts
+        updateFilterCounts();
+        
+        // Show/hide empty state
+        const visibleCards = orderCards.filter(':visible');
+        if (visibleCards.length === 0) {
+            showEmptyState(filter);
+        } else {
+            hideEmptyState();
+        }
+    }
+    
+    function updateFilterCounts() {
+        const today = new Date().toISOString().split('T')[0];
+        
+        filterBtns.each(function() {
+            const btn = $(this);
+            const filter = btn.data('filter');
+            let count = 0;
+            
+            orderCards.each(function() {
+                const card = $(this);
+                const orderType = card.data('order-type');
+                const deliveryDate = card.data('delivery-date');
+                
+                let matches = false;
+                
+                switch(filter) {
+                    case 'all':
+                        matches = true;
+                        break;
+                    case 'dinein':
+                        matches = orderType === 'dinein';
+                        break;
+                    case 'pickup-all':
+                        matches = orderType === 'pickup' || orderType === 'pickup_timed';
+                        break;
+                    case 'pickup-immediate':
+                        matches = orderType === 'pickup';
+                        break;
+                    case 'pickup-today':
+                        matches = orderType === 'pickup_timed' && deliveryDate && deliveryDate.includes(today);
+                        break;
+                    case 'pickup-upcoming':
+                        matches = orderType === 'pickup_timed' && deliveryDate && deliveryDate > today;
+                        break;
+                }
+                
+                if (matches) count++;
+            });
+            
+            // Update button text with count (optional)
+            const label = btn.find('.oj-filter-label');
+            const originalText = label.text().replace(/ \(\d+\)$/, '');
+            if (count > 0) {
+                label.text(originalText + ' (' + count + ')');
+            } else {
+                label.text(originalText);
+            }
+        });
+    }
+    
+    function showEmptyState(filter) {
+        const container = $('.oj-kitchen-cards-container');
+        
+        // Remove existing empty state
+        $('.oj-empty-state').remove();
+        
+        const filterNames = {
+            'all': '<?php _e('orders', 'orders-jet'); ?>',
+            'dinein': '<?php _e('dining orders', 'orders-jet'); ?>',
+            'pickup-all': '<?php _e('pickup orders', 'orders-jet'); ?>',
+            'pickup-immediate': '<?php _e('immediate pickup orders', 'orders-jet'); ?>',
+            'pickup-today': '<?php _e('today pickup orders', 'orders-jet'); ?>',
+            'pickup-upcoming': '<?php _e('upcoming pickup orders', 'orders-jet'); ?>'
+        };
+        
+        const emptyState = $('<div class="oj-empty-state" style="text-align: center; padding: 40px; color: #666;">' +
+            '<div style="font-size: 48px; margin-bottom: 16px;">📋</div>' +
+            '<h3><?php _e('No Orders Found', 'orders-jet'); ?></h3>' +
+            '<p><?php _e('There are currently no', 'orders-jet'); ?> ' + (filterNames[filter] || '<?php _e('orders', 'orders-jet'); ?>') + '.</p>' +
+            '</div>');
+            
+        container.append(emptyState);
+    }
+    
+    function hideEmptyState() {
+        $('.oj-empty-state').remove();
+    }
 });
 </script>
