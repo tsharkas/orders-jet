@@ -99,44 +99,45 @@ if ($current_page === 'manager-screen') {
     border-bottom: 1px solid #dee2e6;
     margin: 0 -20px 20px -20px;
     padding: 0;
+    overflow-x: hidden;
 }
 
 .manager-header {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    padding: 20px 20px 15px 20px;
+    padding: 15px 20px;
 }
 
 .manager-header-content {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    max-width: 1200px;
-    margin: 0 auto;
+    width: 100%;
+    max-width: none;
 }
 
 .manager-title {
     margin: 0;
-    font-size: 28px;
+    font-size: 24px;
     font-weight: 600;
     color: white;
 }
 
 .manager-title .dashicons {
-    font-size: 32px;
+    font-size: 28px;
     vertical-align: middle;
-    margin-right: 10px;
+    margin-right: 8px;
 }
 
 .manager-subtitle {
-    margin: 5px 0 0 0;
+    margin: 3px 0 0 0;
     opacity: 0.9;
-    font-size: 16px;
+    font-size: 14px;
 }
 
 .manager-quick-stats {
     display: flex;
-    gap: 20px;
+    gap: 15px;
 }
 
 .quick-stat {
@@ -145,13 +146,13 @@ if ($current_page === 'manager-screen') {
 
 .stat-value {
     display: block;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
 }
 
 .stat-label {
     display: block;
-    font-size: 12px;
+    font-size: 11px;
     opacity: 0.8;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -159,17 +160,19 @@ if ($current_page === 'manager-screen') {
 
 .manager-navigation {
     background: white;
-    padding: 0 20px;
+    padding: 0;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    overflow-x: auto;
 }
 
 .manager-nav-tabs {
     display: flex;
-    max-width: 1200px;
-    margin: 0 auto;
+    width: 100%;
+    min-width: fit-content;
     overflow-x: auto;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    padding: 0 20px;
 }
 
 .manager-nav-tabs::-webkit-scrollbar {
@@ -179,13 +182,13 @@ if ($current_page === 'manager-screen') {
 .manager-nav-tab {
     display: flex;
     align-items: center;
-    padding: 15px 20px;
+    padding: 12px 16px;
     text-decoration: none;
     color: #666;
     border-bottom: 3px solid transparent;
     transition: all 0.2s ease;
     white-space: nowrap;
-    min-width: 180px;
+    flex-shrink: 0;
 }
 
 .manager-nav-tab:hover {
@@ -201,8 +204,8 @@ if ($current_page === 'manager-screen') {
 }
 
 .nav-icon {
-    font-size: 20px;
-    margin-right: 12px;
+    font-size: 18px;
+    margin-right: 8px;
     flex-shrink: 0;
 }
 
@@ -213,14 +216,14 @@ if ($current_page === 'manager-screen') {
 
 .nav-title {
     font-weight: 600;
-    font-size: 14px;
+    font-size: 13px;
     line-height: 1.2;
 }
 
 .nav-description {
-    font-size: 12px;
+    font-size: 11px;
     color: #999;
-    margin-top: 2px;
+    margin-top: 1px;
 }
 
 .manager-nav-tab.active .nav-description {
@@ -232,20 +235,19 @@ if ($current_page === 'manager-screen') {
     .manager-header-content {
         flex-direction: column;
         text-align: center;
-        gap: 15px;
+        gap: 10px;
+    }
+    
+    .manager-quick-stats {
+        gap: 10px;
     }
     
     .manager-nav-tabs {
-        padding: 0 10px;
+        padding: 0 15px;
     }
     
     .manager-nav-tab {
-        min-width: 150px;
-        padding: 12px 15px;
-    }
-    
-    .nav-title {
-        font-size: 13px;
+        padding: 10px 12px;
     }
     
     .nav-description {
@@ -259,16 +261,23 @@ if ($current_page === 'manager-screen') {
     }
     
     .manager-header {
-        padding: 15px 10px;
+        padding: 12px 15px;
     }
     
     .manager-title {
-        font-size: 24px;
+        font-size: 20px;
+    }
+    
+    .manager-nav-tabs {
+        padding: 0 10px;
     }
     
     .manager-nav-tab {
-        min-width: 120px;
-        padding: 10px 12px;
+        padding: 8px 10px;
+    }
+    
+    .nav-title {
+        font-size: 12px;
     }
 }
 </style>
