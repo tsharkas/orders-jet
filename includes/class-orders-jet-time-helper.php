@@ -67,27 +67,19 @@ class OJ_Time_Helper {
         
         if ($timestamp === false) return '';
         
-        // IMPORTANT: Don't apply timezone conversion if the input is already in local format
-        // WooFood typically stores in UTC, but some formats might already be local
-        
-        // Check if this looks like a UTC timestamp that needs conversion
-        $utc_datetime = gmdate('Y-m-d H:i:s', $timestamp);
-        $local_datetime = get_date_from_gmt($utc_datetime, 'Y-m-d H:i:s');
-        
-        // For debugging - let's return the original parsed time for now
-        // This will help us see what's actually happening
+        // WooFood stores date/time in local timezone, no conversion needed
         return date('Y-m-d H:i:s', $timestamp);
     }
     
     /**
      * Use WooFood Unix timestamp (most reliable!)
-     * This is timezone-aware and most accurate
+     * WooFood stores Unix timestamps in local time, not UTC
      */
     public static function parse_woofood_unix($unix_timestamp, $format = 'Y-m-d H:i:s') {
         if (empty($unix_timestamp)) return '';
         
-        // Convert Unix timestamp to local timezone
-        return get_date_from_gmt(gmdate('Y-m-d H:i:s', $unix_timestamp), $format);
+        // WooFood Unix timestamps are already in local timezone, no conversion needed
+        return date($format, $unix_timestamp);
     }
     
     /**
