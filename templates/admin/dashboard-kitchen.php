@@ -314,61 +314,37 @@ if (function_exists('wc_get_orders')) {
     }
 }
 
-// Sort by priority: today's orders first, then upcoming orders at the end
+// Simple logical sorting: Dine-in first, then pickup orders at bottom, sorted by time ascending
 usort($active_orders, function($a, $b) {
-    $today = date('Y-m-d');
+    // 1. Dine-in orders (table orders) come first
+    $a_is_dinein = !empty($a['table_number']);
+    $b_is_dinein = !empty($b['table_number']);
     
-    // Get delivery dates for comparison
-    $a_delivery_date = !empty($a['delivery_date']) ? date('Y-m-d', strtotime($a['delivery_date'])) : '';
-    $b_delivery_date = !empty($b['delivery_date']) ? date('Y-m-d', strtotime($b['delivery_date'])) : '';
-    
-    // Determine if orders are for today or upcoming
-    $a_is_upcoming = ($a['order_type'] === 'pickup_timed' && $a_delivery_date && $a_delivery_date > $today);
-    $b_is_upcoming = ($b['order_type'] === 'pickup_timed' && $b_delivery_date && $b_delivery_date > $today);
-    
-    // Upcoming orders go to the end
-    if ($a_is_upcoming && !$b_is_upcoming) {
-        return 1; // a goes after b
+    if ($a_is_dinein && !$b_is_dinein) {
+        return -1; // Dine-in comes first
     }
-    if ($b_is_upcoming && !$a_is_upcoming) {
-        return -1; // b goes after a
+    if ($b_is_dinein && !$a_is_dinein) {
+        return 1; // Dine-in comes first
     }
     
-    // If both are upcoming, sort by delivery date then time
-    if ($a_is_upcoming && $b_is_upcoming) {
-        if ($a_delivery_date !== $b_delivery_date) {
-            return strcmp($a_delivery_date, $b_delivery_date);
-        }
-        // Same date, sort by time
-        $time_a = !empty($a['delivery_time']) ? strtotime($a['delivery_time']) : 0;
-        $time_b = !empty($b['delivery_time']) ? strtotime($b['delivery_time']) : 0;
-        return $time_a - $time_b;
+    // 2. Within same type (both dine-in or both pickup), sort by date/time ascending
+    $a_time = strtotime($a['post_date']);
+    $b_time = strtotime($b['post_date']);
+    
+    // For pickup orders with delivery time, use delivery time for sorting
+    if (!$a_is_dinein && !empty($a['delivery_time'])) {
+        $today = date('Y-m-d');
+        $a_delivery_datetime = $today . ' ' . $a['delivery_time'];
+        $a_time = strtotime($a_delivery_datetime);
     }
     
-    // For today's orders: timed pickups sorted by delivery time come first
-    if ($a['order_type'] === 'pickup_timed' && $b['order_type'] === 'pickup_timed' && !$a_is_upcoming && !$b_is_upcoming) {
-        $time_a = !empty($a['delivery_time']) ? strtotime($a['delivery_time']) : 0;
-        $time_b = !empty($b['delivery_time']) ? strtotime($b['delivery_time']) : 0;
-        return $time_a - $time_b;
+    if (!$b_is_dinein && !empty($b['delivery_time'])) {
+        $today = date('Y-m-d');
+        $b_delivery_datetime = $today . ' ' . $b['delivery_time'];
+        $b_time = strtotime($b_delivery_datetime);
     }
     
-    // Today's timed pickups come before regular orders
-    if ($a['order_type'] === 'pickup_timed' && $b['order_type'] !== 'pickup_timed' && !$a_is_upcoming) {
-        return -1;
-    }
-    if ($b['order_type'] === 'pickup_timed' && $a['order_type'] !== 'pickup_timed' && !$b_is_upcoming) {
-        return 1;
-    }
-    
-    // Regular priority for other orders
-    $priority = array('wc-processing' => 1, 'wc-pending' => 2, 'wc-on-hold' => 3);
-    $a_priority = $priority[$a['post_status']] ?? 4;
-    $b_priority = $priority[$b['post_status']] ?? 4;
-    
-    if ($a_priority === $b_priority) {
-        return strtotime($a['post_date']) - strtotime($b['post_date']);
-    }
-    return $a_priority - $b_priority;
+    return $a_time - $b_time; // Ascending order (earliest first)
 });
 
 error_log('Orders Jet Kitchen: Final order count: ' . count($active_orders));
@@ -646,54 +622,13 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                     $delivery_time = $wc_order->get_meta('exwfood_time_deli');
                                     $delivery_unix = $wc_order->get_meta('exwfood_datetime_deli_unix');
                                     
-                                    // Check if it's a timed pickup order
-                                    if (!empty($delivery_date) && !empty($delivery_time)) {
-                                        // SIMPLE CALCULATION: Current time vs Pickup time
-                                        $current_time = current_time('timestamp'); // Local time
-                                        
-                                        // Debug what we're actually getting
-                                        error_log('SIMPLE DEBUG: Current time: ' . date('Y-m-d H:i:s', $current_time) . ' (' . date('g:i A', $current_time) . ')');
-                                        error_log('SIMPLE DEBUG: Delivery date: "' . $delivery_date . '"');
-                                        error_log('SIMPLE DEBUG: Delivery time: "' . $delivery_time . '"');
-                                        
-                                        // For today's orders, use today's date with the delivery time
-                                        $today_date = date('Y-m-d');
-                                        $pickup_datetime = $today_date . ' ' . $delivery_time;
-                                        $pickup_timestamp = strtotime($pickup_datetime);
-                                        
-                                        error_log('SIMPLE DEBUG: Pickup datetime: "' . $pickup_datetime . '" → timestamp: ' . $pickup_timestamp . ' (' . date('g:i A', $pickup_timestamp) . ')');
-                                        
-                                        $diff_seconds = $pickup_timestamp - $current_time;
-                                        $hours = floor($diff_seconds / 3600);
-                                        $minutes = floor(($diff_seconds % 3600) / 60);
-                                        
-                                        $time_remaining = array(
-                                            'short_text' => $hours > 0 ? $hours . 'h ' . $minutes . 'm' : $minutes . 'm',
-                                            'class' => $diff_seconds <= 1800 ? 'oj-time-urgent' : ($diff_seconds <= 3600 ? 'oj-time-soon' : 'oj-time-normal')
-                                        );
-                                        
-                                        $countdown_data = array(
-                                            'target_timestamp' => $pickup_timestamp,
-                                            'diff_seconds' => $diff_seconds
-                                        );
-                                        ?>
-                                        <span class="oj-status-badge processing oj-countdown-badge <?php echo esc_attr($time_remaining['class']); ?>" 
-                                              data-countdown-target="<?php echo esc_attr($countdown_data['target_timestamp']); ?>"
-                                              data-countdown-seconds="<?php echo esc_attr($countdown_data['diff_seconds']); ?>">
-                                            <span class="dashicons dashicons-admin-tools"></span>
-                                            <span class="oj-cooking-text"><?php _e('COOKING', 'orders-jet'); ?></span>
-                                            <span class="oj-countdown-text">(<?php echo esc_html($time_remaining['short_text']); ?>)</span>
-                                        </span>
-                                        <?php
-                                    } else {
-                                        // Regular cooking badge for non-timed orders
-                                        ?>
-                                        <span class="oj-status-badge processing">
-                                            <span class="dashicons dashicons-admin-tools"></span>
-                                            <?php _e('COOKING', 'orders-jet'); ?>
-                                        </span>
-                                        <?php
-                                    }
+                                    // Simple COOKING badge without countdown
+                                    ?>
+                                    <span class="oj-status-badge processing">
+                                        <span class="dashicons dashicons-admin-tools"></span>
+                                        <?php _e('COOKING', 'orders-jet'); ?>
+                                    </span>
+                                    <?php
                                     ?>
                                 
                                 <?php endif; ?>
