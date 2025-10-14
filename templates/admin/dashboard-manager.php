@@ -34,10 +34,10 @@ if (function_exists('wc_get_orders')) {
     error_log('Orders Jet Kitchen: Using ultra-simple approach...');
     
     $wc_orders = wc_get_orders(array(
-        'status' => array('processing', 'in-progress'), // Cover both possible status names
+        'status' => array('pending', 'processing', 'in-progress', 'on-hold', 'completed', 'cancelled', 'refunded'),
         'limit' => -1,
         'orderby' => 'date',
-        'order' => 'ASC'
+        'order' => 'DESC' // Show newest first for managers
     ));
     
     error_log('Orders Jet Kitchen: Found ' . count($wc_orders) . ' orders');
@@ -244,15 +244,17 @@ foreach ($active_orders as $order) {
         
         $order_items = array();
         foreach ($wc_order->get_items() as $item) {
-            // Get basic item info
-                    $item_data = array(
-                        'name' => $item->get_name(),
-                        'quantity' => $item->get_quantity(),
-                        'total' => $item->get_total(),
-                        'variations' => array(),
-                        'addons' => array(),
-                        'notes' => ''
-                    );
+            // Get comprehensive item info for managers
+            $item_data = array(
+                'name' => $item->get_name(),
+                'quantity' => $item->get_quantity(),
+                'total' => $item->get_total(),
+                'subtotal' => $item->get_subtotal(),
+                'unit_price' => $item->get_total() / max($item->get_quantity(), 1),
+                'variations' => array(),
+                'addons' => array(),
+                'notes' => ''
+            );
                     
                     // Get variations using WooCommerce native methods
                     $product = $item->get_product();
@@ -315,9 +317,13 @@ foreach ($active_orders as $order) {
             $order_items[] = $item_data;
         }
         
-        // Create a new order array with items (avoid reference issues)
+        // Create a new order array with items and financial info for managers
         $order_with_items = $order;
         $order_with_items['items'] = $order_items;
+        $order_with_items['order_subtotal'] = $wc_order->get_subtotal();
+        $order_with_items['order_tax'] = $wc_order->get_total_tax();
+        $order_with_items['order_shipping'] = $wc_order->get_shipping_total();
+        $order_with_items['order_discount'] = $wc_order->get_discount_total();
         $orders_with_items[] = $order_with_items;
     } else {
         // Create order with empty items if WC order not found
@@ -330,14 +336,35 @@ foreach ($active_orders as $order) {
 // Replace the original array with the new one
 $active_orders = $orders_with_items;
 
-// Kitchen stats (count from existing data)
-// In Progress: Count orders with wc-processing status
-$in_progress_orders = 0;
+// Manager stats (comprehensive order status tracking)
+$pending_orders = 0;
+$processing_orders = 0;
+$ready_orders = 0;
 $completed_orders = 0;
+$cancelled_orders = 0;
+$refunded_orders = 0;
 
 foreach ($active_orders as $order) {
-    if ($order['post_status'] === 'wc-processing') {
-        $in_progress_orders++;
+    switch ($order['post_status']) {
+        case 'wc-pending':
+            $pending_orders++;
+            break;
+        case 'wc-processing':
+        case 'wc-in-progress':
+            $processing_orders++;
+            break;
+        case 'wc-on-hold':
+            $ready_orders++;
+            break;
+        case 'wc-completed':
+            $completed_orders++;
+            break;
+        case 'wc-cancelled':
+            $cancelled_orders++;
+            break;
+        case 'wc-refunded':
+            $refunded_orders++;
+            break;
     }
 }
 
@@ -406,19 +433,39 @@ $currency_symbol = get_woocommerce_currency_symbol();
         <h2><?php echo sprintf(__('Business Overview - %s', 'orders-jet'), $today_formatted); ?></h2>
         
         <div class="oj-stats-row">
-            <div class="oj-stat-box processing">
-                <div class="oj-stat-number"><?php echo esc_html($today_orders ?: 0); ?></div>
-                <div class="oj-stat-label"><?php _e('Orders Today', 'orders-jet'); ?></div>
-            </div>
-            <div class="oj-stat-box completed">
+            <div class="oj-stat-box revenue">
                 <div class="oj-stat-number"><?php echo $currency_symbol . number_format($today_revenue ?: 0, 2); ?></div>
                 <div class="oj-stat-label"><?php _e('Revenue Today', 'orders-jet'); ?></div>
             </div>
-            <div class="oj-stat-box">
+            <div class="oj-stat-box processing">
+                <div class="oj-stat-number"><?php echo esc_html($processing_orders); ?></div>
+                <div class="oj-stat-label"><?php _e('Cooking', 'orders-jet'); ?></div>
+            </div>
+            <div class="oj-stat-box ready">
+                <div class="oj-stat-number"><?php echo esc_html($ready_orders); ?></div>
+                <div class="oj-stat-label"><?php _e('Ready', 'orders-jet'); ?></div>
+            </div>
+            <div class="oj-stat-box completed">
+                <div class="oj-stat-number"><?php echo esc_html($completed_orders); ?></div>
+                <div class="oj-stat-label"><?php _e('Completed', 'orders-jet'); ?></div>
+            </div>
+        </div>
+        
+        <!-- Secondary Stats Row -->
+        <div class="oj-stats-row oj-secondary-stats">
+            <div class="oj-stat-box pending">
+                <div class="oj-stat-number"><?php echo esc_html($pending_orders); ?></div>
+                <div class="oj-stat-label"><?php _e('Pending Payment', 'orders-jet'); ?></div>
+            </div>
+            <div class="oj-stat-box tables">
                 <div class="oj-stat-number"><?php echo esc_html($active_tables ?: 0); ?>/<?php echo esc_html($total_tables ?: 0); ?></div>
                 <div class="oj-stat-label"><?php _e('Tables Active', 'orders-jet'); ?></div>
             </div>
-            <div class="oj-stat-box">
+            <div class="oj-stat-box cancelled">
+                <div class="oj-stat-number"><?php echo esc_html($cancelled_orders + $refunded_orders); ?></div>
+                <div class="oj-stat-label"><?php _e('Cancelled/Refunded', 'orders-jet'); ?></div>
+            </div>
+            <div class="oj-stat-box avg-value">
                 <div class="oj-stat-number"><?php echo $currency_symbol . number_format($today_orders > 0 ? ($today_revenue / $today_orders) : 0, 2); ?></div>
                 <div class="oj-stat-label"><?php _e('Avg Order Value', 'orders-jet'); ?></div>
             </div>
@@ -428,28 +475,28 @@ $currency_symbol = get_woocommerce_currency_symbol();
     <!-- Manager Filters -->
     <div class="oj-order-filters">
         <button class="oj-filter-btn active" data-filter="all">
-            <span class="oj-filter-icon">📊</span>
+            <span class="oj-filter-icon">📋</span>
             <span class="oj-filter-label"><?php _e('All Orders', 'orders-jet'); ?></span>
         </button>
-        <button class="oj-filter-btn" data-filter="today">
-            <span class="oj-filter-icon">📅</span>
-            <span class="oj-filter-label"><?php _e('Today', 'orders-jet'); ?></span>
+        <button class="oj-filter-btn" data-filter="pending">
+            <span class="oj-filter-icon">⏳</span>
+            <span class="oj-filter-label"><?php _e('Pending Payment', 'orders-jet'); ?></span>
         </button>
-        <button class="oj-filter-btn" data-filter="revenue">
-            <span class="oj-filter-icon">💰</span>
-            <span class="oj-filter-label"><?php _e('High Value', 'orders-jet'); ?></span>
+        <button class="oj-filter-btn" data-filter="processing">
+            <span class="oj-filter-icon">👨‍🍳</span>
+            <span class="oj-filter-label"><?php _e('Cooking', 'orders-jet'); ?></span>
         </button>
-        <button class="oj-filter-btn" data-filter="dinein">
-            <span class="oj-filter-icon">🍽️</span>
-            <span class="oj-filter-label"><?php _e('Dining', 'orders-jet'); ?></span>
-        </button>
-        <button class="oj-filter-btn" data-filter="pickup-all">
-            <span class="oj-filter-icon">🥡</span>
-            <span class="oj-filter-label"><?php _e('Pickup', 'orders-jet'); ?></span>
+        <button class="oj-filter-btn" data-filter="ready">
+            <span class="oj-filter-icon">✅</span>
+            <span class="oj-filter-label"><?php _e('Ready', 'orders-jet'); ?></span>
         </button>
         <button class="oj-filter-btn" data-filter="completed">
-            <span class="oj-filter-icon">✅</span>
+            <span class="oj-filter-icon">🎉</span>
             <span class="oj-filter-label"><?php _e('Completed', 'orders-jet'); ?></span>
+        </button>
+        <button class="oj-filter-btn" data-filter="cancelled">
+            <span class="oj-filter-icon">❌</span>
+            <span class="oj-filter-label"><?php _e('Cancelled/Refunded', 'orders-jet'); ?></span>
         </button>
     </div>
     
@@ -503,8 +550,8 @@ $currency_symbol = get_woocommerce_currency_symbol();
                             <div class="oj-card-status">
                                 <?php if ($order['post_status'] === 'wc-pending') : ?>
                                     <span class="oj-status-badge pending">
-                                        <span class="dashicons dashicons-hourglass"></span>
-                                        <?php _e('Pending', 'orders-jet'); ?>
+                                        <span class="dashicons dashicons-clock"></span>
+                                        <?php _e('Pending Payment', 'orders-jet'); ?>
                                     </span>
                                 <?php elseif ($order['post_status'] === 'wc-processing') : ?>
                                     <?php
@@ -551,8 +598,27 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                         <?php
                                     }
                                     ?>
-                                
-        <?php endif; ?>
+                                <?php elseif ($order['post_status'] === 'wc-on-hold') : ?>
+                                    <span class="oj-status-badge ready">
+                                        <span class="dashicons dashicons-yes-alt"></span>
+                                        <?php _e('Ready to Serve', 'orders-jet'); ?>
+                                    </span>
+                                <?php elseif ($order['post_status'] === 'wc-completed') : ?>
+                                    <span class="oj-status-badge completed">
+                                        <span class="dashicons dashicons-thumbs-up"></span>
+                                        <?php _e('Completed', 'orders-jet'); ?>
+                                    </span>
+                                <?php elseif ($order['post_status'] === 'wc-cancelled') : ?>
+                                    <span class="oj-status-badge cancelled">
+                                        <span class="dashicons dashicons-dismiss"></span>
+                                        <?php _e('Cancelled', 'orders-jet'); ?>
+                                    </span>
+                                <?php elseif ($order['post_status'] === 'wc-refunded') : ?>
+                                    <span class="oj-status-badge refunded">
+                                        <span class="dashicons dashicons-undo"></span>
+                                        <?php _e('Refunded', 'orders-jet'); ?>
+                                    </span>
+                                <?php endif; ?>
     </div>
                         </div>
 
@@ -573,8 +639,16 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                     <?php foreach ($order['items'] as $item) : ?>
                                         <div class="oj-card-item">
                                             <div class="oj-item-header">
-                                                <span class="oj-item-qty"><?php echo esc_html($item['quantity']); ?>×</span>
-                                                <span class="oj-item-name"><?php echo esc_html($item['name']); ?></span>
+                                                <div class="oj-item-info">
+                                                    <span class="oj-item-qty"><?php echo esc_html($item['quantity']); ?>×</span>
+                                                    <span class="oj-item-name"><?php echo esc_html($item['name']); ?></span>
+                                                </div>
+                                                <div class="oj-item-pricing">
+                                                    <span class="oj-item-price"><?php echo wc_price($item['total']); ?></span>
+                                                    <?php if ($item['quantity'] > 1) : ?>
+                                                        <span class="oj-unit-price"><?php echo wc_price($item['unit_price']); ?> each</span>
+                                                    <?php endif; ?>
+                                                </div>
                                             </div>
                                             
                                             <?php if (!empty($item['variations'])) : ?>
@@ -602,6 +676,42 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                             <?php endif; ?>
                                         </div>
                                     <?php endforeach; ?>
+                                </div>
+                                
+                                <!-- Order Total Section (Manager Only) -->
+                                <div class="oj-order-total-section">
+                                    <?php if (isset($order['order_subtotal']) && $order['order_subtotal'] != $order['order_total']) : ?>
+                                    <div class="oj-order-subtotal">
+                                        <span class="oj-total-label"><?php _e('Subtotal:', 'orders-jet'); ?></span>
+                                        <span class="oj-total-value"><?php echo wc_price($order['order_subtotal']); ?></span>
+                                    </div>
+                                    <?php endif; ?>
+                                    
+                                    <?php if (isset($order['order_tax']) && $order['order_tax'] > 0) : ?>
+                                    <div class="oj-order-tax">
+                                        <span class="oj-total-label"><?php _e('Tax:', 'orders-jet'); ?></span>
+                                        <span class="oj-total-value"><?php echo wc_price($order['order_tax']); ?></span>
+                                    </div>
+                                    <?php endif; ?>
+                                    
+                                    <?php if (isset($order['order_shipping']) && $order['order_shipping'] > 0) : ?>
+                                    <div class="oj-order-shipping">
+                                        <span class="oj-total-label"><?php _e('Shipping:', 'orders-jet'); ?></span>
+                                        <span class="oj-total-value"><?php echo wc_price($order['order_shipping']); ?></span>
+                                    </div>
+                                    <?php endif; ?>
+                                    
+                                    <?php if (isset($order['order_discount']) && $order['order_discount'] > 0) : ?>
+                                    <div class="oj-order-discount">
+                                        <span class="oj-total-label"><?php _e('Discount:', 'orders-jet'); ?></span>
+                                        <span class="oj-total-value">-<?php echo wc_price($order['order_discount']); ?></span>
+                                    </div>
+                                    <?php endif; ?>
+                                    
+                                    <div class="oj-order-total">
+                                        <span class="oj-total-label"><?php _e('Total:', 'orders-jet'); ?></span>
+                                        <span class="oj-total-value oj-total-final"><?php echo wc_price($order['order_total']); ?></span>
+                                    </div>
                                 </div>
                                 <?php else : ?>
                                 <div class="oj-no-items"><?php _e('No items found', 'orders-jet'); ?></div>
@@ -1518,6 +1628,144 @@ $currency_symbol = get_woocommerce_currency_symbol();
     50% { transform: scale(1.1); }
 }
 
+/* Additional Status Badges for Manager */
+.oj-status-badge.ready {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.oj-status-badge.completed {
+    background: #e2e3e5;
+    color: #383d41;
+    border: 1px solid #d6d8db;
+}
+
+.oj-status-badge.cancelled {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.oj-status-badge.refunded {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+/* Manager Pricing Styles */
+.oj-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    width: 100%;
+}
+
+.oj-item-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+
+.oj-item-pricing {
+    text-align: right;
+    font-weight: 600;
+    color: #28a745;
+    min-width: 80px;
+}
+
+.oj-unit-price {
+    font-size: 11px;
+    color: #6c757d;
+    display: block;
+    font-weight: 400;
+}
+
+/* Order Total Section */
+.oj-order-total-section {
+    margin-top: 16px;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border-top: 2px solid #007cba;
+}
+
+.oj-order-subtotal,
+.oj-order-tax,
+.oj-order-shipping,
+.oj-order-discount,
+.oj-order-total {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+    font-size: 14px;
+}
+
+.oj-order-total {
+    font-weight: 700;
+    font-size: 16px;
+    border-top: 1px solid #dee2e6;
+    padding-top: 8px;
+    margin-top: 8px;
+    margin-bottom: 0;
+}
+
+.oj-total-label {
+    color: #495057;
+}
+
+.oj-total-value {
+    font-weight: 600;
+}
+
+.oj-total-final {
+    color: #28a745;
+    font-size: 18px;
+}
+
+/* Secondary Stats Styling */
+.oj-secondary-stats {
+    margin-top: 10px;
+    opacity: 0.9;
+}
+
+.oj-secondary-stats .oj-stat-box {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+}
+
+/* Status-specific stat box colors */
+.oj-stat-box.revenue {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+}
+
+.oj-stat-box.processing {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white;
+}
+
+.oj-stat-box.ready {
+    background: linear-gradient(135deg, #28a745, #1e7e34);
+    color: white;
+}
+
+.oj-stat-box.completed {
+    background: linear-gradient(135deg, #6c757d, #495057);
+    color: white;
+}
+
+.oj-stat-box.pending {
+    background: linear-gradient(135deg, #ffc107, #e0a800);
+    color: #212529;
+}
+
+.oj-stat-box.cancelled {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+    color: white;
+}
+
 /* Enhanced countdown badge styles */
 .oj-countdown-badge {
     position: relative;
@@ -2121,22 +2369,25 @@ jQuery(document).ready(function($) {
                 case 'all':
                     show = true;
                     break;
-                case 'today':
-                    // Show all orders from today
-                    show = true; // All loaded orders are from today in this context
+                case 'pending':
+                    show = card.find('.oj-status-badge.pending').length > 0;
                     break;
-                case 'revenue':
-                    // Show high-value orders (above average)
-                    show = orderTotal > 50; // Adjust threshold as needed
+                case 'processing':
+                    show = card.find('.oj-status-badge.processing').length > 0 || 
+                           card.find('.oj-status-badge.oj-countdown-upcoming').length > 0 ||
+                           card.find('.oj-status-badge.oj-countdown-soon').length > 0 ||
+                           card.find('.oj-status-badge.oj-countdown-urgent').length > 0 ||
+                           card.find('.oj-status-badge.oj-countdown-overdue').length > 0;
                     break;
-                case 'dinein':
-                    show = orderType === 'dinein';
-                    break;
-                case 'pickup-all':
-                    show = orderType === 'pickup' || orderType === 'pickup_timed';
+                case 'ready':
+                    show = card.find('.oj-status-badge.ready').length > 0;
                     break;
                 case 'completed':
-                    show = orderStatus === 'completed';
+                    show = card.find('.oj-status-badge.completed').length > 0;
+                    break;
+                case 'cancelled':
+                    show = card.find('.oj-status-badge.cancelled').length > 0 || 
+                           card.find('.oj-status-badge.refunded').length > 0;
                     break;
             }
             
