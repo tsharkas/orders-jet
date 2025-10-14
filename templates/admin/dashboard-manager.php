@@ -1,6 +1,6 @@
 <?php
 /**
- * Orders Jet - Manager Dashboard Template
+ * Orders Jet - Manager Orders Management Template
  * Built on proven Kitchen Dashboard foundation with manager-specific customizations
  */
 
@@ -12,6 +12,9 @@ if (!defined('ABSPATH')) {
 if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_options')) {
     wp_die(__('You do not have permission to access this page.', 'orders-jet'));
 }
+
+// Include the manager navigation
+include ORDERS_JET_PLUGIN_DIR . 'templates/admin/manager-navigation.php';
 
 // Manager Dashboard - No form handling needed
 
@@ -420,11 +423,10 @@ $currency_symbol = get_woocommerce_currency_symbol();
 <div class="wrap">
     <div class="oj-header-container">
         <div class="oj-header-left">
-            <h1 class="wp-heading-inline">
-                <span class="dashicons dashicons-chart-bar" style="font-size: 28px; vertical-align: middle; margin-right: 10px;"></span>
-                <?php _e('Manager Dashboard', 'orders-jet'); ?>
-            </h1>
-            <p class="description"><?php echo sprintf(__('Welcome back, %s!', 'orders-jet'), $current_user->display_name); ?></p>
+            <h2 class="oj-section-title">
+                <span class="dashicons dashicons-clipboard" style="font-size: 24px; vertical-align: middle; margin-right: 8px;"></span>
+                <?php _e('Orders Management', 'orders-jet'); ?>
+            </h2>
             <p class="oj-last-updated">
                 <span class="dashicons dashicons-clock" style="font-size: 14px; vertical-align: middle; margin-right: 4px;"></span>
                 <strong><?php _e('Last Updated:', 'orders-jet'); ?></strong> <?php echo esc_html(date('g:i:s A')); ?>
@@ -433,7 +435,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
         <div class="oj-header-right">
             <button type="button" class="oj-check-orders-btn" onclick="location.reload();">
                 <span class="dashicons dashicons-update"></span>
-                <?php _e('Refresh Dashboard', 'orders-jet'); ?>
+                <?php _e('Refresh Orders', 'orders-jet'); ?>
             </button>
         </div>
     </div>
@@ -1598,6 +1600,14 @@ $currency_symbol = get_woocommerce_currency_symbol();
     padding: 16px 20px;
     background: #f8f9fa;
     border-top: 1px solid #dee2e6;
+}
+
+/* Manager Orders Management - Section Title */
+.oj-section-title {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 600;
+    color: #333;
 }
 
 /* Manager Dashboard - Order ID Section Styling */

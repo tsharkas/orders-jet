@@ -28,16 +28,71 @@ class Orders_Jet_Admin_Dashboard {
      * Register admin menu pages based on user role
      */
     public function register_admin_pages() {
-        // Add Manager Dashboard (available to managers and admins)
+        // Add Manager Screen (Parent Menu) - available to managers and admins
         if (current_user_can('access_oj_manager_dashboard') || current_user_can('manage_options')) {
             add_menu_page(
-                __('Manager Dashboard', 'orders-jet'),
-                __('Manager Dashboard', 'orders-jet'),
+                __('Manager Screen', 'orders-jet'),
+                __('Manager Screen', 'orders-jet'),
                 'manage_options', // Use WordPress admin capability as fallback
-                'orders-jet-manager',
-                array($this, 'render_manager_dashboard'),
+                'manager-screen',
+                array($this, 'render_manager_overview'), // Default to overview
                 'dashicons-businessman',
                 3
+            );
+            
+            // Manager Screen Child Pages
+            add_submenu_page(
+                'manager-screen',
+                __('Overview', 'orders-jet'),
+                __('Overview', 'orders-jet'),
+                'manage_options',
+                'manager-overview',
+                array($this, 'render_manager_overview')
+            );
+            
+            add_submenu_page(
+                'manager-screen',
+                __('Orders Management', 'orders-jet'),
+                __('Orders Management', 'orders-jet'),
+                'manage_options',
+                'manager-orders',
+                array($this, 'render_manager_orders')
+            );
+            
+            add_submenu_page(
+                'manager-screen',
+                __('Tables Management', 'orders-jet'),
+                __('Tables Management', 'orders-jet'),
+                'manage_options',
+                'manager-tables',
+                array($this, 'render_manager_tables')
+            );
+            
+            add_submenu_page(
+                'manager-screen',
+                __('Staff Management', 'orders-jet'),
+                __('Staff Management', 'orders-jet'),
+                'manage_options',
+                'manager-staff',
+                array($this, 'render_manager_staff')
+            );
+            
+            add_submenu_page(
+                'manager-screen',
+                __('Reports', 'orders-jet'),
+                __('Reports', 'orders-jet'),
+                'manage_options',
+                'manager-reports',
+                array($this, 'render_manager_reports')
+            );
+            
+            add_submenu_page(
+                'manager-screen',
+                __('Settings', 'orders-jet'),
+                __('Settings', 'orders-jet'),
+                'manage_options',
+                'manager-settings',
+                array($this, 'render_manager_settings')
             );
         }
         
@@ -72,8 +127,25 @@ class Orders_Jet_Admin_Dashboard {
      * Enqueue dashboard assets
      */
     public function enqueue_dashboard_assets($hook) {
+        // Manager Screen pages
+        $manager_pages = array(
+            'toplevel_page_manager-screen',
+            'manager-screen_page_manager-overview',
+            'manager-screen_page_manager-orders',
+            'manager-screen_page_manager-tables',
+            'manager-screen_page_manager-staff',
+            'manager-screen_page_manager-reports',
+            'manager-screen_page_manager-settings'
+        );
+        
+        // Other dashboard pages
+        $other_pages = array(
+            'toplevel_page_orders-jet-kitchen',
+            'toplevel_page_orders-jet-waiter'
+        );
+        
         // Only load on our dashboard pages
-        if (!in_array($hook, array('toplevel_page_orders-jet-manager', 'toplevel_page_orders-jet-kitchen', 'toplevel_page_orders-jet-waiter'))) {
+        if (!in_array($hook, array_merge($manager_pages, $other_pages))) {
             return;
         }
         
@@ -106,21 +178,150 @@ class Orders_Jet_Admin_Dashboard {
     }
     
     /**
-     * Render manager dashboard
+     * Render manager overview (main dashboard)
      */
-    public function render_manager_dashboard() {
+    public function render_manager_overview() {
         // Check permissions with fallback to admin
         if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_options')) {
             wp_die(__('You do not have permission to access this page.', 'orders-jet'));
         }
         
-        // Load the simple dashboard template
+        // Load the overview template (placeholder for now)
+        $template_path = ORDERS_JET_PLUGIN_DIR . 'templates/admin/manager-overview.php';
+        if (file_exists($template_path)) {
+            include $template_path;
+        } else {
+            // Create a simple placeholder
+            $this->render_manager_placeholder('Overview', 'A comprehensive dashboard showing restaurant performance, quick actions, and key metrics.');
+        }
+    }
+    
+    /**
+     * Render manager orders (current orders management)
+     */
+    public function render_manager_orders() {
+        // Check permissions with fallback to admin
+        if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_options')) {
+            wp_die(__('You do not have permission to access this page.', 'orders-jet'));
+        }
+        
+        // Load the orders management template (our current manager dashboard)
         $template_path = ORDERS_JET_PLUGIN_DIR . 'templates/admin/dashboard-manager.php';
         if (file_exists($template_path)) {
             include $template_path;
         } else {
-            wp_die(__('Dashboard template not found.', 'orders-jet'));
+            wp_die(__('Orders Management template not found.', 'orders-jet'));
         }
+    }
+    
+    /**
+     * Render manager tables
+     */
+    public function render_manager_tables() {
+        // Check permissions with fallback to admin
+        if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_options')) {
+            wp_die(__('You do not have permission to access this page.', 'orders-jet'));
+        }
+        
+        // Load the tables management template (placeholder for now)
+        $template_path = ORDERS_JET_PLUGIN_DIR . 'templates/admin/manager-tables.php';
+        if (file_exists($template_path)) {
+            include $template_path;
+        } else {
+            $this->render_manager_placeholder('Tables Management', 'Manage restaurant tables, assignments, and seating arrangements.');
+        }
+    }
+    
+    /**
+     * Render manager staff
+     */
+    public function render_manager_staff() {
+        // Check permissions with fallback to admin
+        if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_options')) {
+            wp_die(__('You do not have permission to access this page.', 'orders-jet'));
+        }
+        
+        // Load the staff management template (placeholder for now)
+        $template_path = ORDERS_JET_PLUGIN_DIR . 'templates/admin/manager-staff.php';
+        if (file_exists($template_path)) {
+            include $template_path;
+        } else {
+            $this->render_manager_placeholder('Staff Management', 'Manage restaurant staff, roles, schedules, and performance.');
+        }
+    }
+    
+    /**
+     * Render manager reports
+     */
+    public function render_manager_reports() {
+        // Check permissions with fallback to admin
+        if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_options')) {
+            wp_die(__('You do not have permission to access this page.', 'orders-jet'));
+        }
+        
+        // Load the reports template (placeholder for now)
+        $template_path = ORDERS_JET_PLUGIN_DIR . 'templates/admin/manager-reports.php';
+        if (file_exists($template_path)) {
+            include $template_path;
+        } else {
+            $this->render_manager_placeholder('Reports', 'View detailed analytics, sales reports, and business insights.');
+        }
+    }
+    
+    /**
+     * Render manager settings
+     */
+    public function render_manager_settings() {
+        // Check permissions with fallback to admin
+        if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_options')) {
+            wp_die(__('You do not have permission to access this page.', 'orders-jet'));
+        }
+        
+        // Load the settings template (placeholder for now)
+        $template_path = ORDERS_JET_PLUGIN_DIR . 'templates/admin/manager-settings.php';
+        if (file_exists($template_path)) {
+            include $template_path;
+        } else {
+            $this->render_manager_placeholder('Settings', 'Configure restaurant settings, preferences, and system options.');
+        }
+    }
+    
+    /**
+     * Render placeholder page for manager sections
+     */
+    private function render_manager_placeholder($title, $description) {
+        ?>
+        <div class="wrap">
+            <h1 class="wp-heading-inline">
+                <span class="dashicons dashicons-businessman" style="font-size: 28px; vertical-align: middle; margin-right: 10px;"></span>
+                <?php echo esc_html($title); ?>
+            </h1>
+            <hr class="wp-header-end">
+            
+            <div class="notice notice-info">
+                <p><strong><?php _e('Coming Soon!', 'orders-jet'); ?></strong></p>
+                <p><?php echo esc_html($description); ?></p>
+                <p><?php _e('This section will be developed in the upcoming phases of the Manager Screen system.', 'orders-jet'); ?></p>
+            </div>
+            
+            <div class="manager-placeholder" style="background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; margin-top: 20px;">
+                <div style="font-size: 64px; color: #ddd; margin-bottom: 20px;">
+                    <span class="dashicons dashicons-businessman"></span>
+                </div>
+                <h2 style="color: #666; margin-bottom: 10px;"><?php echo esc_html($title); ?></h2>
+                <p style="color: #999; font-size: 16px; max-width: 500px; margin: 0 auto;"><?php echo esc_html($description); ?></p>
+                
+                <div style="margin-top: 30px;">
+                    <a href="?page=manager-orders" class="button button-primary" style="margin-right: 10px;">
+                        <?php _e('Go to Orders Management', 'orders-jet'); ?>
+                    </a>
+                    <a href="?page=manager-screen" class="button">
+                        <?php _e('Back to Overview', 'orders-jet'); ?>
+                    </a>
+                </div>
+            </div>
+        </div>
+        <?php
     }
     
     /**
