@@ -1,853 +1,706 @@
 <?php
 /**
- * Orders Jet - Manager Dashboard Template (Simple Version)
- * Basic WordPress admin interface for managers
+ * Orders Jet - Manager Dashboard Template
+ * Built on proven Kitchen Dashboard foundation with manager-specific customizations
  */
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
-// Check user permissions
+// Check user permissions - Manager access
 if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_options')) {
     wp_die(__('You do not have permission to access this page.', 'orders-jet'));
 }
+
+// Manager Dashboard - No form handling needed
 
 // Get user information
 $current_user = wp_get_current_user();
 $today = date('Y-m-d');
 $today_formatted = date('F j, Y');
 
-// Handle location filtering
-$selected_location_id = isset($_GET['location']) ? intval($_GET['location']) : '';
-$woofood_locations = oj_get_available_woofood_locations();
-
-// Get real data from WooCommerce and tables
+// Get real data from WooCommerce orders
 global $wpdb;
 
-// Today's revenue from completed orders
-$today_revenue = $wpdb->get_var($wpdb->prepare("
-    SELECT SUM(meta_value) 
-    FROM {$wpdb->postmeta} pm
-    INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
-    WHERE pm.meta_key = '_order_total'
-    AND p.post_type = 'shop_order'
-    AND p.post_status IN ('wc-completed', 'wc-processing')
-    AND DATE(p.post_date) = %s
-", $today));
+// Get active orders using a more precise approach to avoid duplicates
+$active_orders = array();
 
-// Today's orders count
-$today_orders = $wpdb->get_var($wpdb->prepare("
-    SELECT COUNT(*) 
-    FROM {$wpdb->posts}
-    WHERE post_type = 'shop_order'
-    AND post_status IN ('wc-pending', 'wc-processing', 'wc-on-hold', 'wc-completed')
-    AND DATE(post_date) = %s
-", $today));
-
-// Total tables
-$total_tables = $wpdb->get_var("
-    SELECT COUNT(*) 
-    FROM {$wpdb->posts}
-    WHERE post_type = 'oj_table'
-    AND post_status = 'publish'
-");
-
-// Active tables (tables with active orders) - using same logic as frontend
-$active_tables_posts = get_posts(array(
-    'post_type' => 'shop_order',
-    'post_status' => array('wc-pending', 'wc-processing', 'wc-on-hold'),
-    'meta_query' => array(
-        array(
-            'key' => '_oj_table_number',
-            'compare' => 'EXISTS'
-        )
-    ),
-    'posts_per_page' => -1
-));
-
-// Get unique table numbers from active orders
-$active_table_numbers = array();
-foreach ($active_tables_posts as $order_post) {
-    $order = wc_get_order($order_post->ID);
-    if ($order) {
-        $table_number = $order->get_meta('_oj_table_number');
-        if ($table_number && !in_array($table_number, $active_table_numbers)) {
-            $active_table_numbers[] = $table_number;
-        }
-    }
-}
-
-$active_tables = count($active_table_numbers);
-
-// Enhanced Analytics Data Collection
-// 1. Revenue trend data (last 7 days)
-$revenue_trend = array();
-for ($i = 6; $i >= 0; $i--) {
-    $date = date('Y-m-d', strtotime("-$i days"));
-    $daily_revenue = $wpdb->get_var($wpdb->prepare("
-        SELECT COALESCE(SUM(meta_value), 0)
-        FROM {$wpdb->postmeta} pm
-        INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
-        WHERE pm.meta_key = '_order_total'
-        AND p.post_type = 'shop_order'
-        AND p.post_status IN ('wc-completed', 'wc-processing')
-        AND DATE(p.post_date) = %s
-    ", $date));
-    
-    $revenue_trend[] = array(
-        'date' => $date,
-        'formatted_date' => date('M j', strtotime($date)),
-        'revenue' => floatval($daily_revenue ?: 0)
-    );
-}
-
-// 2. Order type breakdown (today)
-$order_types = array(
-    'dinein' => 0,
-    'pickup' => 0,
-    'delivery' => 0
-);
-
-$todays_orders = $wpdb->get_results($wpdb->prepare("
-    SELECT p.ID
-    FROM {$wpdb->posts} p
-    WHERE p.post_type = 'shop_order'
-    AND p.post_status IN ('wc-pending', 'wc-processing', 'wc-on-hold', 'wc-completed')
-    AND DATE(p.post_date) = %s
-", $today));
-
-foreach ($todays_orders as $order_post) {
-    $order = wc_get_order($order_post->ID);
-    if ($order) {
-        $table_number = $order->get_meta('_oj_table_number');
-        $delivery_date = $order->get_meta('exwfood_date_deli');
-        $order_method = $order->get_meta('exwfood_order_method');
-        
-        if (!empty($table_number)) {
-            $order_types['dinein']++;
-        } elseif (!empty($delivery_date) || $order_method === 'delivery') {
-            $order_types['pickup']++; // WooFood orders are pickup with delivery time
-        } else {
-            $order_types['pickup']++; // Regular pickup orders
-        }
-    }
-}
-
-// 3. Peak hours analysis (today's orders by hour)
-$peak_hours = array();
-for ($hour = 0; $hour < 24; $hour++) {
-    $peak_hours[$hour] = 0;
-}
-
-foreach ($todays_orders as $order_post) {
-    $order_hour = intval(date('H', strtotime($order_post->post_date ?? date('Y-m-d H:i:s'))));
-    if (isset($peak_hours[$order_hour])) {
-        $peak_hours[$order_hour]++;
-    }
-}
-
-// 4. Top selling products (last 7 days)
-$top_products = $wpdb->get_results("
-    SELECT 
-        oi.order_item_name as product_name,
-        SUM(oim_qty.meta_value) as total_quantity,
-        SUM(oim_total.meta_value) as total_revenue
-    FROM {$wpdb->prefix}woocommerce_order_items oi
-    INNER JOIN {$wpdb->prefix}woocommerce_order_itemmeta oim_qty ON oi.order_item_id = oim_qty.order_item_id AND oim_qty.meta_key = '_qty'
-    INNER JOIN {$wpdb->prefix}woocommerce_order_itemmeta oim_total ON oi.order_item_id = oim_total.order_item_id AND oim_total.meta_key = '_line_total'
-    INNER JOIN {$wpdb->posts} p ON oi.order_id = p.ID
-    WHERE oi.order_item_type = 'line_item'
-    AND p.post_type = 'shop_order'
-    AND p.post_status IN ('wc-completed', 'wc-processing')
-    AND p.post_date >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-    GROUP BY oi.order_item_name
-    ORDER BY total_quantity DESC
-    LIMIT 5
-");
-
-// 5. Performance metrics
-$avg_order_value = $today_orders > 0 ? ($today_revenue / $today_orders) : 0;
-$yesterday_revenue = $wpdb->get_var($wpdb->prepare("
-    SELECT COALESCE(SUM(meta_value), 0)
-    FROM {$wpdb->postmeta} pm
-    INNER JOIN {$wpdb->posts} p ON pm.post_id = p.ID
-    WHERE pm.meta_key = '_order_total'
-    AND p.post_type = 'shop_order'
-    AND p.post_status IN ('wc-completed', 'wc-processing')
-    AND DATE(p.post_date) = %s
-", date('Y-m-d', strtotime('-1 day'))));
-
-$revenue_change = $yesterday_revenue > 0 ? (($today_revenue - $yesterday_revenue) / $yesterday_revenue) * 100 : 0;
-
-$active_tables = count($active_table_numbers);
-
-// Format revenue
-$currency_symbol = get_woocommerce_currency_symbol();
-$formatted_revenue = $currency_symbol . number_format($today_revenue ?: 0, 2);
-
-// Get recent orders using the SAME logic as frontend order history
-$recent_orders_posts = get_posts(array(
-    'post_type' => 'shop_order',
-    'post_status' => array('wc-pending', 'wc-processing', 'wc-on-hold'),
-    'meta_query' => array(
-        array(
-            'key' => '_oj_table_number',
-            'compare' => 'EXISTS'
-        )
-    ),
-    'posts_per_page' => 5,
-    'orderby' => 'date',
-    'order' => 'DESC'
-));
-
-// If no orders found with get_posts, try WooCommerce's native method
-if (count($recent_orders_posts) == 0 && function_exists('wc_get_orders')) {
-    error_log('Orders Jet Manager: Trying WooCommerce native method...');
+// Get ALL in-progress/processing orders - ultra simple
+if (function_exists('wc_get_orders')) {
+    error_log('Orders Jet Kitchen: Using ultra-simple approach...');
     
     $wc_orders = wc_get_orders(array(
-        'status' => array('pending', 'processing', 'on-hold'),
-        'meta_key' => '_oj_table_number',
-        'limit' => 5,
+        'status' => array('processing', 'in-progress'), // Cover both possible status names
+        'limit' => -1,
         'orderby' => 'date',
-        'order' => 'DESC'
+        'order' => 'ASC'
     ));
     
-    // Convert WC_Order objects to the format we need
-    $recent_orders = array();
+    error_log('Orders Jet Kitchen: Found ' . count($wc_orders) . ' orders');
+    
+    // Convert to simple format with enhanced pickup logic
+    $active_orders = array();
     foreach ($wc_orders as $wc_order) {
-        $recent_orders[] = array(
+        $table_number = $wc_order->get_meta('_oj_table_number');
+        
+        // DEBUG: Log all meta fields for orders without table numbers (pickup/delivery orders)
+        if (empty($table_number)) {
+            error_log('Orders Jet Kitchen DEBUG: Order #' . $wc_order->get_id() . ' - All meta fields:');
+            $all_meta = $wc_order->get_meta_data();
+            foreach ($all_meta as $meta) {
+                $key = $meta->get_data()['key'];
+                $value = $meta->get_data()['value'];
+                if (strpos($key, 'delivery') !== false || strpos($key, 'exwf') !== false || strpos($key, 'date') !== false || strpos($key, 'time') !== false) {
+                    error_log('Orders Jet Kitchen DEBUG: ' . $key . ' = ' . print_r($value, true));
+                }
+            }
+        }
+        
+        // Get delivery date/time for WooFood orders (using correct field names)
+        $delivery_date = $wc_order->get_meta('exwfood_date_deli'); // "October 13, 2025" format
+        $delivery_time = $wc_order->get_meta('exwfood_time_deli'); // "11:30 PM" format
+        $delivery_unix = $wc_order->get_meta('exwfood_datetime_deli_unix'); // Unix timestamp
+        $order_method = $wc_order->get_meta('exwfood_order_method'); // "delivery"
+        
+        error_log('Orders Jet Kitchen DEBUG: Order #' . $wc_order->get_id() . ' - Found delivery_date: ' . ($delivery_date ?: 'NONE') . ', delivery_time: ' . ($delivery_time ?: 'NONE') . ', order_method: ' . ($order_method ?: 'NONE'));
+        
+        // For pickup orders with delivery date/time, show all orders (let filters handle date filtering)
+        if (empty($table_number) && !empty($delivery_date)) {
+            $today = date('Y-m-d');
+            // Convert WooFood date format "October 13, 2025" to Y-m-d
+            $order_date = date('Y-m-d', strtotime($delivery_date));
+            
+            error_log('Orders Jet Kitchen DEBUG: Order #' . $wc_order->get_id() . ' - Today: ' . $today . ', Order date: ' . $order_date . ' (from: ' . $delivery_date . ')');
+            
+            // Show all orders - let JavaScript filters handle the date filtering
+            // (Removed the continue statement to include upcoming orders)
+            
+            // CHECK IF IT HAS DELIVERY TIME - this is the key difference!
+            if (!empty($delivery_time)) {
+                // Enhanced badge for timed pickup orders (HAS TIME)
+                $order_type = 'pickup_timed';
+                $time_display = date('g:i A', strtotime($delivery_time));
+                
+                // Show date + time for upcoming orders, only time for today's orders
+                if ($order_date === $today) {
+                    $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $time_display;
+                } else {
+                    // For upcoming orders, show date + time
+                    $date_display = date('M j', strtotime($delivery_date)); // e.g., "Oct 15"
+                    $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $date_display . ' ' . $time_display;
+                }
+                
+                $order_type_icon = '🕒';
+                $order_type_class = 'oj-order-type-pickup-timed'; // ORANGE
+                
+                error_log('Orders Jet Kitchen: Including TIMED pickup order #' . $wc_order->get_id() . ' for ' . $order_date . ' at ' . $time_display);
+            } else {
+                // Regular pickup for today but no specific time
+                $order_type = 'pickup';
+                $order_type_label = __('PICK UP', 'orders-jet');
+                $order_type_icon = '🥡';
+                $order_type_class = 'oj-order-type-pickup'; // PURPLE
+                
+                error_log('Orders Jet Kitchen: Including REGULAR pickup order #' . $wc_order->get_id() . ' for ' . $order_date . ' (no specific time)');
+            }
+        } else {
+            // Regular logic for table orders and pickup orders without delivery dates
+            $order_type = !empty($table_number) ? 'dinein' : 'pickup';
+            $order_type_label = !empty($table_number) ? __('DINE IN', 'orders-jet') : __('PICK UP', 'orders-jet');
+            $order_type_icon = !empty($table_number) ? '🍽️' : '🥡';
+            $order_type_class = !empty($table_number) ? 'oj-order-type-dinein' : 'oj-order-type-pickup';
+        }
+        
+        $active_orders[] = array(
             'ID' => $wc_order->get_id(),
             'post_date' => $wc_order->get_date_created()->format('Y-m-d H:i:s'),
             'post_status' => 'wc-' . $wc_order->get_status(),
             'order_total' => $wc_order->get_total(),
-            'table_number' => $wc_order->get_meta('_oj_table_number'),
-            'customer_name' => $wc_order->get_billing_first_name()
+            'table_number' => $table_number,
+            'customer_name' => $wc_order->get_billing_first_name(),
+            'session_id' => $wc_order->get_meta('_oj_session_id'),
+            'delivery_date' => $delivery_date,
+            'delivery_time' => $delivery_time,
+            // Enhanced badge logic
+            'order_type' => $order_type,
+            'order_type_label' => $order_type_label,
+            'order_type_icon' => $order_type_icon,
+            'order_type_class' => $order_type_class
         );
     }
 } else {
-        // Convert posts to the format we need and get order items
-        $recent_orders = array();
-        foreach ($recent_orders_posts as $order_post) {
-            $order = wc_get_order($order_post->ID);
-            if ($order) {
-                $order_data = array(
-                    'ID' => $order->get_id(),
-                    'post_date' => $order_post->post_date,
-                    'post_status' => 'wc-' . $order->get_status(),
-                    'order_total' => $order->get_total(),
-                    'table_number' => $order->get_meta('_oj_table_number'),
-                    'customer_name' => $order->get_billing_first_name(),
-                    'items' => array()
-                );
+    // Simple fallback
+    error_log('Orders Jet Kitchen: Using simple fallback...');
+    
+    $active_orders_posts = get_posts(array(
+        'post_type' => 'shop_order',
+        'post_status' => array('wc-processing', 'wc-in-progress'),
+        'posts_per_page' => -1,
+        'orderby' => 'date',
+        'order' => 'ASC'
+    ));
+    
+    $active_orders = array();
+    foreach ($active_orders_posts as $order_post) {
+        $order = wc_get_order($order_post->ID);
+        if ($order) {
+            $table_number = $order->get_meta('_oj_table_number');
+            
+            // Get delivery date/time for WooFood orders (using correct field names)
+            $delivery_date = $order->get_meta('exwfood_date_deli'); // "October 13, 2025" format
+            $delivery_time = $order->get_meta('exwfood_time_deli'); // "11:30 PM" format
+            $order_method = $order->get_meta('exwfood_order_method'); // "delivery"
+            
+            // For pickup orders with delivery date/time, show all orders (let filters handle date filtering)
+            if (empty($table_number) && !empty($delivery_date)) {
+                $today = date('Y-m-d');
+                // Convert WooFood date format "October 13, 2025" to Y-m-d
+                $order_date = date('Y-m-d', strtotime($delivery_date));
                 
-                // Get order items with variations using WooCommerce native methods
-                foreach ($order->get_items() as $item) {
-                    $item_data = array(
-                        'name' => $item->get_name(),
-                        'quantity' => $item->get_quantity(),
-                        'total' => $item->get_total(),
-                        'variations' => array(),
-                        'addons' => array(),
-                        'notes' => ''
-                    );
+                // Show all orders - let JavaScript filters handle the date filtering
+                // (Removed the continue statement to include upcoming orders)
+                
+                // CHECK IF IT HAS DELIVERY TIME - this is the key difference!
+                if (!empty($delivery_time)) {
+                    // Enhanced badge for timed pickup orders (HAS TIME)
+                    $order_type = 'pickup_timed';
+                    $time_display = date('g:i A', strtotime($delivery_time));
                     
-                    // Get variations using WooCommerce native methods
-                    $product = $item->get_product();
-                    if ($product && $product->is_type('variation')) {
-                        // For variation products, get variation attributes directly
-                        $variation_attributes = $product->get_variation_attributes();
-                        foreach ($variation_attributes as $attribute_name => $attribute_value) {
-                            if (!empty($attribute_value)) {
-                                // Clean attribute name and get proper label
-                                $clean_attribute_name = str_replace('attribute_', '', $attribute_name);
-                                $attribute_label = wc_attribute_label($clean_attribute_name);
-                                $item_data['variations'][$attribute_label] = $attribute_value;
-                            }
-                        }
+                    // Show date + time for upcoming orders, only time for today's orders
+                    if ($order_date === $today) {
+                        $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $time_display;
+                    } else {
+                        // For upcoming orders, show date + time
+                        $date_display = date('M j', strtotime($delivery_date)); // e.g., "Oct 15"
+                        $order_type_label = __('PICK UP', 'orders-jet') . ' ' . $date_display . ' ' . $time_display;
                     }
                     
-                    // Get add-ons and notes from item meta
-                    $item_meta = $item->get_meta_data();
-                    foreach ($item_meta as $meta) {
-                        $meta_key = $meta->key;
-                        $meta_value = $meta->value;
-                        
-                        // Get add-ons
-                        if ($meta_key === '_oj_item_addons') {
-                            $addons = explode(', ', $meta_value);
-                            $item_data['addons'] = array_map(function($addon) {
-                                // Remove price information from add-ons for manager display
-                                // Convert "Combo Plus (+90,00 EGP)" to "Combo Plus"
-                                // Convert "Combo + 60 EGP" to "Combo"
-                                $addon_clean = strip_tags($addon);
-                                // Remove price in parentheses (e.g., "(+90,00 EGP)" or "(+0,00 EGP)")
-                                $addon_clean = preg_replace('/\s*\(\+[^)]+\)/', '', $addon_clean);
-                                // Remove price in format "+ XX EGP" (e.g., "+ 60 EGP")
-                                $addon_clean = preg_replace('/\s*\+\s*\d+[.,]?\d*\s*EGP/', '', $addon_clean);
-                                return trim($addon_clean);
-                            }, $addons);
-                        }
-                        
-                        // Get notes
-                        if ($meta_key === '_oj_item_notes') {
-                            $item_data['notes'] = $meta_value;
-                        }
-                        
-                        // Also check for variations in meta (fallback)
-                        if (strpos($meta_key, 'pa_') === 0 || strpos($meta_key, 'attribute_') === 0) {
-                            $attribute_name = str_replace(array('pa_', 'attribute_'), '', $meta_key);
-                            $attribute_label = wc_attribute_label($attribute_name);
-                            if (!isset($item_data['variations'][$attribute_label])) {
-                                $item_data['variations'][$attribute_label] = $meta_value;
-                            }
-                        }
+                    $order_type_icon = '🕒';
+                    $order_type_class = 'oj-order-type-pickup-timed'; // ORANGE
+                } else {
+                    // Regular pickup for today but no specific time
+                    $order_type = 'pickup';
+                    $order_type_label = __('PICK UP', 'orders-jet');
+                    $order_type_icon = '🥡';
+                    $order_type_class = 'oj-order-type-pickup'; // PURPLE
+                }
+            } else {
+                // Regular logic for table orders and pickup orders without delivery dates
+                $order_type = !empty($table_number) ? 'dinein' : 'pickup';
+                $order_type_label = !empty($table_number) ? __('DINE IN', 'orders-jet') : __('PICK UP', 'orders-jet');
+                $order_type_icon = !empty($table_number) ? '🍽️' : '🥡';
+                $order_type_class = !empty($table_number) ? 'oj-order-type-dinein' : 'oj-order-type-pickup';
+            }
+            
+            $active_orders[] = array(
+                'ID' => $order->get_id(),
+                'post_date' => $order_post->post_date,
+                'post_status' => 'wc-' . $order->get_status(),
+                'order_total' => $order->get_total(),
+                'table_number' => $table_number,
+                'customer_name' => $order->get_billing_first_name(),
+                'session_id' => $order->get_meta('_oj_session_id'),
+                'delivery_date' => $delivery_date,
+                'delivery_time' => $delivery_time,
+                // Enhanced badge logic
+                'order_type' => $order_type,
+                'order_type_label' => $order_type_label,
+                'order_type_icon' => $order_type_icon,
+                'order_type_class' => $order_type_class
+            );
+        }
+    }
+}
+
+// Sort by priority: today's orders first, then upcoming orders at the end
+usort($active_orders, function($a, $b) {
+    $today = date('Y-m-d');
+    
+    // Get delivery dates for comparison
+    $a_delivery_date = !empty($a['delivery_date']) ? date('Y-m-d', strtotime($a['delivery_date'])) : '';
+    $b_delivery_date = !empty($b['delivery_date']) ? date('Y-m-d', strtotime($b['delivery_date'])) : '';
+    
+    // Determine if orders are for today or upcoming
+    $a_is_upcoming = ($a['order_type'] === 'pickup_timed' && $a_delivery_date && $a_delivery_date > $today);
+    $b_is_upcoming = ($b['order_type'] === 'pickup_timed' && $b_delivery_date && $b_delivery_date > $today);
+    
+    // Upcoming orders go to the end
+    if ($a_is_upcoming && !$b_is_upcoming) {
+        return 1; // a goes after b
+    }
+    if ($b_is_upcoming && !$a_is_upcoming) {
+        return -1; // b goes after a
+    }
+    
+    // If both are upcoming, sort by delivery date then time
+    if ($a_is_upcoming && $b_is_upcoming) {
+        if ($a_delivery_date !== $b_delivery_date) {
+            return strcmp($a_delivery_date, $b_delivery_date);
+        }
+        // Same date, sort by time
+        $time_a = !empty($a['delivery_time']) ? strtotime($a['delivery_time']) : 0;
+        $time_b = !empty($b['delivery_time']) ? strtotime($b['delivery_time']) : 0;
+        return $time_a - $time_b;
+    }
+    
+    // For today's orders: timed pickups sorted by delivery time come first
+    if ($a['order_type'] === 'pickup_timed' && $b['order_type'] === 'pickup_timed' && !$a_is_upcoming && !$b_is_upcoming) {
+        $time_a = !empty($a['delivery_time']) ? strtotime($a['delivery_time']) : 0;
+        $time_b = !empty($b['delivery_time']) ? strtotime($b['delivery_time']) : 0;
+        return $time_a - $time_b;
+    }
+    
+    // Today's timed pickups come before regular orders
+    if ($a['order_type'] === 'pickup_timed' && $b['order_type'] !== 'pickup_timed' && !$a_is_upcoming) {
+        return -1;
+    }
+    if ($b['order_type'] === 'pickup_timed' && $a['order_type'] !== 'pickup_timed' && !$b_is_upcoming) {
+        return 1;
+    }
+    
+    // Regular priority for other orders
+    $priority = array('wc-processing' => 1, 'wc-pending' => 2, 'wc-on-hold' => 3);
+    $a_priority = $priority[$a['post_status']] ?? 4;
+    $b_priority = $priority[$b['post_status']] ?? 4;
+    
+    if ($a_priority === $b_priority) {
+        return strtotime($a['post_date']) - strtotime($b['post_date']);
+    }
+    return $a_priority - $b_priority;
+});
+
+error_log('Orders Jet Kitchen: Final order count: ' . count($active_orders));
+error_log('Orders Jet Kitchen: Order IDs: ' . implode(', ', array_column($active_orders, 'ID')));
+
+// Get order items for each order using WooCommerce methods (same as frontend)
+$orders_with_items = array();
+foreach ($active_orders as $order) {
+    $wc_order = wc_get_order($order['ID']);
+    if ($wc_order) {
+        // Order type is already set in the simple logic above - no need for complex detection
+        
+        $order_items = array();
+        foreach ($wc_order->get_items() as $item) {
+            // Get basic item info
+            $item_data = array(
+                'name' => $item->get_name(),
+                'quantity' => $item->get_quantity(),
+                'total' => $item->get_total(),
+                'variations' => array(),
+                'addons' => array(),
+                'notes' => ''
+            );
+            
+            // Get variations using WooCommerce native methods
+            $product = $item->get_product();
+            if ($product && $product->is_type('variation')) {
+                // For variation products, get variation attributes directly
+                $variation_attributes = $product->get_variation_attributes();
+                foreach ($variation_attributes as $attribute_name => $attribute_value) {
+                    if (!empty($attribute_value)) {
+                        // Clean attribute name and get proper label
+                        $clean_attribute_name = str_replace('attribute_', '', $attribute_name);
+                        $attribute_label = wc_attribute_label($clean_attribute_name);
+                        $item_data['variations'][$attribute_label] = $attribute_value;
                     }
-                    
-                    $order_data['items'][] = $item_data;
                 }
                 
-                $recent_orders[] = $order_data;
+            } else {
+                // For non-variation products, still check meta for any variation info
+                $item_meta = $item->get_meta_data();
+                foreach ($item_meta as $meta) {
+                    $meta_key = $meta->key;
+                    $meta_value = $meta->value;
+                    
+                    // Get variations from stored meta
+                    if (strpos($meta_key, 'pa_') === 0 || strpos($meta_key, 'attribute_') === 0) {
+                        $attribute_name = str_replace(array('pa_', 'attribute_'), '', $meta_key);
+                        $attribute_label = wc_attribute_label($attribute_name);
+                        $item_data['variations'][$attribute_label] = $meta_value;
+                    }
+                }
             }
+            
+            // Get add-ons and notes from item meta
+            $item_meta = $item->get_meta_data();
+            foreach ($item_meta as $meta) {
+                $meta_key = $meta->key;
+                $meta_value = $meta->value;
+                
+                // Get add-ons
+                if ($meta_key === '_oj_item_addons') {
+                    $addons = explode(', ', $meta_value);
+                    $item_data['addons'] = array_map(function($addon) {
+                        // Remove price information from add-ons for kitchen display
+                        // Convert "Combo Plus (+90,00 EGP)" to "Combo Plus"
+                        // Convert "Combo + 60 EGP" to "Combo"
+                        $addon_clean = strip_tags($addon);
+                        // Remove price in parentheses (e.g., "(+90,00 EGP)" or "(+0,00 EGP)")
+                        $addon_clean = preg_replace('/\s*\(\+[^)]+\)/', '', $addon_clean);
+                        // Remove price in format "+ XX EGP" (e.g., "+ 60 EGP")
+                        $addon_clean = preg_replace('/\s*\+\s*\d+[.,]?\d*\s*EGP/', '', $addon_clean);
+                        return trim($addon_clean);
+                    }, $addons);
+                }
+                
+                // Get notes
+                if ($meta_key === '_oj_item_notes') {
+                    $item_data['notes'] = $meta_value;
+                }
+            }
+            
+            $order_items[] = $item_data;
         }
+        
+        // Create a new order array with items (avoid reference issues)
+        $order_with_items = $order;
+        $order_with_items['items'] = $order_items;
+        $orders_with_items[] = $order_with_items;
+    } else {
+        // Create order with empty items if WC order not found
+        $order_with_items = $order;
+        $order_with_items['items'] = array();
+        $orders_with_items[] = $order_with_items;
+    }
 }
 
-error_log('Orders Jet Manager: Found ' . count($recent_orders) . ' recent orders using frontend logic');
+// Replace the original array with the new one
+$active_orders = $orders_with_items;
 
-// Get table status with active order information
-// Build table status query with location filtering
-$table_status_query = "
-    SELECT p.ID, p.post_title, pm_status.meta_value as table_status,
-           pm_capacity.meta_value as table_capacity, pm_location.meta_value as table_location,
-           pm_woofood_loc.meta_value as woofood_location_id,
-           (SELECT COUNT(*) FROM {$wpdb->posts} p2 
-            INNER JOIN {$wpdb->postmeta} pm_table ON p2.ID = pm_table.post_id AND pm_table.meta_key = '_oj_table_number'
-            WHERE p2.post_type = 'shop_order' 
-            AND p2.post_status IN ('wc-pending', 'wc-processing', 'wc-on-hold')
-            AND pm_table.meta_value = p.post_title) as active_orders_count
-    FROM {$wpdb->posts} p
-    LEFT JOIN {$wpdb->postmeta} pm_status ON p.ID = pm_status.post_id AND pm_status.meta_key = '_oj_table_status'
-    LEFT JOIN {$wpdb->postmeta} pm_capacity ON p.ID = pm_capacity.post_id AND pm_capacity.meta_key = '_oj_table_capacity'
-    LEFT JOIN {$wpdb->postmeta} pm_location ON p.ID = pm_location.post_id AND pm_location.meta_key = '_oj_table_location'
-    LEFT JOIN {$wpdb->postmeta} pm_woofood_loc ON p.ID = pm_woofood_loc.post_id AND pm_woofood_loc.meta_key = '_oj_woofood_location_id'
-    WHERE p.post_type = 'oj_table'
-    AND p.post_status = 'publish'";
+// Kitchen stats (count from existing data)
+// In Progress: Count orders with wc-processing status
+$in_progress_orders = 0;
+$completed_orders = 0;
 
-// Add location filter if selected
-if ($selected_location_id) {
-    $table_status_query .= $wpdb->prepare(" AND pm_woofood_loc.meta_value = %d", $selected_location_id);
+foreach ($active_orders as $order) {
+    if ($order['post_status'] === 'wc-processing') {
+        $in_progress_orders++;
+    }
 }
 
-$table_status_query .= " ORDER BY p.post_title ASC LIMIT 20";
+// Get completed orders (on-hold) - ultra simple
+if (function_exists('wc_get_orders')) {
+    $completed_wc_orders = wc_get_orders(array(
+        'status' => array('on-hold'), // Ready orders
+        'limit' => -1
+    ));
+    $completed_orders = count($completed_wc_orders);
+} else {
+    $completed_orders_posts = get_posts(array(
+        'post_type' => 'shop_order',
+        'post_status' => array('wc-on-hold'),
+        'posts_per_page' => -1
+    ));
+    $completed_orders = count($completed_orders_posts);
+}
 
-$table_status = $wpdb->get_results($table_status_query, ARRAY_A);
+// Debug logging
+error_log('Orders Jet Kitchen Stats: In Progress Orders = ' . $in_progress_orders);
+error_log('Orders Jet Kitchen Stats: Completed Orders = ' . $completed_orders);
+error_log('Orders Jet Kitchen Stats: Active Orders Count = ' . count($active_orders));
+
+// Additional debug for completed orders
+if (function_exists('wc_get_orders')) {
+    error_log('Orders Jet Kitchen Stats: Using wc_get_orders for completed orders');
+    if (isset($completed_wc_orders)) {
+        error_log('Orders Jet Kitchen Stats: Found ' . count($completed_wc_orders) . ' on-hold orders');
+        foreach ($completed_wc_orders as $completed_order) {
+            error_log('Orders Jet Kitchen Stats: On-hold Order #' . $completed_order->get_id() . ' - Status: ' . $completed_order->get_status() . ' - Table: ' . $completed_order->get_meta('_oj_table_number'));
+        }
+    }
+} else {
+    error_log('Orders Jet Kitchen Stats: Using get_posts fallback for completed orders');
+}
+
+// Format currency
+$currency_symbol = get_woocommerce_currency_symbol();
 ?>
 
 <div class="wrap">
-    <h1 class="wp-heading-inline">
-        <span class="dashicons dashicons-businessman" style="font-size: 28px; vertical-align: middle; margin-right: 10px;"></span>
-        <?php _e('Manager Dashboard', 'orders-jet'); ?>
-    </h1>
-    <button type="button" class="button oj-refresh-dashboard" style="margin-left: 10px;">
-        <span class="dashicons dashicons-update" style="vertical-align: middle; margin-right: 5px;"></span>
-        <?php _e('Refresh', 'orders-jet'); ?>
-    </button>
-    
-    <?php if ($woofood_locations && !is_wp_error($woofood_locations) && count($woofood_locations) > 0): ?>
-    <div class="oj-location-filter" style="float: right; margin-top: 5px;">
-        <form method="get" style="display: inline-block;">
-            <input type="hidden" name="page" value="orders-jet-manager">
-            <label for="location-filter" style="margin-right: 5px;"><?php _e('Filter by Location:', 'orders-jet'); ?></label>
-            <select name="location" id="location-filter" onchange="this.form.submit()" style="margin-right: 10px;">
-                <option value=""><?php _e('All Locations', 'orders-jet'); ?></option>
-                <?php foreach ($woofood_locations as $location): ?>
-                    <option value="<?php echo esc_attr($location->term_id); ?>" <?php selected($selected_location_id, $location->term_id); ?>>
-                        <?php echo esc_html($location->name); ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </form>
+    <div class="oj-header-container">
+        <div class="oj-header-left">
+            <h1 class="wp-heading-inline">
+                <span class="dashicons dashicons-chart-bar" style="font-size: 28px; vertical-align: middle; margin-right: 10px;"></span>
+                <?php _e('Manager Dashboard', 'orders-jet'); ?>
+            </h1>
+            <p class="description"><?php echo sprintf(__('Welcome back, %s!', 'orders-jet'), $current_user->display_name); ?></p>
+            <p class="oj-last-updated">
+                <span class="dashicons dashicons-clock" style="font-size: 14px; vertical-align: middle; margin-right: 4px;"></span>
+                <strong><?php _e('Last Updated:', 'orders-jet'); ?></strong> <?php echo esc_html(date('g:i:s A')); ?>
+            </p>
+        </div>
+        <div class="oj-header-right">
+            <button type="button" class="oj-check-orders-btn" onclick="location.reload();">
+                <span class="dashicons dashicons-update"></span>
+                <?php _e('Refresh Dashboard', 'orders-jet'); ?>
+            </button>
+        </div>
     </div>
-    <div style="clear: both;"></div>
-    <?php endif; ?>
-    
-    <p class="description"><?php echo sprintf(__('Welcome back, %s!', 'orders-jet'), $current_user->display_name); ?></p>
     
     <hr class="wp-header-end">
 
-    <!-- Real Stats -->
-    <div class="oj-dashboard-stats">
-        <h2><?php echo sprintf(__('Today\'s Overview - %s', 'orders-jet'), $today_formatted); ?></h2>
+    <!-- Manager Stats -->
+    <div class="oj-kitchen-stats">
+        <h2><?php echo sprintf(__('Business Overview - %s', 'orders-jet'), $today_formatted); ?></h2>
         
         <div class="oj-stats-row">
-            <div class="oj-stat-box">
+            <div class="oj-stat-box processing">
                 <div class="oj-stat-number"><?php echo esc_html($today_orders ?: 0); ?></div>
                 <div class="oj-stat-label"><?php _e('Orders Today', 'orders-jet'); ?></div>
             </div>
-            <div class="oj-stat-box">
-                <div class="oj-stat-number"><?php echo esc_html($formatted_revenue); ?></div>
-                <div class="oj-stat-label">
-                    <?php _e('Revenue Today', 'orders-jet'); ?>
-                    <?php if ($revenue_change != 0): ?>
-                        <span class="oj-trend <?php echo $revenue_change > 0 ? 'positive' : 'negative'; ?>">
-                            <?php echo $revenue_change > 0 ? '↗' : '↘'; ?> <?php echo abs(round($revenue_change, 1)); ?>%
-                        </span>
-                    <?php endif; ?>
-                </div>
+            <div class="oj-stat-box completed">
+                <div class="oj-stat-number"><?php echo $currency_symbol . number_format($today_revenue ?: 0, 2); ?></div>
+                <div class="oj-stat-label"><?php _e('Revenue Today', 'orders-jet'); ?></div>
             </div>
             <div class="oj-stat-box">
                 <div class="oj-stat-number"><?php echo esc_html($active_tables ?: 0); ?>/<?php echo esc_html($total_tables ?: 0); ?></div>
-                <div class="oj-stat-label"><?php _e('Tables Available', 'orders-jet'); ?></div>
+                <div class="oj-stat-label"><?php _e('Tables Active', 'orders-jet'); ?></div>
             </div>
             <div class="oj-stat-box">
-                <div class="oj-stat-number"><?php echo $currency_symbol . number_format($avg_order_value, 2); ?></div>
+                <div class="oj-stat-number"><?php echo $currency_symbol . number_format($today_orders > 0 ? ($today_revenue / $today_orders) : 0, 2); ?></div>
                 <div class="oj-stat-label"><?php _e('Avg Order Value', 'orders-jet'); ?></div>
             </div>
         </div>
     </div>
 
-    <!-- Enhanced Analytics Dashboard -->
-    <div class="oj-analytics-dashboard">
-        <h2><?php _e('Business Analytics', 'orders-jet'); ?></h2>
+    <!-- Manager Filters -->
+    <div class="oj-order-filters">
+        <button class="oj-filter-btn active" data-filter="all">
+            <span class="oj-filter-icon">📊</span>
+            <span class="oj-filter-label"><?php _e('All Orders', 'orders-jet'); ?></span>
+        </button>
+        <button class="oj-filter-btn" data-filter="today">
+            <span class="oj-filter-icon">📅</span>
+            <span class="oj-filter-label"><?php _e('Today', 'orders-jet'); ?></span>
+        </button>
+        <button class="oj-filter-btn" data-filter="revenue">
+            <span class="oj-filter-icon">💰</span>
+            <span class="oj-filter-label"><?php _e('High Value', 'orders-jet'); ?></span>
+        </button>
+        <button class="oj-filter-btn" data-filter="dinein">
+            <span class="oj-filter-icon">🍽️</span>
+            <span class="oj-filter-label"><?php _e('Dining', 'orders-jet'); ?></span>
+        </button>
+        <button class="oj-filter-btn" data-filter="pickup-all">
+            <span class="oj-filter-icon">🥡</span>
+            <span class="oj-filter-label"><?php _e('Pickup', 'orders-jet'); ?></span>
+        </button>
+        <button class="oj-filter-btn" data-filter="completed">
+            <span class="oj-filter-icon">✅</span>
+            <span class="oj-filter-label"><?php _e('Completed', 'orders-jet'); ?></span>
+        </button>
+    </div>
+
+    <!-- Order Queue -->
+    <div class="oj-dashboard-orders">
+        <h2><?php _e('Order Management', 'orders-jet'); ?></h2>
         
-        <div class="oj-analytics-row">
-            <!-- Revenue Trend Chart -->
-            <div class="oj-analytics-card oj-chart-card">
-                <h3><?php _e('Revenue Trend (7 Days)', 'orders-jet'); ?></h3>
-                <canvas id="revenueChart" width="400" height="200"></canvas>
-            </div>
-            
-            <!-- Order Types Breakdown -->
-            <div class="oj-analytics-card oj-chart-card">
-                <h3><?php _e('Today\'s Order Types', 'orders-jet'); ?></h3>
-                <canvas id="orderTypesChart" width="300" height="200"></canvas>
-            </div>
-        </div>
-        
-        <div class="oj-analytics-row">
-            <!-- Peak Hours Heatmap -->
-            <div class="oj-analytics-card">
-                <h3><?php _e('Peak Hours Today', 'orders-jet'); ?></h3>
-                <div class="oj-peak-hours-grid">
-                    <?php for ($hour = 0; $hour < 24; $hour++): ?>
-                        <?php 
-                        $order_count = $peak_hours[$hour];
-                        $max_orders = max($peak_hours);
-                        $intensity = $max_orders > 0 ? ($order_count / $max_orders) : 0;
-                        $opacity = 0.1 + ($intensity * 0.9); // 0.1 to 1.0
-                        ?>
-                        <div class="oj-hour-cell" 
-                             style="background-color: rgba(0, 123, 186, <?php echo $opacity; ?>);"
-                             title="<?php echo sprintf(__('%d orders at %02d:00', 'orders-jet'), $order_count, $hour); ?>">
-                            <div class="oj-hour-label"><?php echo sprintf('%02d:00', $hour); ?></div>
-                            <div class="oj-hour-count"><?php echo $order_count; ?></div>
-                        </div>
-                    <?php endfor; ?>
-                </div>
-            </div>
-            
-            <!-- Top Products -->
-            <div class="oj-analytics-card">
-                <h3><?php _e('Top Products (7 Days)', 'orders-jet'); ?></h3>
-                <div class="oj-top-products">
-                    <?php if (!empty($top_products)): ?>
-                        <?php foreach ($top_products as $index => $product): ?>
-                            <div class="oj-product-item">
-                                <div class="oj-product-rank">#<?php echo $index + 1; ?></div>
-                                <div class="oj-product-info">
-                                    <div class="oj-product-name"><?php echo esc_html($product->product_name); ?></div>
-                                    <div class="oj-product-stats">
-                                        <span class="oj-product-qty"><?php echo esc_html($product->total_quantity); ?> sold</span>
-                                        <span class="oj-product-revenue"><?php echo $currency_symbol . number_format($product->total_revenue, 2); ?></span>
+        <?php if (!empty($active_orders)) : ?>
+            <div class="oj-kitchen-cards-container">
+                <?php foreach ($active_orders as $order) : ?>
+                    <div class="oj-kitchen-card" 
+                         data-order-id="<?php echo esc_attr($order['ID']); ?>"
+                         data-order-type="<?php echo esc_attr($order['order_type']); ?>"
+                         data-delivery-date="<?php echo esc_attr($order['delivery_date'] ?? ''); ?>"
+                         data-delivery-date-formatted="<?php echo esc_attr(!empty($order['delivery_date']) ? date('Y-m-d', strtotime($order['delivery_date'])) : ''); ?>"
+                         data-delivery-time="<?php echo esc_attr($order['delivery_time'] ?? ''); ?>"
+                         data-table-number="<?php echo esc_attr($order['table_number'] ?? ''); ?>">
+                        <!-- Card Header -->
+                        <div class="oj-card-header">
+                            <div class="oj-card-info">
+                                <div class="oj-table-info">
+                                    <?php if ($order['table_number']) : ?>
+                                        <span class="oj-table-number">Table <?php echo esc_html($order['table_number']); ?></span>
+                                    <?php elseif ($order['order_type'] === 'delivery') : ?>
+                                        <?php 
+                                        // Get delivery address for delivery orders
+                                        $wc_order = wc_get_order($order['ID']);
+                                        $delivery_address = '';
+                                        if ($wc_order) {
+                                            $delivery_address = $wc_order->get_meta('_oj_delivery_address') ?: 
+                                                             $wc_order->get_meta('_exwf_delivery_address') ?: 
+                                                             $wc_order->get_formatted_shipping_address();
+                                        }
+                                        ?>
+                                        <span class="oj-delivery-address">
+                                            <span class="dashicons dashicons-location-alt" style="font-size: 14px; margin-right: 4px;"></span>
+                                            <?php echo esc_html($delivery_address ?: __('Delivery Address', 'orders-jet')); ?>
+                                        </span>
+                                    <?php endif; ?>
+                                    <!-- Order Type Badge - SIMPLE VERSION -->
+                                    <div class="oj-order-type-badge <?php echo esc_attr($order['order_type_class']); ?>">
+                                        <span class="oj-type-icon"><?php echo esc_html($order['order_type_icon']); ?></span>
+                                        <span class="oj-type-label"><?php echo esc_html($order['order_type_label']); ?></span>
                                     </div>
                                 </div>
+                                <div class="oj-order-time">
+                                    <span class="dashicons dashicons-clock"></span>
+                                    <?php echo esc_html(date('g:i A', strtotime($order['post_date']))); ?>
+                                </div>
                             </div>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <p class="oj-no-data"><?php _e('No sales data available for the last 7 days.', 'orders-jet'); ?></p>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="oj-dashboard-actions">
-        <h2><?php _e('Quick Actions', 'orders-jet'); ?></h2>
-        
-        <div class="oj-action-buttons">
-            <a href="<?php echo admin_url('edit.php?post_type=shop_order'); ?>" class="button button-primary">
-                <?php _e('View Orders', 'orders-jet'); ?>
-            </a>
-            <a href="<?php echo admin_url('edit.php?post_type=oj_table'); ?>" class="button button-secondary">
-                <?php _e('Manage Tables', 'orders-jet'); ?>
-            </a>
-            <a href="<?php echo admin_url('edit.php?post_type=product'); ?>" class="button button-secondary">
-                <?php _e('Manage Menu', 'orders-jet'); ?>
-            </a>
-            <?php if (class_exists('Orders_Jet_Menu_Integration')): ?>
-            <a href="<?php echo admin_url('admin.php?page=orders-jet-menu-analyzer'); ?>" class="button button-secondary">
-                <?php _e('Menu Analytics', 'orders-jet'); ?>
-            </a>
-            <?php endif; ?>
-        </div>
-    </div>
-    
-    <?php if (class_exists('Orders_Jet_Menu_Integration')): ?>
-    <!-- Menu Management Section -->
-    <div class="oj-dashboard-section">
-        <h2><?php _e('Menu Management', 'orders-jet'); ?></h2>
-        
-        <?php
-        // Get menu analytics
-        global $wpdb;
-        
-        // Get total products
-        $total_products = $wpdb->get_var("
-            SELECT COUNT(*)
-            FROM {$wpdb->posts}
-            WHERE post_type = 'product'
-            AND post_status = 'publish'
-        ");
-        
-        // Get available products
-        $available_products = $wpdb->get_var("
-            SELECT COUNT(DISTINCT p.ID)
-            FROM {$wpdb->posts} p
-            LEFT JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id AND pm.meta_key = '_oj_menu_availability'
-            WHERE p.post_type = 'product'
-            AND p.post_status = 'publish'
-            AND (pm.meta_value IS NULL OR pm.meta_value != 'unavailable')
-        ");
-        
-        // Get featured products
-        $featured_products = $wpdb->get_var("
-            SELECT COUNT(DISTINCT p.ID)
-            FROM {$wpdb->posts} p
-            JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
-            WHERE p.post_type = 'product'
-            AND p.post_status = 'publish'
-            AND ((pm.meta_key = '_oj_menu_featured' AND pm.meta_value = '1')
-                 OR (pm.meta_key = '_oj_menu_priority' AND pm.meta_value = 'featured'))
-        ");
-        
-        // Get unavailable products
-        $unavailable_products = $total_products - $available_products;
-        ?>
-        
-        <div class="oj-menu-stats-grid">
-            <div class="oj-menu-stat-card">
-                <div class="oj-stat-number"><?php echo $total_products; ?></div>
-                <div class="oj-stat-label"><?php _e('Total Menu Items', 'orders-jet'); ?></div>
-            </div>
-            <div class="oj-menu-stat-card oj-stat-success">
-                <div class="oj-stat-number"><?php echo $available_products; ?></div>
-                <div class="oj-stat-label"><?php _e('Available Items', 'orders-jet'); ?></div>
-            </div>
-            <div class="oj-menu-stat-card oj-stat-warning">
-                <div class="oj-stat-number"><?php echo $unavailable_products; ?></div>
-                <div class="oj-stat-label"><?php _e('Unavailable Items', 'orders-jet'); ?></div>
-            </div>
-            <div class="oj-menu-stat-card oj-stat-featured">
-                <div class="oj-stat-number"><?php echo $featured_products; ?></div>
-                <div class="oj-stat-label"><?php _e('Featured Items', 'orders-jet'); ?></div>
-            </div>
-        </div>
-        
-        <?php if (taxonomy_exists('exwoofood_loc') && $woofood_locations && !is_wp_error($woofood_locations)): ?>
-        <div class="oj-location-menu-overview">
-            <h3><?php _e('Menu by Location', 'orders-jet'); ?></h3>
-            <div class="oj-location-menu-grid">
-                <?php foreach ($woofood_locations as $location): 
-                    // Get products count for this location
-                    $location_products = get_posts(array(
-                        'post_type' => 'product',
-                        'post_status' => 'publish',
-                        'numberposts' => -1,
-                        'tax_query' => array(
-                            array(
-                                'taxonomy' => 'exwoofood_loc',
-                                'field' => 'term_id',
-                                'terms' => $location->term_id
-                            )
-                        ),
-                        'fields' => 'ids'
-                    ));
-                    
-                    $location_product_count = count($location_products);
-                ?>
-                <div class="oj-location-menu-card">
-                    <h4>📍 <?php echo esc_html($location->name); ?></h4>
-                    <div class="oj-location-stats">
-                        <span class="oj-location-count"><?php echo $location_product_count; ?> <?php _e('items', 'orders-jet'); ?></span>
-                    </div>
-                    <div class="oj-location-actions">
-                        <a href="<?php echo admin_url('edit.php?post_type=product&exwoofood_loc=' . $location->slug); ?>" 
-                           class="button button-small">
-                            <?php _e('View Menu', 'orders-jet'); ?>
-                        </a>
-                    </div>
-                </div>
-                <?php endforeach; ?>
-            </div>
-        </div>
-        <?php endif; ?>
-    </div>
-    <?php endif; ?>
-
-    <!-- Recent Orders -->
-    <div class="oj-dashboard-orders">
-        <h2><?php _e('Recent Orders', 'orders-jet'); ?></h2>
-        
-        <?php if (!empty($recent_orders)) : ?>
-            <table class="wp-list-table widefat fixed striped">
-                <thead>
-                    <tr>
-                        <th><?php _e('Order #', 'orders-jet'); ?></th>
-                        <th><?php _e('Date', 'orders-jet'); ?></th>
-                        <th><?php _e('Status', 'orders-jet'); ?></th>
-                        <th><?php _e('Customer/Table', 'orders-jet'); ?></th>
-                        <th><?php _e('Items', 'orders-jet'); ?></th>
-                        <th><?php _e('Total', 'orders-jet'); ?></th>
-                        <th><?php _e('Actions', 'orders-jet'); ?></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($recent_orders as $order) : ?>
-                        <tr>
-                            <td><strong>#<?php echo esc_html($order['ID']); ?></strong></td>
-                            <td><?php echo esc_html(date('M j, Y g:i A', strtotime($order['post_date']))); ?></td>
-                            <td>
-                                <span class="oj-status-badge status-<?php echo esc_attr(str_replace('wc-', '', $order['post_status'])); ?>">
-                                    <?php echo esc_html(ucfirst(str_replace('wc-', '', $order['post_status']))); ?>
-                                </span>
-                            </td>
-                            <td>
-                                <?php if ($order['table_number']) : ?>
-                                    <strong>Table <?php echo esc_html($order['table_number']); ?></strong><br>
+                            <div class="oj-card-status">
+                                <?php if ($order['post_status'] === 'wc-pending') : ?>
+                                    <span class="oj-status-badge pending">
+                                        <span class="dashicons dashicons-hourglass"></span>
+                                        <?php _e('Pending', 'orders-jet'); ?>
+                                    </span>
+                                <?php elseif ($order['post_status'] === 'wc-processing') : ?>
+                                    <span class="oj-status-badge processing">
+                                        <span class="dashicons dashicons-admin-tools"></span>
+                                        <?php _e('Cooking', 'orders-jet'); ?>
+                                    </span>
                                 <?php endif; ?>
-                                <?php if ($order['customer_name']) : ?>
-                                    <?php echo esc_html($order['customer_name']); ?>
-                                <?php else : ?>
-                                    Guest
-                                <?php endif; ?>
-                            </td>
-                            <td class="oj-manager-items">
-                                <?php if (!empty($order['items'])) : ?>
+                            </div>
+                        </div>
+
+                        <!-- Customer Info -->
+                        <div class="oj-customer-info">
+                            <?php if ($order['customer_name']) : ?>
+                                <div class="oj-customer-name"><?php echo esc_html($order['customer_name']); ?></div>
+                            <?php else : ?>
+                                <div class="oj-customer-name">Guest</div>
+                            <?php endif; ?>
+                            <div class="oj-order-number">#<?php echo esc_html($order['ID']); ?></div>
+                        </div>
+
+                        <!-- Card Body - Items -->
+                        <div class="oj-card-body">
+                            <?php if (!empty($order['items'])) : ?>
+                                <div class="oj-card-items">
                                     <?php foreach ($order['items'] as $item) : ?>
-                                        <div class="oj-manager-item">
-                                            <span class="oj-item-qty"><?php echo esc_html($item['quantity']); ?>x</span>
-                                            <strong class="oj-item-name"><?php echo esc_html($item['name']); ?></strong>
+                                        <div class="oj-card-item">
+                                            <div class="oj-item-header">
+                                                <span class="oj-item-qty"><?php echo esc_html($item['quantity']); ?>×</span>
+                                                <span class="oj-item-name"><?php echo esc_html($item['name']); ?></span>
+                                            </div>
                                             
                                             <?php if (!empty($item['variations'])) : ?>
-                                                <div class="oj-item-variations-compact">
+                                                <div class="oj-item-variations">
                                                     <?php foreach ($item['variations'] as $variation_name => $variation_value) : ?>
-                                                        <span class="oj-variation-compact"><?php echo esc_html($variation_name); ?>: <?php echo esc_html($variation_value); ?></span>
+                                                        <span class="oj-variation-tag"><?php echo esc_html($variation_name); ?>: <?php echo esc_html($variation_value); ?></span>
                                                     <?php endforeach; ?>
                                                 </div>
                                             <?php endif; ?>
                                             
                                             <?php if (!empty($item['addons'])) : ?>
-                                                <div class="oj-item-addons-compact">
+                                                <div class="oj-item-addons">
+                                                    <span class="oj-addons-label">+</span>
                                                     <?php foreach ($item['addons'] as $addon) : ?>
-                                                        <span class="oj-addon-compact">+ <?php echo esc_html($addon); ?></span>
+                                                        <span class="oj-addon-tag"><?php echo esc_html($addon); ?></span>
                                                     <?php endforeach; ?>
+                                                </div>
+                                            <?php endif; ?>
+                                            
+                                            <?php if (!empty($item['notes'])) : ?>
+                                                <div class="oj-item-notes">
+                                                    <span class="dashicons dashicons-format-quote"></span>
+                                                    <span class="oj-notes-text"><?php echo esc_html($item['notes']); ?></span>
                                                 </div>
                                             <?php endif; ?>
                                         </div>
                                     <?php endforeach; ?>
-                                <?php else : ?>
-                                    <span class="oj-no-items"><?php _e('No items found', 'orders-jet'); ?></span>
-                                <?php endif; ?>
-                            </td>
-                            <td><strong><?php echo esc_html($currency_symbol . number_format($order['order_total'] ?: 0, 2)); ?></strong></td>
-                            <td>
-                                <a href="<?php echo admin_url('post.php?post=' . $order['ID'] . '&action=edit'); ?>" class="button button-small">
-                                    <?php _e('View', 'orders-jet'); ?>
-                                </a>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php else : ?>
-            <div class="oj-no-orders">
-                <p><?php _e('No recent orders found.', 'orders-jet'); ?></p>
-            </div>
-        <?php endif; ?>
-    </div>
-
-    <!-- Ready Orders (Orders ready for pickup) -->
-    <div class="oj-dashboard-ready-orders">
-        <h2><?php _e('Ready for Pickup', 'orders-jet'); ?> 
-            <span class="dashicons dashicons-bell" style="font-size: 20px; color: #d63384; vertical-align: middle; margin-left: 8px;"></span>
-        </h2>
-        
-        <?php
-        // Get orders that are ready for pickup (on-hold status)
-        $ready_orders_posts = get_posts(array(
-            'post_type' => 'shop_order',
-            'post_status' => array('wc-on-hold'), // Ready orders
-            'meta_query' => array(
-                array(
-                    'key' => '_oj_table_number',
-                    'compare' => 'EXISTS'
-                )
-            ),
-            'posts_per_page' => -1,
-            'orderby' => 'date',
-            'order' => 'ASC'
-        ));
-
-        $ready_orders = array();
-        foreach ($ready_orders_posts as $order_post) {
-            $order = wc_get_order($order_post->ID);
-            if ($order) {
-                $ready_orders[] = array(
-                    'ID' => $order->get_id(),
-                    'post_date' => $order_post->post_date,
-                    'post_status' => $order_post->post_status,
-                    'order_total' => $order->get_total(),
-                    'table_number' => $order->get_meta('_oj_table_number'),
-                    'customer_name' => $order->get_billing_first_name(),
-                    'session_id' => $order->get_meta('_oj_session_id')
-                );
-            }
-        }
-        ?>
-        
-        <?php if (!empty($ready_orders)) : ?>
-            <table class="wp-list-table widefat fixed striped">
-                <thead>
-                    <tr>
-                        <th style="width: 15%;"><?php _e('Order #', 'orders-jet'); ?></th>
-                        <th style="width: 20%;"><?php _e('Customer/Table', 'orders-jet'); ?></th>
-                        <th style="width: 15%;"><?php _e('Date', 'orders-jet'); ?></th>
-                        <th style="width: 15%;"><?php _e('Total', 'orders-jet'); ?></th>
-                        <th style="width: 20%;"><?php _e('Status', 'orders-jet'); ?></th>
-                        <th style="width: 15%;"><?php _e('Action', 'orders-jet'); ?></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($ready_orders as $order) : ?>
-                        <tr style="background: #fff3cd; border-left: 4px solid #ffc107;">
-                            <td><strong>#<?php echo esc_html($order['ID']); ?></strong></td>
-                            <td>
-                                <?php if ($order['customer_name']) : ?>
-                                    <?php echo esc_html($order['customer_name']); ?><br>
-                                <?php endif; ?>
-                                <strong><?php echo esc_html($order['table_number'] ?: __('N/A', 'orders-jet')); ?></strong>
-                            </td>
-                            <td><?php echo esc_html(date('M j, Y g:i A', strtotime($order['post_date']))); ?></td>
-                            <td><strong><?php echo wc_price($order['order_total']); ?></strong></td>
-                            <td>
-                                <span class="status-badge" style="background: #ffc107; color: #856404; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600;">
-                                    <span class="dashicons dashicons-clock" style="font-size: 12px; vertical-align: middle; margin-right: 4px;"></span>
-                                    <?php _e('Ready for Pickup', 'orders-jet'); ?>
-                                </span>
-                            </td>
-                            <td>
-                                <button class="button button-primary oj-deliver-order" data-order-id="<?php echo esc_attr($order['ID']); ?>" style="background: #00a32a; border-color: #00a32a; font-size: 12px; padding: 4px 8px;">
-                                    <span class="dashicons dashicons-yes" style="font-size: 14px; vertical-align: middle; margin-right: 4px;"></span>
-                                    <?php _e('Mark Delivered', 'orders-jet'); ?>
-                                </button>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php else : ?>
-            <div class="oj-no-orders" style="text-align: center; padding: 20px; color: #666; background: #f8f9fa; border-radius: 4px;">
-                <span class="dashicons dashicons-yes-alt" style="font-size: 32px; margin-bottom: 10px; color: #00a32a;"></span>
-                <p><?php _e('No orders ready for pickup.', 'orders-jet'); ?></p>
-            </div>
-        <?php endif; ?>
-    </div>
-
-    <!-- Table Status -->
-    <div class="oj-dashboard-tables">
-        <h2><?php _e('Table Status', 'orders-jet'); ?></h2>
-        
-        <?php if (!empty($table_status)) : ?>
-            <div class="oj-tables-grid">
-                <?php foreach ($table_status as $table) : ?>
-                    <?php 
-                    $meta_status = $table['table_status'] ?: 'available';
-                    $has_active_orders = intval($table['active_orders_count']) > 0;
-                    $display_status = $has_active_orders ? 'occupied' : $meta_status;
-                    ?>
-                    <div class="oj-table-card status-<?php echo esc_attr($display_status); ?>">
-                        <div class="oj-table-number"><?php echo esc_html($table['post_title']); ?></div>
-                        
-                        <?php if ($table['table_capacity']) : ?>
-                            <div class="oj-table-info"><?php echo sprintf(__('Capacity: %s', 'orders-jet'), esc_html($table['table_capacity'])); ?></div>
-                        <?php endif; ?>
-                        
-                        <?php if ($table['table_location']) : ?>
-                            <div class="oj-table-info"><?php echo esc_html($table['table_location']); ?></div>
-                        <?php endif; ?>
-                        
-                        <?php if ($table['woofood_location_id'] && class_exists('EX_WooFood')) : 
-                            $woofood_loc = get_term($table['woofood_location_id'], 'exwoofood_loc');
-                            if ($woofood_loc && !is_wp_error($woofood_loc)) :
-                        ?>
-                            <div class="oj-table-info" style="color: #0073aa; font-weight: 500;">
-                                📍 <?php echo esc_html($woofood_loc->name); ?>
-                            </div>
-                        <?php endif; endif; ?>
-                        
-                        <div class="oj-table-status">
-                            <span class="oj-status-indicator"></span>
-                            <?php 
-                            if ($has_active_orders) {
-                                echo sprintf(__('%s Active Orders', 'orders-jet'), $table['active_orders_count']);
-                            } else {
-                                echo esc_html(ucfirst($meta_status));
-                            }
-                            ?>
-                        </div>
-                        <div class="oj-table-actions">
-                            <a href="<?php echo admin_url('post.php?post=' . $table['ID'] . '&action=edit'); ?>" class="button button-small">
-                                <?php _e('Manage', 'orders-jet'); ?>
-                            </a>
-                            <?php if ($has_active_orders) : ?>
-                                <a href="<?php echo admin_url('edit.php?post_type=shop_order&table_number=' . urlencode($table['post_title'])); ?>" class="button button-primary button-small">
-                                    <?php _e('View Orders', 'orders-jet'); ?>
-                                </a>
+                                </div>
+                            <?php else : ?>
+                                <div class="oj-no-items"><?php _e('No items found', 'orders-jet'); ?></div>
                             <?php endif; ?>
+                        </div>
+
+                        <!-- Card Footer - Manager Actions -->
+                        <div class="oj-card-footer">
+                            <div class="oj-manager-actions">
+                                <button class="oj-action-btn oj-view-details" data-order-id="<?php echo esc_attr($order['ID']); ?>">
+                                    <span class="dashicons dashicons-visibility"></span>
+                                    <?php _e('View Details', 'orders-jet'); ?>
+                                </button>
+                                <button class="oj-action-btn oj-customer-info" data-order-id="<?php echo esc_attr($order['ID']); ?>">
+                                    <span class="dashicons dashicons-admin-users"></span>
+                                    <?php _e('Customer', 'orders-jet'); ?>
+                                </button>
+                                <?php if ($order['post_status'] === 'wc-processing') : ?>
+                                    <button class="oj-action-btn oj-priority" data-order-id="<?php echo esc_attr($order['ID']); ?>">
+                                        <span class="dashicons dashicons-flag"></span>
+                                        <?php _e('Priority', 'orders-jet'); ?>
+                                    </button>
+                                <?php endif; ?>
+                            </div>
                         </div>
                     </div>
                 <?php endforeach; ?>
             </div>
         <?php else : ?>
-            <div class="oj-no-tables">
-                <p><?php _e('No tables configured yet.', 'orders-jet'); ?></p>
-                <a href="<?php echo admin_url('post-new.php?post_type=oj_table'); ?>" class="button button-primary">
-                    <?php _e('Add First Table', 'orders-jet'); ?>
-                </a>
+            <div class="oj-no-orders">
+                <p><?php _e('No active orders found.', 'orders-jet'); ?></p>
             </div>
         <?php endif; ?>
     </div>
 
-    <!-- System Status -->
-    <div class="oj-dashboard-info">
-        <h2><?php _e('System Status', 'orders-jet'); ?></h2>
-        <div class="oj-info-box">
-            <p><strong><?php _e('Plugin Status:', 'orders-jet'); ?></strong> <?php _e('Active', 'orders-jet'); ?></p>
-            <p><strong><?php _e('WooCommerce:', 'orders-jet'); ?></strong> <?php echo class_exists('WooCommerce') ? __('Active', 'orders-jet') : __('Inactive', 'orders-jet'); ?></p>
-            <p><strong><?php _e('Current Date:', 'orders-jet'); ?></strong> <?php echo date('F j, Y'); ?></p>
-            <p><strong><?php _e('Current Time:', 'orders-jet'); ?></strong> <?php echo date('H:i:s'); ?></p>
-        </div>
-    </div>
 </div>
 
 <style>
-.oj-dashboard-stats,
-.oj-dashboard-actions,
-.oj-dashboard-info,
-.oj-dashboard-orders,
-.oj-dashboard-tables,
-.oj-dashboard-section {
+/* Header Layout */
+.oj-header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 20px;
+    gap: 20px;
+}
+
+.oj-header-left {
+    flex: 1;
+}
+
+.oj-header-right {
+    flex-shrink: 0;
+}
+
+.oj-last-updated {
+    color: #6c757d;
+    font-size: 13px;
+    margin: 8px 0 0 0;
+}
+
+.oj-check-orders-btn {
+    background: linear-gradient(135deg, #007cba 0%, #005a87 100%);
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 8px rgba(0, 124, 186, 0.3);
+}
+
+.oj-check-orders-btn:hover {
+    background: linear-gradient(135deg, #005a87 0%, #004666 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 124, 186, 0.4);
+}
+
+.oj-check-orders-btn .dashicons {
+    font-size: 16px;
+    animation: spin 2s linear infinite;
+}
+
+.oj-check-orders-btn:hover .dashicons {
+    animation-duration: 0.5s;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.oj-kitchen-stats,
+.oj-order-queue {
     background: white;
     border: 1px solid #ccd0d4;
     border-radius: 4px;
@@ -865,21 +718,197 @@ $table_status = $wpdb->get_results($table_status_query, ARRAY_A);
     flex: 1;
     text-align: center;
     padding: 20px;
-    background: #f8f9fa;
     border: 1px solid #e9ecef;
     border-radius: 4px;
+}
+
+.oj-stat-box.pending {
+    background: #fff5f5;
+    border-color: #fed7d7;
+}
+
+.oj-stat-box.processing {
+    background: #fffbf0;
+    border-color: #fbd38d;
+}
+
+.oj-stat-box.completed {
+    background: #f0fff4;
+    border-color: #9ae6b4;
 }
 
 .oj-stat-number {
     font-size: 32px;
     font-weight: bold;
-    color: #0073aa;
     margin-bottom: 5px;
+}
+
+.oj-stat-box.pending .oj-stat-number {
+    color: #e53e3e;
+}
+
+.oj-stat-box.processing .oj-stat-number {
+    color: #dd6b20;
+}
+
+.oj-stat-box.completed .oj-stat-number {
+    color: #38a169;
 }
 
 .oj-stat-label {
     font-size: 14px;
     color: #666;
+}
+
+/* Order Cards */
+.oj-orders-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+    margin-top: 15px;
+}
+
+.oj-order-card {
+    background: white;
+    border: 2px solid #e1e5e9;
+    border-radius: 8px;
+    padding: 20px;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.oj-order-card.status-pending {
+    border-color: #e53e3e;
+    background: #fff5f5;
+}
+
+.oj-order-card.status-processing {
+    border-color: #dd6b20;
+    background: #fffbf0;
+}
+
+.oj-order-card.status-on-hold {
+    border-color: #a0aec0;
+    background: #f7fafc;
+}
+
+.oj-order-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e1e5e9;
+}
+
+.oj-order-number {
+    font-size: 18px;
+    font-weight: bold;
+    color: #2d3748;
+}
+
+.oj-order-time {
+    font-size: 12px;
+    color: #718096;
+}
+
+.oj-order-status {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.oj-order-status.status-pending {
+    background: #fed7d7;
+    color: #c53030;
+}
+
+.oj-order-status.status-processing {
+    background: #fbd38d;
+    color: #c05621;
+}
+
+.oj-order-status.status-on-hold {
+    background: #e2e8f0;
+    color: #4a5568;
+}
+
+.oj-order-table,
+.oj-order-customer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    font-size: 14px;
+    color: #4a5568;
+}
+
+.oj-order-table .dashicons,
+.oj-order-customer .dashicons {
+    font-size: 16px;
+    color: #718096;
+}
+
+.oj-order-items {
+    margin-bottom: 15px;
+}
+
+.oj-order-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 14px;
+}
+
+.oj-order-item:last-child {
+    border-bottom: none;
+}
+
+.oj-item-qty {
+    font-weight: 600;
+    color: #2d3748;
+    margin-right: 10px;
+}
+
+.oj-item-name {
+    flex: 1;
+    color: #4a5568;
+}
+
+.oj-order-total {
+    text-align: right;
+    margin-bottom: 15px;
+    font-size: 16px;
+    color: #2d3748;
+}
+
+.oj-order-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.oj-order-actions .button {
+    flex: 1;
+    min-width: 120px;
+}
+
+.oj-no-orders {
+    text-align: center;
+    padding: 40px 20px;
+    color: #666;
+}
+
+.oj-no-orders-icon {
+    margin-bottom: 15px;
+}
+
+.oj-no-orders h3 {
+    margin-bottom: 10px;
+    color: #4a5568;
 }
 
 .oj-action-buttons {
@@ -904,118 +933,6 @@ $table_status = $wpdb->get_results($table_status_query, ARRAY_A);
     font-size: 14px;
 }
 
-/* Status badges */
-.oj-status-badge {
-    display: inline-block;
-    padding: 4px 8px;
-    border-radius: 3px;
-    font-size: 12px;
-    font-weight: 500;
-    text-transform: uppercase;
-}
-
-.oj-status-badge.status-pending {
-    background: #fff3cd;
-    color: #856404;
-    border: 1px solid #ffeaa7;
-}
-
-.oj-status-badge.status-processing {
-    background: #d1ecf1;
-    color: #0c5460;
-    border: 1px solid #bee5eb;
-}
-
-.oj-status-badge.status-on-hold {
-    background: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
-}
-
-.oj-status-badge.status-completed {
-    background: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
-}
-
-/* Tables grid */
-.oj-tables-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 15px;
-}
-
-.oj-table-card {
-    background: #f8f9fa;
-    border: 2px solid #e1e5e9;
-    border-radius: 8px;
-    padding: 15px;
-    text-align: center;
-    transition: all 0.3s ease;
-}
-
-.oj-table-card.status-occupied {
-    border-color: #dc3545;
-    background: #fff5f5;
-}
-
-.oj-table-card.status-reserved {
-    border-color: #ffc107;
-    background: #fffdf5;
-}
-
-.oj-table-card.status-available {
-    border-color: #28a745;
-    background: #f5fff5;
-}
-
-.oj-table-number {
-    font-size: 24px;
-    font-weight: bold;
-    color: #23282d;
-    margin-bottom: 8px;
-}
-
-.oj-table-info {
-    font-size: 12px;
-    color: #666;
-    margin-bottom: 5px;
-}
-
-.oj-table-status {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    margin-bottom: 10px;
-}
-
-.oj-status-indicator {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #6c757d;
-}
-
-.oj-table-card.status-occupied .oj-status-indicator {
-    background: #dc3545;
-}
-
-.oj-table-card.status-reserved .oj-status-indicator {
-    background: #ffc107;
-}
-
-.oj-table-card.status-available .oj-status-indicator {
-    background: #28a745;
-}
-
-.oj-no-orders,
-.oj-no-tables {
-    text-align: center;
-    padding: 40px 20px;
-    color: #666;
-}
-
 @media (max-width: 768px) {
     .oj-stats-row {
         flex-direction: column;
@@ -1027,487 +944,1106 @@ $table_status = $wpdb->get_results($table_status_query, ARRAY_A);
         margin-right: 0;
     }
     
-    .oj-tables-grid {
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    /* Mobile filter styles */
+    .oj-order-filters {
+        padding: 10px;
+        gap: 8px;
+    }
+    
+    .oj-filter-btn {
+        padding: 10px 14px;
+        font-size: 13px;
+    }
+    
+    .oj-filter-icon {
+        font-size: 14px;
     }
 }
 
-/* Menu Management Styles */
-.oj-menu-stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 15px;
-    margin-bottom: 20px;
+/* Kitchen-specific styles for order items */
+.oj-kitchen-items {
+    padding: 10px 0;
 }
 
-.oj-menu-stat-card {
+.oj-kitchen-item {
     background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    padding: 20px;
-    text-align: center;
-    transition: all 0.2s ease;
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 8px;
 }
 
-.oj-menu-stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+.oj-kitchen-item:last-child {
+    margin-bottom: 0;
 }
 
-.oj-menu-stat-card.oj-stat-success {
-    background: linear-gradient(135deg, #d4edda, #c3e6cb);
-    border-color: #c3e6cb;
-}
-
-.oj-menu-stat-card.oj-stat-warning {
-    background: linear-gradient(135deg, #fff3cd, #ffeaa7);
-    border-color: #ffeaa7;
-}
-
-.oj-menu-stat-card.oj-stat-featured {
-    background: linear-gradient(135deg, #ffd700, #ffb347);
-    border-color: #ffb347;
-}
-
-.oj-menu-stat-card .oj-stat-number {
-    font-size: 2.5em;
-    font-weight: bold;
-    color: #333;
+.oj-item-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     margin-bottom: 5px;
 }
 
-.oj-menu-stat-card .oj-stat-label {
-    font-size: 14px;
-    color: #666;
+.oj-item-qty {
+    background: #007cba;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: bold;
+    min-width: 24px;
+    text-align: center;
+}
+
+.oj-item-name {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.oj-item-variations {
+    margin: 5px 0;
+    font-size: 12px;
+}
+
+.oj-variation {
+    background: #e3f2fd;
+    color: #1976d2;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-right: 5px;
+    display: inline-block;
+    margin-bottom: 2px;
+}
+
+.oj-item-addons {
+    margin: 5px 0;
+    font-size: 12px;
+}
+
+.oj-addons-label {
+    font-weight: 600;
+    color: #e67e22;
+    margin-right: 5px;
+}
+
+.oj-addon {
+    background: #fff3cd;
+    color: #856404;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-right: 5px;
+    display: inline-block;
+    margin-bottom: 2px;
+}
+
+.oj-item-notes {
+    margin: 5px 0;
+    font-size: 12px;
+    background: #f8d7da;
+    color: #721c24;
+    padding: 5px;
+    border-radius: 3px;
+}
+
+.oj-notes-label {
+    font-weight: 600;
+    margin-right: 5px;
+}
+
+.oj-notes-text {
+    font-style: italic;
+}
+
+.oj-no-items {
+    color: #6c757d;
+    font-style: italic;
+}
+
+/* Kitchen Cards Layout */
+.oj-kitchen-cards-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.oj-kitchen-card {
+    background: #ffffff;
+    border: 2px solid #e1e5e9;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.oj-kitchen-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+/* Card Header */
+.oj-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-bottom: 1px solid #dee2e6;
+}
+
+.oj-card-info {
+    flex: 1;
+}
+
+.oj-table-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.oj-table-number {
+    background: #007cba;
+    color: #ffffff;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* Order Type Badge - styled like order number */
+.oj-order-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
-.oj-location-menu-overview {
-    margin-top: 30px;
+.oj-order-type-badge .oj-type-icon {
+    font-size: 12px;
 }
 
-.oj-location-menu-overview h3 {
-    margin-bottom: 15px;
-    color: #333;
+.oj-order-type-badge .oj-type-label {
+    font-size: 11px;
 }
 
-.oj-location-menu-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 15px;
+/* Order Type Colors */
+.oj-order-type-badge.oj-order-type-dinein {
+    background: #4CAF50 !important;
+    color: #ffffff !important;
 }
 
-.oj-location-menu-card {
+.oj-order-type-badge.oj-order-type-delivery {
+    background: #2196F3 !important;
+    color: #ffffff !important;
+}
+
+.oj-order-type-badge.oj-order-type-pickup {
+    background: #9C27B0 !important;
+    color: #ffffff !important;
+    font-weight: bold;
+}
+
+.oj-order-type-badge.oj-order-type-pickup-timed {
+    background: #FF5722 !important;
+    color: #ffffff !important;
+    font-weight: bold;
+}
+
+.oj-order-type-badge.oj-order-type-unknown {
+    background: #757575 !important;
+    color: #ffffff !important;
+}
+
+/* Order Filters - Kitchen Dashboard */
+.oj-order-filters {
     background: white;
-    border: 1px solid #ddd;
-    border-radius: 8px;
+    border-radius: 15px;
     padding: 15px;
-    transition: all 0.2s ease;
-}
-
-.oj-location-menu-card:hover {
-    border-color: #0073aa;
-    box-shadow: 0 2px 8px rgba(0, 115, 170, 0.1);
-}
-
-.oj-location-menu-card h4 {
-    margin: 0 0 10px 0;
-    color: #0073aa;
-    font-size: 16px;
-}
-
-.oj-location-stats {
-    margin-bottom: 15px;
-}
-
-.oj-location-count {
-    background: #f0f0f1;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    color: #666;
-}
-
-.oj-location-actions .button {
-    width: 100%;
-}
-
-@media (max-width: 768px) {
-    .oj-menu-stats-grid {
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 10px;
-    }
-    
-    .oj-location-menu-grid {
-        grid-template-columns: 1fr;
-    }
-    
-    .oj-menu-stat-card .oj-stat-number {
-        font-size: 2em;
-    }
-}
-
-/* Enhanced Analytics Dashboard Styles */
-.oj-analytics-dashboard {
-    margin: 30px 0;
-    background: #fff;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.oj-analytics-dashboard h2 {
     margin-bottom: 20px;
-    color: #333;
-    border-bottom: 2px solid #007cba;
-    padding-bottom: 10px;
-}
-
-.oj-analytics-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-    margin-bottom: 20px;
-}
-
-.oj-analytics-card {
-    background: #fff;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    padding: 20px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    transition: all 0.3s ease;
-}
-
-.oj-analytics-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-
-.oj-analytics-card h3 {
-    margin-bottom: 15px;
-    color: #333;
-    font-size: 16px;
-    font-weight: 600;
-}
-
-.oj-chart-card canvas {
-    max-width: 100%;
-    height: auto;
-}
-
-/* Trend indicators */
-.oj-trend {
-    font-size: 12px;
-    font-weight: bold;
-    margin-left: 8px;
-}
-
-.oj-trend.positive {
-    color: #4CAF50;
-}
-
-.oj-trend.negative {
-    color: #f44336;
-}
-
-/* Peak Hours Heatmap */
-.oj-peak-hours-grid {
-    display: grid;
-    grid-template-columns: repeat(8, 1fr);
-    gap: 4px;
-    margin-top: 10px;
-}
-
-.oj-hour-cell {
-    aspect-ratio: 1;
-    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     display: flex;
-    flex-direction: column;
+    gap: 10px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    position: sticky;
+    top: 32px;
+    z-index: 100;
+}
+
+.oj-order-filters::-webkit-scrollbar {
+    display: none;
+}
+
+.oj-filter-btn {
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    font-size: 10px;
-    color: #333;
+    gap: 8px;
+    padding: 12px 16px;
+    border: 2px solid #e9ecef;
+    background: white;
+    border-radius: 25px;
+    font-size: 14px;
+    font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
-    min-height: 50px;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    color: #333;
+    text-decoration: none;
+    min-width: auto;
+    box-shadow: none;
 }
 
-.oj-hour-cell:hover {
-    transform: scale(1.05);
-    z-index: 10;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+.oj-filter-btn:hover {
+    border-color: #007cba;
+    background: #f8f9fa;
+    color: #007cba;
+    transform: translateY(-1px);
 }
 
-.oj-hour-label {
-    font-weight: bold;
-    margin-bottom: 2px;
-}
-
-.oj-hour-count {
-    font-size: 12px;
-    font-weight: bold;
-}
-
-/* Top Products */
-.oj-top-products {
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-.oj-product-item {
-    display: flex;
-    align-items: center;
-    padding: 12px 0;
-    border-bottom: 1px solid #f0f0f0;
-    transition: background-color 0.2s ease;
-}
-
-.oj-product-item:hover {
-    background-color: #f8f9fa;
-}
-
-.oj-product-item:last-child {
-    border-bottom: none;
-}
-
-.oj-product-rank {
-    width: 30px;
-    height: 30px;
+.oj-filter-btn.active {
     background: #007cba;
     color: white;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    font-size: 12px;
-    margin-right: 15px;
-    flex-shrink: 0;
+    border-color: #007cba;
 }
 
-.oj-product-info {
-    flex: 1;
+.oj-filter-btn.active:hover {
+    background: #005a87;
+    color: white;
 }
 
-.oj-product-name {
+.oj-filter-icon {
+    font-size: 16px;
+}
+
+.oj-filter-label {
     font-weight: 600;
-    color: #333;
-    margin-bottom: 4px;
 }
 
-.oj-product-stats {
-    display: flex;
-    gap: 15px;
-    font-size: 12px;
-    color: #666;
-}
-
-.oj-product-qty {
-    color: #4CAF50;
-    font-weight: 500;
-}
-
-.oj-product-revenue {
-    color: #007cba;
-    font-weight: 500;
-}
-
-.oj-no-data {
-    text-align: center;
-    color: #666;
-    font-style: italic;
-    padding: 20px;
-}
-
-/* Enhanced stat boxes */
-.oj-stat-box {
+/* Visual indicators for upcoming orders */
+.oj-kitchen-card[data-order-type="pickup_timed"] {
     position: relative;
 }
 
-.oj-stat-box .oj-stat-label {
+.oj-kitchen-card[data-order-type="pickup_timed"]:not([data-delivery-date-formatted=""]) {
+    /* Add a subtle left border for timed orders */
+    border-left: 4px solid transparent;
+}
+
+.oj-kitchen-card[data-order-type="pickup_timed"][data-delivery-date-formatted] {
+    /* Today's orders - green left border */
+    border-left-color: #4CAF50;
+}
+
+/* Upcoming orders styling - will be applied via JavaScript */
+.oj-kitchen-card.oj-upcoming-order {
+    border-left-color: #673AB7 !important;
+    opacity: 1;
+}
+
+.oj-kitchen-card.oj-upcoming-order .oj-card-header {
+    background: linear-gradient(135deg, #f3e5f5 0%, #ffffff 100%);
+}
+
+.oj-kitchen-card.oj-upcoming-order .oj-order-type-badge {
+    background: #673AB7 !important;
+    color: #ffffff !important;
+    font-weight: bold;
+}
+
+/* Customer Info */
+.oj-customer-info {
+    padding: 12px 20px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.oj-customer-name {
+    font-weight: 500;
+    color: #495057;
+    margin-bottom: 4px;
+}
+
+.oj-order-number {
+    background: #6c757d;
+    color: #ffffff;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.oj-order-time {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #6c757d;
+    font-size: 14px;
+}
+
+/* Card Body */
+.oj-card-body {
+    padding: 20px;
+    background: #f8f9fa;
+}
+
+.oj-card-items {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.oj-card-item {
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 3px solid #007cba;
+}
+
+.oj-item-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.oj-item-qty {
+    background: #007cba;
+    color: #ffffff;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    min-width: 32px;
+    text-align: center;
+}
+
+.oj-item-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #2c3e50;
+    flex: 1;
+}
+
+.oj-item-variations {
+    margin-left: 44px;
+    margin-bottom: 8px;
+}
+
+.oj-variation-tag {
+    background: #87CEEB;
+    color: #ffffff;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    margin-right: 6px;
+}
+
+.oj-item-addons {
+    margin-left: 44px;
+    margin-bottom: 8px;
+}
+
+.oj-addons-label {
+    background: #4CAF50;
+    color: #ffffff;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    margin-right: 8px;
+}
+
+.oj-addon-tag {
+    background: #FFF3CD;
+    color: #856404;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    margin-right: 6px;
+}
+
+.oj-item-notes {
+    background: #F8D7DA;
+    color: #721C24;
+    padding: 12px;
+    border-radius: 8px;
+    margin-left: 44px;
+    border-left: 3px solid #DC3545;
+}
+
+.oj-notes-text {
+    font-style: italic;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.oj-table-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.oj-table-number {
+    background: #007cba;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.oj-delivery-address {
+    background: #2196F3;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.oj-order-number {
+    background: #6c757d;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.oj-customer-name {
+    font-weight: 500;
+    color: #495057;
+    margin-bottom: 4px;
+}
+
+.oj-order-time {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #6c757d;
+    font-size: 13px;
+}
+
+.oj-order-time .dashicons {
+    font-size: 14px;
+}
+
+.oj-card-status {
+    margin-left: 16px;
+}
+
+.oj-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.oj-status-badge.pending {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.oj-status-badge.processing {
+    background: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+
+.oj-status-badge .dashicons {
+    font-size: 14px;
+}
+
+/* Card Body */
+.oj-card-body {
+    padding: 20px;
+    background: #f8f9fa;
+}
+
+.oj-card-items {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.oj-card-item {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.oj-item-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.oj-item-qty {
+    background: #007cba;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    min-width: 28px;
+    text-align: center;
+}
+
+.oj-item-name {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 15px;
+}
+
+.oj-item-variations {
+    margin: 6px 0;
+}
+
+.oj-variation-tag {
+    background: #e3f2fd;
+    color: #1976d2;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    margin-right: 6px;
+    margin-bottom: 4px;
+    display: inline-block;
+}
+
+.oj-item-addons {
+    margin: 6px 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.oj-addons-label {
+    background: #28a745;
+    color: white;
+    padding: 2px 6px;
+    border-radius: 50%;
+    font-size: 10px;
+    font-weight: bold;
+    width: 18px;
+    height: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-wrap: wrap;
-    gap: 5px;
+}
+
+.oj-addon-tag {
+    background: #fff3cd;
+    color: #856404;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    margin-bottom: 4px;
+    display: inline-block;
+}
+
+.oj-item-notes {
+    margin: 8px 0;
+    background: #f8d7da;
+    color: #721c24;
+    padding: 8px;
+    border-radius: 6px;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 12px;
+}
+
+.oj-item-notes .dashicons {
+    font-size: 14px;
+    margin-top: 1px;
+}
+
+.oj-notes-text {
+    font-style: italic;
+    line-height: 1.4;
+}
+
+/* Card Footer */
+.oj-card-footer {
+    padding: 16px 20px;
+    background: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+}
+
+/* Manager Actions */
+.oj-manager-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+}
+
+.oj-manager-actions .oj-action-btn {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 12px;
+    min-height: auto;
+    width: auto;
+}
+
+.oj-view-details {
+    background: #007cba;
+    border-color: #007cba;
+}
+
+.oj-view-details:hover {
+    background: #005a87;
+    border-color: #005a87;
+}
+
+.oj-customer-info {
+    background: #28a745;
+    border-color: #28a745;
+}
+
+.oj-customer-info:hover {
+    background: #1e7e34;
+    border-color: #1e7e34;
+}
+
+.oj-priority {
+    background: #dc3545;
+    border-color: #dc3545;
+}
+
+.oj-priority:hover {
+    background: #c82333;
+    border-color: #c82333;
+}
+
+.oj-action-btn {
+    width: 100%;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.oj-action-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.oj-action-btn.oj-start-cooking {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+}
+
+.oj-action-btn.oj-mark-ready {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+    color: white;
+}
+
+.oj-action-btn.oj-resume-order {
+    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+    color: #212529;
+}
+
+.oj-action-btn .dashicons {
+    font-size: 16px;
 }
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
-    .oj-analytics-row {
-        grid-template-columns: 1fr;
-    }
-    
-    .oj-peak-hours-grid {
-        grid-template-columns: repeat(6, 1fr);
-    }
-    
-    .oj-hour-cell {
-        min-height: 40px;
-        font-size: 9px;
-    }
-    
-    .oj-product-stats {
+    .oj-header-container {
         flex-direction: column;
-        gap: 5px;
+        gap: 12px;
+    }
+    
+    .oj-header-right {
+        align-self: stretch;
+    }
+    
+    .oj-check-orders-btn {
+        width: 100%;
+        justify-content: center;
+        padding: 14px 20px;
+        font-size: 15px;
+    }
+    
+    .oj-kitchen-cards-container {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    
+    .oj-kitchen-card {
+        margin: 0 -10px;
+        border-radius: 8px;
+    }
+    
+    .oj-card-header {
+        padding: 12px 16px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .oj-card-status {
+        margin-left: 0;
+        align-self: flex-end;
+    }
+    
+    .oj-table-info {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    
+    .oj-card-body {
+        padding: 16px;
+    }
+    
+    .oj-card-item {
+        padding: 10px;
+    }
+    
+    .oj-item-header {
+        flex-wrap: wrap;
+    }
+    
+    .oj-action-btn {
+        padding: 14px 16px;
+        font-size: 16px;
     }
 }
 
 @media (max-width: 480px) {
-    .oj-analytics-dashboard {
-        padding: 15px;
-        margin: 15px 0;
+    .oj-kitchen-cards-container {
+        gap: 12px;
     }
     
-    .oj-analytics-card {
-        padding: 15px;
+    .oj-kitchen-card {
+        margin: 0 -5px;
     }
     
-    .oj-peak-hours-grid {
-        grid-template-columns: repeat(4, 1fr);
+    .oj-card-header,
+    .oj-card-body,
+    .oj-card-footer {
+        padding: 12px;
+    }
+    
+    .oj-card-header {
+        padding: 12px 16px;
+    }
+    
+    .oj-customer-info {
+        padding: 8px 16px;
+    }
+    
+    .oj-card-body {
+        padding: 16px;
+    }
+    
+    .oj-order-type-badge {
+        padding: 3px 6px;
+        font-size: 10px;
+    }
+    
+    .oj-order-type-badge .oj-type-icon {
+        font-size: 10px;
+    }
+    
+    .oj-order-type-badge .oj-type-label {
+        font-size: 9px;
+    }
+    
+    .oj-order-number {
+        padding: 3px 6px;
+        font-size: 10px;
+    }
+    
+    .oj-item-qty {
+        padding: 3px 6px;
+        font-size: 11px;
+        min-width: 28px;
+    }
+    
+    .oj-item-name {
+        font-size: 14px;
+    }
+    
+    .oj-item-variations, .oj-item-addons, .oj-item-notes {
+        margin-left: 36px;
+    }
+    
+    .oj-table-number,
+    .oj-order-number {
+        font-size: 12px;
+        padding: 3px 8px;
+    }
+    
+    .oj-item-name {
+        font-size: 14px;
+    }
+    
+    .oj-action-btn {
+        padding: 16px;
+        font-size: 15px;
     }
 }
 </style>
-
-<!-- Chart.js Library -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
 jQuery(document).ready(function($) {
     'use strict';
     
-    // Refresh button functionality
-    $('.oj-refresh-dashboard').on('click', function() {
-        location.reload();
+    // DISABLED: Loading state JavaScript interferes with form submission
+    // The form works perfectly without JavaScript - keeping it simple and reliable
+    
+    // Auto-dismiss success/error notices after 5 seconds
+    setTimeout(function() {
+        $('.notice.is-dismissible').fadeOut();
+    }, 5000);
+    
+    // Order Filtering Functionality
+    const filterBtns = $('.oj-filter-btn');
+    const orderCards = $('.oj-kitchen-card');
+    
+    // Initialize filter counts
+    updateFilterCounts();
+    
+    // Apply visual styling for upcoming orders
+    applyUpcomingOrderStyling();
+    
+    filterBtns.on('click', function(e) {
+        e.preventDefault();
+        
+        const filter = $(this).data('filter');
+        
+        // Update active button
+        filterBtns.removeClass('active');
+        $(this).addClass('active');
+        
+        // Filter orders
+        filterOrders(filter);
     });
     
-    // Initialize Charts
-    initializeCharts();
-    
-    function initializeCharts() {
-        // Revenue Trend Chart
-        const revenueCtx = document.getElementById('revenueChart');
-        if (revenueCtx) {
-            const revenueData = <?php echo json_encode($revenue_trend); ?>;
-            
-            new Chart(revenueCtx, {
-                type: 'line',
-                data: {
-                    labels: revenueData.map(item => item.formatted_date),
-                    datasets: [{
-                        label: '<?php _e('Revenue', 'orders-jet'); ?>',
-                        data: revenueData.map(item => item.revenue),
-                        borderColor: '#007cba',
-                        backgroundColor: 'rgba(0, 123, 186, 0.1)',
-                        borderWidth: 3,
-                        fill: true,
-                        tension: 0.4,
-                        pointBackgroundColor: '#007cba',
-                        pointBorderColor: '#ffffff',
-                        pointBorderWidth: 2,
-                        pointRadius: 6,
-                        pointHoverRadius: 8
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return '<?php echo $currency_symbol; ?>' + value.toFixed(2);
-                                }
-                            }
-                        },
-                        x: {
-                            grid: {
-                                display: false
-                            }
-                        }
-                    },
-                    elements: {
-                        point: {
-                            hoverBackgroundColor: '#007cba'
-                        }
-                    }
-                }
-            });
-        }
+    function filterOrders(filter) {
+        const today = new Date().toISOString().split('T')[0];
         
-        // Order Types Pie Chart
-        const orderTypesCtx = document.getElementById('orderTypesChart');
-        if (orderTypesCtx) {
-            const orderTypesData = <?php echo json_encode($order_types); ?>;
+        orderCards.each(function() {
+            const card = $(this);
+            const orderType = card.data('order-type');
+            const deliveryDate = card.data('delivery-date');
+            const deliveryTime = card.data('delivery-time');
+            const tableNumber = card.data('table-number');
+            const orderTotal = parseFloat(card.find('.oj-order-total').text().replace(/[^0-9.]/g, '')) || 0;
+            const orderStatus = card.find('.oj-status-badge').length > 0 ? 
+                              card.find('.oj-status-badge').attr('class').includes('completed') ? 'completed' : 'active' : 'active';
             
-            new Chart(orderTypesCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: [
-                        '<?php _e('Dine In', 'orders-jet'); ?>',
-                        '<?php _e('Pickup', 'orders-jet'); ?>'
-                    ],
-                    datasets: [{
-                        data: [orderTypesData.dinein, orderTypesData.pickup],
-                        backgroundColor: [
-                            '#4CAF50',
-                            '#9C27B0'
-                        ],
-                        borderColor: [
-                            '#ffffff',
-                            '#ffffff'
-                        ],
-                        borderWidth: 3,
-                        hoverOffset: 10
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                padding: 20,
-                                usePointStyle: true,
-                                font: {
-                                    size: 12
-                                }
-                            }
-                        }
-                    },
-                    cutout: '60%'
-                }
-            });
+            let show = false;
+            
+            switch(filter) {
+                case 'all':
+                    show = true;
+                    break;
+                case 'today':
+                    // Show all orders from today
+                    show = true; // All loaded orders are from today in this context
+                    break;
+                case 'revenue':
+                    // Show high-value orders (above average)
+                    show = orderTotal > 50; // Adjust threshold as needed
+                    break;
+                case 'dinein':
+                    show = orderType === 'dinein';
+                    break;
+                case 'pickup-all':
+                    show = orderType === 'pickup' || orderType === 'pickup_timed';
+                    break;
+                case 'completed':
+                    show = orderStatus === 'completed';
+                    break;
+            }
+            
+            if (show) {
+                card.show();
+            } else {
+                card.hide();
+            }
+        });
+        
+        // Update counts
+        updateFilterCounts();
+        
+        // Show/hide empty state
+        const visibleCards = orderCards.filter(':visible');
+        if (visibleCards.length === 0) {
+            showEmptyState(filter);
+        } else {
+            hideEmptyState();
         }
     }
     
-    // Enhanced hover effects for analytics cards
-    $('.oj-analytics-card').hover(
-        function() {
-            $(this).find('h3').css('color', '#007cba');
-        },
-        function() {
-            $(this).find('h3').css('color', '#333');
-        }
-    );
-    
-    // Peak hours cell click functionality
-    $('.oj-hour-cell').on('click', function() {
-        const hour = $(this).find('.oj-hour-label').text();
-        const count = $(this).find('.oj-hour-count').text();
+    function updateFilterCounts() {
+        const today = new Date().toISOString().split('T')[0];
         
-        if (count > 0) {
-            alert('<?php _e('Orders at', 'orders-jet'); ?> ' + hour + ': ' + count + ' <?php _e('orders', 'orders-jet'); ?>');
+        filterBtns.each(function() {
+            const btn = $(this);
+            const filter = btn.data('filter');
+            let count = 0;
+            
+            orderCards.each(function() {
+                const card = $(this);
+                const orderType = card.data('order-type');
+                const deliveryDate = card.data('delivery-date');
+                
+                let matches = false;
+                
+                switch(filter) {
+                    case 'all':
+                        matches = true;
+                        break;
+                    case 'dinein':
+                        matches = orderType === 'dinein';
+                        break;
+                    case 'pickup-all':
+                        matches = orderType === 'pickup' || orderType === 'pickup_timed';
+                        break;
+                    case 'pickup-immediate':
+                        matches = orderType === 'pickup';
+                        break;
+                    case 'pickup-today':
+                        if (orderType === 'pickup_timed') {
+                            const deliveryDateFormatted = card.data('delivery-date-formatted');
+                            matches = deliveryDateFormatted === today;
+                        }
+                        break;
+                    case 'pickup-upcoming':
+                        if (orderType === 'pickup_timed') {
+                            const deliveryDateFormatted = card.data('delivery-date-formatted');
+                            matches = deliveryDateFormatted > today;
+                        }
+                        break;
+                }
+                
+                if (matches) count++;
+            });
+            
+            // Update button text with count (optional)
+            const label = btn.find('.oj-filter-label');
+            const originalText = label.text().replace(/ \(\d+\)$/, '');
+            if (count > 0) {
+                label.text(originalText + ' (' + count + ')');
+            } else {
+                label.text(originalText);
+            }
+        });
+    }
+    
+    function showEmptyState(filter) {
+        const container = $('.oj-kitchen-cards-container');
+        
+        // Remove existing empty state
+        $('.oj-empty-state').remove();
+        
+        const filterNames = {
+            'all': '<?php _e('orders', 'orders-jet'); ?>',
+            'dinein': '<?php _e('dining orders', 'orders-jet'); ?>',
+            'pickup-all': '<?php _e('pickup orders', 'orders-jet'); ?>',
+            'pickup-immediate': '<?php _e('immediate pickup orders', 'orders-jet'); ?>',
+            'pickup-today': '<?php _e('today pickup orders', 'orders-jet'); ?>',
+            'pickup-upcoming': '<?php _e('upcoming pickup orders', 'orders-jet'); ?>'
+        };
+        
+        const emptyState = $('<div class="oj-empty-state" style="text-align: center; padding: 40px; color: #666;">' +
+            '<div style="font-size: 48px; margin-bottom: 16px;">📋</div>' +
+            '<h3><?php _e('No Orders Found', 'orders-jet'); ?></h3>' +
+            '<p><?php _e('There are currently no', 'orders-jet'); ?> ' + (filterNames[filter] || '<?php _e('orders', 'orders-jet'); ?>') + '.</p>' +
+            '</div>');
+            
+        container.append(emptyState);
+    }
+    
+    function hideEmptyState() {
+        $('.oj-empty-state').remove();
+    }
+    
+    function applyUpcomingOrderStyling() {
+        const today = new Date().toISOString().split('T')[0];
+        
+        orderCards.each(function() {
+            const card = $(this);
+            const orderType = card.data('order-type');
+            const deliveryDateFormatted = card.data('delivery-date-formatted');
+            
+            // Add upcoming order styling for future pickup orders
+            if (orderType === 'pickup_timed' && deliveryDateFormatted && deliveryDateFormatted > today) {
+                card.addClass('oj-upcoming-order');
+            }
+        });
+    }
+    
+    // Manager Action Handlers
+    $('.oj-view-details').on('click', function() {
+        const orderId = $(this).data('order-id');
+        // Redirect to WooCommerce order edit page
+        window.open('<?php echo admin_url('post.php?action=edit&post='); ?>' + orderId, '_blank');
+    });
+    
+    $('.oj-customer-info').on('click', function() {
+        const orderId = $(this).data('order-id');
+        const card = $(this).closest('.oj-kitchen-card');
+        const customerName = card.find('.oj-customer-name').text();
+        const tableNumber = card.find('.oj-table-number').text() || 'Pickup Order';
+        
+        alert('<?php _e('Customer:', 'orders-jet'); ?> ' + customerName + '\n<?php _e('Order:', 'orders-jet'); ?> #' + orderId + '\n<?php _e('Type:', 'orders-jet'); ?> ' + tableNumber);
+    });
+    
+    $('.oj-priority').on('click', function() {
+        const orderId = $(this).data('order-id');
+        const button = $(this);
+        
+        if (button.hasClass('priority-active')) {
+            button.removeClass('priority-active');
+            button.find('.oj-filter-label').text('<?php _e('Priority', 'orders-jet'); ?>');
+            button.closest('.oj-kitchen-card').removeClass('oj-priority-order');
+        } else {
+            button.addClass('priority-active');
+            button.find('.oj-filter-label').text('<?php _e('High Priority', 'orders-jet'); ?>');
+            button.closest('.oj-kitchen-card').addClass('oj-priority-order');
         }
     });
 });
