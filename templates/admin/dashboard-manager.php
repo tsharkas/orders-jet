@@ -507,6 +507,10 @@ $currency_symbol = get_woocommerce_currency_symbol();
             <span class="oj-filter-icon">⏳</span>
             <span class="oj-filter-label"><?php _e('Pending Payment', 'orders-jet'); ?></span>
         </button>
+        <button class="oj-filter-btn" data-filter="completed">
+            <span class="oj-filter-icon">🎉</span>
+            <span class="oj-filter-label"><?php _e('Completed', 'orders-jet'); ?></span>
+        </button>
         <button class="oj-filter-btn" data-filter="cancelled">
             <span class="oj-filter-icon">❌</span>
             <span class="oj-filter-label"><?php _e('Cancelled', 'orders-jet'); ?></span>
@@ -2411,6 +2415,9 @@ jQuery(document).ready(function($) {
                 case 'pending':
                     show = card.find('.oj-status-badge.pending').length > 0;
                     break;
+                case 'completed':
+                    show = card.find('.oj-status-badge.completed').length > 0;
+                    break;
                 case 'cancelled':
                     show = card.find('.oj-status-badge.cancelled').length > 0 || 
                            card.find('.oj-status-badge.refunded').length > 0;
@@ -2483,6 +2490,9 @@ jQuery(document).ready(function($) {
                     case 'pending':
                         matches = card.find('.oj-status-badge.pending').length > 0;
                         break;
+                    case 'completed':
+                        matches = card.find('.oj-status-badge.completed').length > 0;
+                        break;
                     case 'cancelled':
                         matches = card.find('.oj-status-badge.cancelled').length > 0 || 
                                  card.find('.oj-status-badge.refunded').length > 0;
@@ -2518,6 +2528,7 @@ jQuery(document).ready(function($) {
             'pickup-upcoming': '<?php _e('upcoming pickup orders', 'orders-jet'); ?>',
             'ready': '<?php _e('ready orders', 'orders-jet'); ?>',
             'pending': '<?php _e('pending payment orders', 'orders-jet'); ?>',
+            'completed': '<?php _e('completed orders', 'orders-jet'); ?>',
             'cancelled': '<?php _e('cancelled orders', 'orders-jet'); ?>'
         };
         
