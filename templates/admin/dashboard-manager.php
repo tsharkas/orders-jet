@@ -1600,6 +1600,23 @@ $currency_symbol = get_woocommerce_currency_symbol();
     border-top: 1px solid #dee2e6;
 }
 
+/* Manager Dashboard - Order ID Section Styling */
+.oj-kitchen-card .oj-customer-info-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: white !important;
+    border-radius: 8px 8px 0 0;
+}
+
+.oj-kitchen-card .oj-customer-name {
+    color: white !important;
+    font-weight: 600;
+}
+
+.oj-kitchen-card .oj-order-number {
+    color: rgba(255, 255, 255, 0.9) !important;
+    font-weight: 500;
+}
+
 /* Manager Actions */
 .oj-manager-actions {
     display: flex;
@@ -1609,40 +1626,57 @@ $currency_symbol = get_woocommerce_currency_symbol();
 
 .oj-manager-actions .oj-action-btn {
     flex: 1;
-    padding: 8px 12px;
+    padding: 10px 12px;
     font-size: 12px;
+    font-weight: 600;
     min-height: auto;
     width: auto;
+    border: none;
+    border-radius: 6px;
+    color: white !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.oj-manager-actions .oj-action-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
 }
 
 .oj-view-details {
-    background: #007cba;
-    border-color: #007cba;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 .oj-view-details:hover {
-    background: #005a87;
-    border-color: #005a87;
+    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
 }
 
 .oj-customer-info {
-    background: #28a745;
-    border-color: #28a745;
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
 }
 
 .oj-customer-info:hover {
-    background: #1e7e34;
-    border-color: #1e7e34;
+    background: linear-gradient(135deg, #0e8078 0%, #2dd865 100%);
 }
 
 .oj-priority {
-    background: #dc3545;
-    border-color: #dc3545;
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
 }
 
 .oj-priority:hover {
-    background: #c82333;
-    border-color: #c82333;
+    background: linear-gradient(135deg, #ff5252 0%, #d63031 100%);
+}
+
+.oj-priority.priority-active {
+    background: linear-gradient(135deg, #fd79a8 0%, #fdcb6e 100%);
+    animation: pulse-priority 2s infinite;
+}
+
+@keyframes pulse-priority {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
 }
 
 .oj-action-btn {
