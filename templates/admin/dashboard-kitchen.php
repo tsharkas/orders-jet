@@ -161,7 +161,7 @@ if (function_exists('wc_get_orders')) {
         
         error_log('Orders Jet Kitchen DEBUG: Order #' . $wc_order->get_id() . ' - Found delivery_date: ' . ($delivery_date ?: 'NONE') . ', delivery_time: ' . ($delivery_time ?: 'NONE') . ', order_method: ' . ($order_method ?: 'NONE'));
         
-        // For pickup orders with delivery date/time, only show today's orders
+        // For pickup orders with delivery date/time, show all orders (let filters handle date filtering)
         if (empty($table_number) && !empty($delivery_date)) {
             $today = date('Y-m-d');
             // Convert WooFood date format "October 13, 2025" to Y-m-d
@@ -169,11 +169,8 @@ if (function_exists('wc_get_orders')) {
             
             error_log('Orders Jet Kitchen DEBUG: Order #' . $wc_order->get_id() . ' - Today: ' . $today . ', Order date: ' . $order_date . ' (from: ' . $delivery_date . ')');
             
-            // Skip if not today's delivery
-            if ($order_date !== $today) {
-                error_log('Orders Jet Kitchen: Skipping order #' . $wc_order->get_id() . ' - scheduled for ' . $order_date . ' (not today)');
-                continue;
-            }
+            // Show all orders - let JavaScript filters handle the date filtering
+            // (Removed the continue statement to include upcoming orders)
             
             // CHECK IF IT HAS DELIVERY TIME - this is the key difference!
             if (!empty($delivery_time)) {
@@ -184,7 +181,7 @@ if (function_exists('wc_get_orders')) {
                 $order_type_icon = '🕒';
                 $order_type_class = 'oj-order-type-pickup-timed'; // ORANGE
                 
-                error_log('Orders Jet Kitchen: Including TIMED pickup order #' . $wc_order->get_id() . ' for today at ' . $time_display);
+                error_log('Orders Jet Kitchen: Including TIMED pickup order #' . $wc_order->get_id() . ' for ' . $order_date . ' at ' . $time_display);
             } else {
                 // Regular pickup for today but no specific time
                 $order_type = 'pickup';
@@ -192,7 +189,7 @@ if (function_exists('wc_get_orders')) {
                 $order_type_icon = '🥡';
                 $order_type_class = 'oj-order-type-pickup'; // PURPLE
                 
-                error_log('Orders Jet Kitchen: Including REGULAR pickup order #' . $wc_order->get_id() . ' for today (no specific time)');
+                error_log('Orders Jet Kitchen: Including REGULAR pickup order #' . $wc_order->get_id() . ' for ' . $order_date . ' (no specific time)');
             }
         } else {
             // Regular logic for table orders and pickup orders without delivery dates
@@ -242,16 +239,14 @@ if (function_exists('wc_get_orders')) {
             $delivery_time = $order->get_meta('exwfood_time_deli'); // "11:30 PM" format
             $order_method = $order->get_meta('exwfood_order_method'); // "delivery"
             
-            // For pickup orders with delivery date/time, only show today's orders
+            // For pickup orders with delivery date/time, show all orders (let filters handle date filtering)
             if (empty($table_number) && !empty($delivery_date)) {
                 $today = date('Y-m-d');
                 // Convert WooFood date format "October 13, 2025" to Y-m-d
                 $order_date = date('Y-m-d', strtotime($delivery_date));
                 
-                // Skip if not today's delivery
-                if ($order_date !== $today) {
-                    continue;
-                }
+                // Show all orders - let JavaScript filters handle the date filtering
+                // (Removed the continue statement to include upcoming orders)
                 
                 // CHECK IF IT HAS DELIVERY TIME - this is the key difference!
                 if (!empty($delivery_time)) {
@@ -550,6 +545,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
                          data-order-id="<?php echo esc_attr($order['ID']); ?>"
                          data-order-type="<?php echo esc_attr($order['order_type']); ?>"
                          data-delivery-date="<?php echo esc_attr($order['delivery_date'] ?? ''); ?>"
+                         data-delivery-date-formatted="<?php echo esc_attr(!empty($order['delivery_date']) ? date('Y-m-d', strtotime($order['delivery_date'])) : ''); ?>"
                          data-delivery-time="<?php echo esc_attr($order['delivery_time'] ?? ''); ?>"
                          data-table-number="<?php echo esc_attr($order['table_number'] ?? ''); ?>">
                         <!-- Card Header -->
@@ -1276,6 +1272,31 @@ $currency_symbol = get_woocommerce_currency_symbol();
     font-weight: 600;
 }
 
+/* Visual indicators for upcoming orders */
+.oj-kitchen-card[data-order-type="pickup_timed"] {
+    position: relative;
+}
+
+.oj-kitchen-card[data-order-type="pickup_timed"]:not([data-delivery-date-formatted=""]) {
+    /* Add a subtle left border for timed orders */
+    border-left: 4px solid transparent;
+}
+
+.oj-kitchen-card[data-order-type="pickup_timed"][data-delivery-date-formatted] {
+    /* Today's orders - green left border */
+    border-left-color: #4CAF50;
+}
+
+/* Upcoming orders styling - will be applied via JavaScript */
+.oj-kitchen-card.oj-upcoming-order {
+    border-left-color: #FF9800 !important;
+    opacity: 0.85;
+}
+
+.oj-kitchen-card.oj-upcoming-order .oj-card-header {
+    background: linear-gradient(135deg, #fff3e0 0%, #ffffff 100%);
+}
+
 /* Customer Info */
 .oj-customer-info {
     padding: 12px 20px;
@@ -1818,6 +1839,9 @@ jQuery(document).ready(function($) {
     // Initialize filter counts
     updateFilterCounts();
     
+    // Apply visual styling for upcoming orders
+    applyUpcomingOrderStyling();
+    
     filterBtns.on('click', function(e) {
         e.preventDefault();
         
@@ -1857,10 +1881,16 @@ jQuery(document).ready(function($) {
                     show = orderType === 'pickup'; // No delivery date/time
                     break;
                 case 'pickup-today':
-                    show = orderType === 'pickup_timed'; // All timed pickups are for today already
+                    if (orderType === 'pickup_timed') {
+                        const deliveryDateFormatted = card.data('delivery-date-formatted');
+                        show = deliveryDateFormatted === today;
+                    }
                     break;
                 case 'pickup-upcoming':
-                    show = false; // No upcoming orders are loaded in the backend
+                    if (orderType === 'pickup_timed') {
+                        const deliveryDateFormatted = card.data('delivery-date-formatted');
+                        show = deliveryDateFormatted > today;
+                    }
                     break;
             }
             
@@ -1912,10 +1942,16 @@ jQuery(document).ready(function($) {
                         matches = orderType === 'pickup';
                         break;
                     case 'pickup-today':
-                        matches = orderType === 'pickup_timed'; // All timed pickups are for today already
+                        if (orderType === 'pickup_timed') {
+                            const deliveryDateFormatted = card.data('delivery-date-formatted');
+                            matches = deliveryDateFormatted === today;
+                        }
                         break;
                     case 'pickup-upcoming':
-                        matches = false; // No upcoming orders are loaded in the backend
+                        if (orderType === 'pickup_timed') {
+                            const deliveryDateFormatted = card.data('delivery-date-formatted');
+                            matches = deliveryDateFormatted > today;
+                        }
                         break;
                 }
                 
@@ -1959,6 +1995,21 @@ jQuery(document).ready(function($) {
     
     function hideEmptyState() {
         $('.oj-empty-state').remove();
+    }
+    
+    function applyUpcomingOrderStyling() {
+        const today = new Date().toISOString().split('T')[0];
+        
+        orderCards.each(function() {
+            const card = $(this);
+            const orderType = card.data('order-type');
+            const deliveryDateFormatted = card.data('delivery-date-formatted');
+            
+            // Add upcoming order styling for future pickup orders
+            if (orderType === 'pickup_timed' && deliveryDateFormatted && deliveryDateFormatted > today) {
+                card.addClass('oj-upcoming-order');
+            }
+        });
     }
 });
 </script>
