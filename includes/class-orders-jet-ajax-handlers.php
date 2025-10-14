@@ -847,13 +847,13 @@ class Orders_Jet_AJAX_Handlers {
         // If table is available, only show pending/processing/pending-payment orders (new session)
         // If table is occupied, show all orders (current session)
         if ($table_status === 'available') {
-            $post_statuses = array('wc-pending', 'wc-processing', 'wc-pending-payment', 'wc-on-hold');
+            $post_statuses = array('wc-pending', 'wc-processing', 'wc-pending_payment', 'wc-on-hold');
             error_log('Orders Jet: Table is available - showing only pending orders for new session');
         } else {
             $post_statuses = array(
                 'wc-pending',
                 'wc-processing', 
-                'wc-pending-payment',
+                'wc-pending_payment',
                 'wc-on-hold',
                 'wc-completed',
                 'wc-cancelled',
@@ -887,7 +887,7 @@ class Orders_Jet_AJAX_Handlers {
             'post_status' => array(
                 'wc-pending',
                 'wc-processing', 
-                'wc-pending-payment',
+                'wc-pending_payment',
                 'wc-on-hold',
                 'wc-completed',
                 'wc-cancelled',
@@ -1172,7 +1172,7 @@ class Orders_Jet_AJAX_Handlers {
             'post_status' => array(
                 'wc-pending',
                 'wc-processing', 
-                'wc-pending-payment',
+                'wc-pending_payment',
                 'wc-on-hold',
                 'wc-completed',
                 'wc-cancelled',
@@ -1297,7 +1297,7 @@ class Orders_Jet_AJAX_Handlers {
         // Check if there are any recent pending/processing/pending-payment orders for this table
         $recent_orders = get_posts(array(
             'post_type' => 'shop_order',
-            'post_status' => array('wc-processing', 'wc-pending', 'wc-pending-payment', 'wc-on-hold'),
+            'post_status' => array('wc-processing', 'wc-pending', 'wc-pending_payment', 'wc-on-hold'),
             'meta_query' => array(
                 array(
                     'key' => '_oj_table_number',
@@ -1326,7 +1326,7 @@ class Orders_Jet_AJAX_Handlers {
         // Check if there's an active session for this table (last 2 hours)
         $recent_orders = get_posts(array(
             'post_type' => 'shop_order',
-            'post_status' => array('wc-processing', 'wc-pending', 'wc-pending-payment', 'wc-on-hold'),
+            'post_status' => array('wc-processing', 'wc-pending', 'wc-pending_payment', 'wc-on-hold'),
             'meta_query' => array(
                 array(
                     'key' => '_oj_table_number',
@@ -1546,8 +1546,8 @@ class Orders_Jet_AJAX_Handlers {
             }
             
             // Only allow payment confirmation for pending-payment orders
-            if ($order->get_status() !== 'pending-payment') {
-                wp_send_json_error(array('message' => sprintf(__('Order cannot be completed from status: %s (must be pending-payment)', 'orders-jet'), $order->get_status())));
+            if ($order->get_status() !== 'pending_payment') {
+                wp_send_json_error(array('message' => sprintf(__('Order cannot be completed from status: %s (must be pending_payment)', 'orders-jet'), $order->get_status())));
             }
             
             // Confirm this is a pickup order (not a table order)

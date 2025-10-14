@@ -74,6 +74,9 @@ class Orders_Jet_Integration {
         // Load text domain
         load_plugin_textdomain('orders-jet', false, dirname(plugin_basename(__FILE__)) . '/languages');
         
+        // Register custom order statuses
+        $this->register_custom_order_statuses();
+        
         // Include required files
         $this->includes();
         

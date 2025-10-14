@@ -615,7 +615,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                         <?php
                                     }
                                     ?>
-                                <?php elseif ($order['post_status'] === 'wc-pending-payment') : ?>
+                                <?php elseif ($order['post_status'] === 'wc-pending_payment') : ?>
                                     <?php if (!empty($order['table_number'])) : ?>
                                         <span class="oj-status-badge pending-payment-table">
                                             <span class="dashicons dashicons-money-alt"></span>
@@ -766,7 +766,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                 <?php endif; ?>
                                 
                                 <!-- Payment Confirmation Button for Pickup Orders -->
-                                <?php if ($order['post_status'] === 'wc-pending-payment' && empty($order['table_number'])) : ?>
+                                <?php if ($order['post_status'] === 'wc-pending_payment' && empty($order['table_number'])) : ?>
                                     <button class="oj-action-btn oj-confirm-payment" data-order-id="<?php echo esc_attr($order['ID']); ?>">
                                         <span class="dashicons dashicons-money-alt"></span>
                                         <?php _e('Confirm Payment', 'orders-jet'); ?>
