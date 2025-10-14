@@ -1604,19 +1604,24 @@ $currency_symbol = get_woocommerce_currency_symbol();
 .oj-kitchen-card .oj-customer-info:not(.oj-action-btn) {
     background: #f8f9fa !important;
     background-color: #f8f9fa !important;
-    color: #495057 !important;
+    color: #212529 !important;
     border-radius: 8px 8px 0 0;
     border-bottom: 1px solid #dee2e6;
 }
 
 .oj-kitchen-card .oj-customer-info:not(.oj-action-btn) .oj-customer-name {
-    color: #495057 !important;
+    color: #212529 !important;
     font-weight: 600;
 }
 
 .oj-kitchen-card .oj-customer-info:not(.oj-action-btn) .oj-order-number {
-    color: #6c757d !important;
+    color: #495057 !important;
     font-weight: 500;
+}
+
+/* Ensure all text elements in order ID section are visible */
+.oj-kitchen-card .oj-customer-info:not(.oj-action-btn) * {
+    color: #212529 !important;
 }
 
 
