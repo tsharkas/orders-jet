@@ -1857,10 +1857,16 @@ jQuery(document).ready(function($) {
                     show = orderType === 'pickup'; // No delivery date/time
                     break;
                 case 'pickup-today':
-                    show = orderType === 'pickup_timed' && deliveryDate && deliveryDate.includes(today);
+                    if (orderType === 'pickup_timed' && deliveryDate) {
+                        const orderDateFormatted = new Date(deliveryDate).toISOString().split('T')[0];
+                        show = orderDateFormatted === today;
+                    }
                     break;
                 case 'pickup-upcoming':
-                    show = orderType === 'pickup_timed' && deliveryDate && deliveryDate > today;
+                    if (orderType === 'pickup_timed' && deliveryDate) {
+                        const orderDateFormatted = new Date(deliveryDate).toISOString().split('T')[0];
+                        show = orderDateFormatted > today;
+                    }
                     break;
             }
             
@@ -1912,10 +1918,16 @@ jQuery(document).ready(function($) {
                         matches = orderType === 'pickup';
                         break;
                     case 'pickup-today':
-                        matches = orderType === 'pickup_timed' && deliveryDate && deliveryDate.includes(today);
+                        if (orderType === 'pickup_timed' && deliveryDate) {
+                            const orderDateFormatted = new Date(deliveryDate).toISOString().split('T')[0];
+                            matches = orderDateFormatted === today;
+                        }
                         break;
                     case 'pickup-upcoming':
-                        matches = orderType === 'pickup_timed' && deliveryDate && deliveryDate > today;
+                        if (orderType === 'pickup_timed' && deliveryDate) {
+                            const orderDateFormatted = new Date(deliveryDate).toISOString().split('T')[0];
+                            matches = orderDateFormatted > today;
+                        }
                         break;
                 }
                 
