@@ -153,26 +153,21 @@ if (function_exists('wc_get_orders')) {
             }
         }
         
-        // Get delivery date/time for WooFood orders (try multiple possible field names)
-        $delivery_date = $wc_order->get_meta('exwf_delivery_date') ?: 
-                        $wc_order->get_meta('_exwf_delivery_date') ?: 
-                        $wc_order->get_meta('delivery_date') ?: 
-                        $wc_order->get_meta('_delivery_date');
-                        
-        $delivery_time = $wc_order->get_meta('_exwf_delivery_time') ?: 
-                        $wc_order->get_meta('exwf_delivery_time') ?: 
-                        $wc_order->get_meta('_oj_delivery_time') ?: 
-                        $wc_order->get_meta('delivery_time') ?: 
-                        $wc_order->get_meta('_delivery_time');
+        // Get delivery date/time for WooFood orders (using correct field names)
+        $delivery_date = $wc_order->get_meta('exwfood_date_deli'); // "October 13, 2025" format
+        $delivery_time = $wc_order->get_meta('exwfood_time_deli'); // "11:30 PM" format
+        $delivery_unix = $wc_order->get_meta('exwfood_datetime_deli_unix'); // Unix timestamp
+        $order_method = $wc_order->get_meta('exwfood_order_method'); // "delivery"
         
-        error_log('Orders Jet Kitchen DEBUG: Order #' . $wc_order->get_id() . ' - Found delivery_date: ' . ($delivery_date ?: 'NONE') . ', delivery_time: ' . ($delivery_time ?: 'NONE'));
+        error_log('Orders Jet Kitchen DEBUG: Order #' . $wc_order->get_id() . ' - Found delivery_date: ' . ($delivery_date ?: 'NONE') . ', delivery_time: ' . ($delivery_time ?: 'NONE') . ', order_method: ' . ($order_method ?: 'NONE'));
         
         // For pickup orders with delivery date/time, only show today's orders
         if (empty($table_number) && !empty($delivery_date)) {
             $today = date('Y-m-d');
+            // Convert WooFood date format "October 13, 2025" to Y-m-d
             $order_date = date('Y-m-d', strtotime($delivery_date));
             
-            error_log('Orders Jet Kitchen DEBUG: Order #' . $wc_order->get_id() . ' - Today: ' . $today . ', Order date: ' . $order_date);
+            error_log('Orders Jet Kitchen DEBUG: Order #' . $wc_order->get_id() . ' - Today: ' . $today . ', Order date: ' . $order_date . ' (from: ' . $delivery_date . ')');
             
             // Skip if not today's delivery
             if ($order_date !== $today) {
@@ -182,6 +177,7 @@ if (function_exists('wc_get_orders')) {
             
             // Enhanced badge for timed pickup orders
             $order_type = 'pickup_timed';
+            // Convert WooFood time format "11:30 PM" to display format
             $time_display = !empty($delivery_time) ? date('g:i A', strtotime($delivery_time)) : '';
             $order_type_label = !empty($time_display) ? __('PICK UP', 'orders-jet') . ' ' . $time_display : __('PICK UP TODAY', 'orders-jet');
             $order_type_icon = '🕒';
@@ -231,13 +227,15 @@ if (function_exists('wc_get_orders')) {
         if ($order) {
             $table_number = $order->get_meta('_oj_table_number');
             
-            // Get delivery date/time for WooFood orders
-            $delivery_date = $order->get_meta('exwf_delivery_date');
-            $delivery_time = $order->get_meta('_exwf_delivery_time') ?: $order->get_meta('_oj_delivery_time');
+            // Get delivery date/time for WooFood orders (using correct field names)
+            $delivery_date = $order->get_meta('exwfood_date_deli'); // "October 13, 2025" format
+            $delivery_time = $order->get_meta('exwfood_time_deli'); // "11:30 PM" format
+            $order_method = $order->get_meta('exwfood_order_method'); // "delivery"
             
             // For pickup orders with delivery date/time, only show today's orders
             if (empty($table_number) && !empty($delivery_date)) {
                 $today = date('Y-m-d');
+                // Convert WooFood date format "October 13, 2025" to Y-m-d
                 $order_date = date('Y-m-d', strtotime($delivery_date));
                 
                 // Skip if not today's delivery
@@ -247,6 +245,7 @@ if (function_exists('wc_get_orders')) {
                 
                 // Enhanced badge for timed pickup orders
                 $order_type = 'pickup_timed';
+                // Convert WooFood time format "11:30 PM" to display format
                 $time_display = !empty($delivery_time) ? date('g:i A', strtotime($delivery_time)) : '';
                 $order_type_label = !empty($time_display) ? __('PICK UP', 'orders-jet') . ' ' . $time_display : __('PICK UP TODAY', 'orders-jet');
                 $order_type_icon = '🕒';
@@ -281,12 +280,13 @@ if (function_exists('wc_get_orders')) {
 
 // Sort by priority: timed pickups by delivery time, then processing first, then pending, then on-hold
 usort($active_orders, function($a, $b) {
-    // First priority: timed pickup orders sorted by delivery time
-    if ($a['order_type'] === 'pickup_timed' && $b['order_type'] === 'pickup_timed') {
-        $time_a = !empty($a['delivery_time']) ? strtotime($a['delivery_time']) : 0;
-        $time_b = !empty($b['delivery_time']) ? strtotime($b['delivery_time']) : 0;
-        return $time_a - $time_b;
-    }
+        // First priority: timed pickup orders sorted by delivery time
+        if ($a['order_type'] === 'pickup_timed' && $b['order_type'] === 'pickup_timed') {
+            // Use WooFood time format "11:30 PM"
+            $time_a = !empty($a['delivery_time']) ? strtotime($a['delivery_time']) : 0;
+            $time_b = !empty($b['delivery_time']) ? strtotime($b['delivery_time']) : 0;
+            return $time_a - $time_b;
+        }
     
     // Timed pickups come before regular orders
     if ($a['order_type'] === 'pickup_timed' && $b['order_type'] !== 'pickup_timed') {
