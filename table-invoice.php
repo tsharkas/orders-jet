@@ -34,11 +34,11 @@ if (empty($table_number)) {
     wp_die(__('Table number is required', 'orders-jet'));
 }
 
-// Get orders that are ready for invoice generation (processing status)
-// These are the current session orders that haven't been invoiced yet
+// Get orders that are ready for invoice generation (pending-payment status)
+// These are the current session orders that have been marked ready but haven't been invoiced yet
 $orders = get_posts(array(
     'post_type' => 'shop_order',
-    'post_status' => array('wc-processing'),
+    'post_status' => array('wc-pending-payment'),
     'meta_query' => array(
         array(
             'key' => '_oj_table_number',
@@ -51,7 +51,7 @@ $orders = get_posts(array(
     'order' => 'DESC'
 ));
 
-error_log('Orders Jet Invoice: Found ' . count($orders) . ' processing orders for table ' . $table_number);
+error_log('Orders Jet Invoice: Found ' . count($orders) . ' pending-payment orders for table ' . $table_number);
 
 $total_amount = 0;
 $order_data = array();

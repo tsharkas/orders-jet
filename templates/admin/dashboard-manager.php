@@ -615,6 +615,18 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                         <?php
                                     }
                                     ?>
+                                <?php elseif ($order['post_status'] === 'wc-pending-payment') : ?>
+                                    <?php if (!empty($order['table_number'])) : ?>
+                                        <span class="oj-status-badge pending-payment-table">
+                                            <span class="dashicons dashicons-money-alt"></span>
+                                            <?php _e('Ready - Awaiting Payment', 'orders-jet'); ?>
+                                        </span>
+                                    <?php else : ?>
+                                        <span class="oj-status-badge pending-payment-pickup">
+                                            <span class="dashicons dashicons-money-alt"></span>
+                                            <?php _e('Ready for Pickup', 'orders-jet'); ?>
+                                        </span>
+                                    <?php endif; ?>
                                 <?php elseif ($order['post_status'] === 'wc-on-hold') : ?>
                                     <span class="oj-status-badge ready">
                                         <span class="dashicons dashicons-yes-alt"></span>
@@ -750,6 +762,14 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                     <button class="oj-action-btn oj-priority" data-order-id="<?php echo esc_attr($order['ID']); ?>">
                                         <span class="dashicons dashicons-flag"></span>
                                         <?php _e('Priority', 'orders-jet'); ?>
+                                    </button>
+                                <?php endif; ?>
+                                
+                                <!-- Payment Confirmation Button for Pickup Orders -->
+                                <?php if ($order['post_status'] === 'wc-pending-payment' && empty($order['table_number'])) : ?>
+                                    <button class="oj-action-btn oj-confirm-payment" data-order-id="<?php echo esc_attr($order['ID']); ?>">
+                                        <span class="dashicons dashicons-money-alt"></span>
+                                        <?php _e('Confirm Payment', 'orders-jet'); ?>
                                     </button>
                                 <?php endif; ?>
                             </div>
@@ -1608,6 +1628,18 @@ $currency_symbol = get_woocommerce_currency_symbol();
     border: 1px solid #bee5eb;
 }
 
+.oj-status-badge.pending-payment-table {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.oj-status-badge.pending-payment-pickup {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
 /* Countdown Status Classes */
 .oj-status-badge.oj-countdown-upcoming {
     background: #e3f2fd;
@@ -2078,6 +2110,14 @@ $currency_symbol = get_woocommerce_currency_symbol();
     background: #d63031;
 }
 
+.oj-confirm-payment {
+    background: #00b894;
+}
+
+.oj-confirm-payment:hover {
+    background: #00a085;
+}
+
 .oj-priority.priority-active {
     background: #fd79a8;
     animation: pulse-priority 2s infinite;
@@ -2410,7 +2450,9 @@ jQuery(document).ready(function($) {
                     break;
                 // Additional Manager Status filters
                 case 'ready':
-                    show = card.find('.oj-status-badge.ready').length > 0;
+                    show = card.find('.oj-status-badge.ready').length > 0 || 
+                           card.find('.oj-status-badge.pending-payment-table').length > 0 || 
+                           card.find('.oj-status-badge.pending-payment-pickup').length > 0;
                     break;
                 case 'pending':
                     show = card.find('.oj-status-badge.pending').length > 0;
@@ -2485,7 +2527,9 @@ jQuery(document).ready(function($) {
                         break;
                     // Additional Manager Status filters
                     case 'ready':
-                        matches = card.find('.oj-status-badge.ready').length > 0;
+                        matches = card.find('.oj-status-badge.ready').length > 0 || 
+                                  card.find('.oj-status-badge.pending-payment-table').length > 0 || 
+                                  card.find('.oj-status-badge.pending-payment-pickup').length > 0;
                         break;
                     case 'pending':
                         matches = card.find('.oj-status-badge.pending').length > 0;
@@ -2588,6 +2632,45 @@ jQuery(document).ready(function($) {
             button.addClass('priority-active');
             button.find('.oj-filter-label').text('<?php _e('High Priority', 'orders-jet'); ?>');
             button.closest('.oj-kitchen-card').addClass('oj-priority-order');
+        }
+    });
+    
+    // Handle payment confirmation for pickup orders
+    $('.oj-confirm-payment').on('click', function() {
+        const orderId = $(this).data('order-id');
+        const button = $(this);
+        
+        if (confirm('<?php _e('Confirm payment received for this pickup order?', 'orders-jet'); ?>')) {
+            button.prop('disabled', true);
+            button.html('<span class="dashicons dashicons-update"></span> <?php _e('Processing...', 'orders-jet'); ?>');
+            
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'oj_confirm_pickup_payment',
+                    order_id: orderId,
+                    nonce: '<?php echo wp_create_nonce('oj_dashboard_nonce'); ?>'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Show success message
+                        alert(response.data.message);
+                        
+                        // Reload the page to refresh order status
+                        window.location.reload();
+                    } else {
+                        alert('<?php _e('Error:', 'orders-jet'); ?> ' + response.data.message);
+                        button.prop('disabled', false);
+                        button.html('<span class="dashicons dashicons-money-alt"></span> <?php _e('Confirm Payment', 'orders-jet'); ?>');
+                    }
+                },
+                error: function() {
+                    alert('<?php _e('Connection error. Please try again.', 'orders-jet'); ?>');
+                    button.prop('disabled', false);
+                    button.html('<span class="dashicons dashicons-money-alt"></span> <?php _e('Confirm Payment', 'orders-jet'); ?>');
+                }
+            });
         }
     });
 });

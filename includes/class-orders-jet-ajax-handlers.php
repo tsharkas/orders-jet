@@ -20,6 +20,7 @@ class Orders_Jet_AJAX_Handlers {
         add_action('wp_ajax_oj_close_table', array($this, 'close_table'));
         add_action('wp_ajax_oj_mark_order_ready', array($this, 'mark_order_ready'));
         add_action('wp_ajax_oj_mark_order_delivered', array($this, 'mark_order_delivered'));
+        add_action('wp_ajax_oj_confirm_pickup_payment', array($this, 'confirm_pickup_payment'));
         
         // AJAX handlers for non-logged in users (guests)
         add_action('wp_ajax_nopriv_oj_submit_table_order', array($this, 'submit_table_order'));
@@ -843,15 +844,16 @@ class Orders_Jet_AJAX_Handlers {
         $table_id = oj_get_table_id_by_number($table_number);
         $table_status = $table_id ? get_post_meta($table_id, '_oj_table_status', true) : '';
         
-        // If table is available, only show pending/processing orders (new session)
+        // If table is available, only show pending/processing/pending-payment orders (new session)
         // If table is occupied, show all orders (current session)
         if ($table_status === 'available') {
-            $post_statuses = array('wc-pending', 'wc-processing', 'wc-on-hold');
+            $post_statuses = array('wc-pending', 'wc-processing', 'wc-pending-payment', 'wc-on-hold');
             error_log('Orders Jet: Table is available - showing only pending orders for new session');
         } else {
             $post_statuses = array(
                 'wc-pending',
                 'wc-processing', 
+                'wc-pending-payment',
                 'wc-on-hold',
                 'wc-completed',
                 'wc-cancelled',
@@ -885,6 +887,7 @@ class Orders_Jet_AJAX_Handlers {
             'post_status' => array(
                 'wc-pending',
                 'wc-processing', 
+                'wc-pending-payment',
                 'wc-on-hold',
                 'wc-completed',
                 'wc-cancelled',
@@ -1169,6 +1172,7 @@ class Orders_Jet_AJAX_Handlers {
             'post_status' => array(
                 'wc-pending',
                 'wc-processing', 
+                'wc-pending-payment',
                 'wc-on-hold',
                 'wc-completed',
                 'wc-cancelled',
@@ -1290,10 +1294,10 @@ class Orders_Jet_AJAX_Handlers {
      * Check if this is a new session for the table
      */
     private function is_new_table_session($table_number) {
-        // Check if there are any recent pending/processing orders for this table
+        // Check if there are any recent pending/processing/pending-payment orders for this table
         $recent_orders = get_posts(array(
             'post_type' => 'shop_order',
-            'post_status' => array('wc-processing', 'wc-pending', 'wc-on-hold'),
+            'post_status' => array('wc-processing', 'wc-pending', 'wc-pending-payment', 'wc-on-hold'),
             'meta_query' => array(
                 array(
                     'key' => '_oj_table_number',
@@ -1322,7 +1326,7 @@ class Orders_Jet_AJAX_Handlers {
         // Check if there's an active session for this table (last 2 hours)
         $recent_orders = get_posts(array(
             'post_type' => 'shop_order',
-            'post_status' => array('wc-processing', 'wc-pending', 'wc-on-hold'),
+            'post_status' => array('wc-processing', 'wc-pending', 'wc-pending-payment', 'wc-on-hold'),
             'meta_query' => array(
                 array(
                     'key' => '_oj_table_number',
@@ -1513,6 +1517,66 @@ class Orders_Jet_AJAX_Handlers {
         } catch (Exception $e) {
             error_log('Orders Jet Manager: Error marking order delivered: ' . $e->getMessage());
             wp_send_json_error(array('message' => __('Failed to mark order as delivered. Please try again.', 'orders-jet')));
+        }
+    }
+    
+    /**
+     * Confirm payment for pickup orders
+     */
+    public function confirm_pickup_payment() {
+        // Check nonce for security
+        check_ajax_referer('oj_dashboard_nonce', 'nonce');
+        
+        // Check user permissions
+        if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('You do not have permission to perform this action.', 'orders-jet')));
+        }
+        
+        $order_id = intval($_POST['order_id']);
+        
+        if (!$order_id) {
+            wp_send_json_error(array('message' => __('Order ID is required.', 'orders-jet')));
+        }
+        
+        try {
+            $order = wc_get_order($order_id);
+            
+            if (!$order) {
+                wp_send_json_error(array('message' => __('Order not found.', 'orders-jet')));
+            }
+            
+            // Only allow payment confirmation for pending-payment orders
+            if ($order->get_status() !== 'pending-payment') {
+                wp_send_json_error(array('message' => sprintf(__('Order cannot be completed from status: %s (must be pending-payment)', 'orders-jet'), $order->get_status())));
+            }
+            
+            // Confirm this is a pickup order (not a table order)
+            $table_number = $order->get_meta('_oj_table_number');
+            if (!empty($table_number)) {
+                wp_send_json_error(array('message' => __('Table orders should be paid through the table invoice system.', 'orders-jet')));
+            }
+            
+            // Mark order as completed
+            $order->set_status('completed');
+            $order->add_order_note(sprintf(
+                __('Pickup payment confirmed and order completed by staff (%s)', 'orders-jet'), 
+                wp_get_current_user()->display_name
+            ));
+            
+            // Save the order
+            $order->save();
+            
+            error_log('Orders Jet Manager: Pickup order #' . $order_id . ' payment confirmed and completed by user #' . get_current_user_id());
+            
+            wp_send_json_success(array(
+                'message' => sprintf(__('Payment confirmed! Order #%d completed.', 'orders-jet'), $order_id),
+                'order_id' => $order_id,
+                'new_status' => 'completed'
+            ));
+            
+        } catch (Exception $e) {
+            error_log('Orders Jet Manager: Error confirming pickup payment: ' . $e->getMessage());
+            wp_send_json_error(array('message' => __('Failed to confirm payment. Please try again.', 'orders-jet')));
         }
     }
     

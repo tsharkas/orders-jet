@@ -45,16 +45,22 @@ if (isset($_POST['oj_mark_ready']) && isset($_POST['order_id']) && isset($_POST[
                         // Get current status before change
                         $old_status = $order->get_status();
                         
-                        // Mark order as ready (on-hold status means ready for pickup)
-                        $order->set_status('on-hold');
+                        // UNIFIED APPROACH: Mark order as ready and awaiting payment
+                        $order->set_status('pending-payment');
                         
-                        // Add order note
-                        $order_type = !empty($table_number) ? 'table order' : 'pickup order';
-                        $order->add_order_note(sprintf(
-                            __('Order marked as ready by kitchen staff (%s) - %s', 'orders-jet'), 
-                            wp_get_current_user()->display_name,
-                            $order_type
-                        ));
+                        // Add context-aware order note
+                        if (!empty($table_number)) {
+                            $order->add_order_note(sprintf(
+                                __('Order ready for serving at Table %s - awaiting payment by kitchen staff (%s)', 'orders-jet'),
+                                $table_number,
+                                wp_get_current_user()->display_name
+                            ));
+                        } else {
+                            $order->add_order_note(sprintf(
+                                __('Order ready for pickup - awaiting payment confirmation by kitchen staff (%s)', 'orders-jet'),
+                                wp_get_current_user()->display_name
+                            ));
+                        }
                         
                         // Save the order
                         $save_result = $order->save();
@@ -64,18 +70,22 @@ if (isset($_POST['oj_mark_ready']) && isset($_POST['order_id']) && isset($_POST[
                         
                         error_log('Orders Jet Kitchen: Status change attempt - Old: ' . $old_status . ', New: ' . $new_status . ', Save result: ' . $save_result);
                         
-                        if ($new_status === 'on-hold') {
-                            error_log('Orders Jet Kitchen: SUCCESS - Order #' . $order_id . ' status changed to on-hold by user #' . get_current_user_id());
+                        if ($new_status === 'pending-payment') {
+                            error_log('Orders Jet Kitchen: SUCCESS - Order #' . $order_id . ' status changed to pending-payment by user #' . get_current_user_id());
                             
-                            // Store success message
-                            $success_message = sprintf(__('Order #%d marked as ready! (Status: %s → %s)', 'orders-jet'), $order_id, $old_status, $new_status);
+                            // Context-aware success message
+                            if (!empty($table_number)) {
+                                $success_message = sprintf(__('Order #%d ready for Table %s - awaiting payment!', 'orders-jet'), $order_id, $table_number);
+                            } else {
+                                $success_message = sprintf(__('Order #%d ready for pickup - customer will be notified!', 'orders-jet'), $order_id);
+                            }
                             
                             // Redirect to avoid resubmission
                             wp_redirect(add_query_arg('success', urlencode($success_message), $_SERVER['REQUEST_URI']));
                             exit;
                         } else {
-                            error_log('Orders Jet Kitchen: ERROR - Status did not change as expected. Expected: on-hold, Actual: ' . $new_status);
-                            $error_message = sprintf(__('Status change failed. Expected: on-hold, Got: %s', 'orders-jet'), $new_status);
+                            error_log('Orders Jet Kitchen: ERROR - Status did not change as expected. Expected: pending-payment, Actual: ' . $new_status);
+                            $error_message = sprintf(__('Status change failed. Expected: pending-payment, Got: %s', 'orders-jet'), $new_status);
                         }
                         
                     } catch (Exception $e) {
@@ -638,6 +648,18 @@ $currency_symbol = get_woocommerce_currency_symbol();
                     }
                     ?>
                                 
+                                <?php elseif ($order['post_status'] === 'wc-pending-payment') : ?>
+                                    <?php if (!empty($order['table_number'])) : ?>
+                                        <span class="oj-status-badge pending-payment-table">
+                                            <span class="dashicons dashicons-money-alt"></span>
+                                            <?php _e('Ready - Awaiting Payment', 'orders-jet'); ?>
+                                        </span>
+                                    <?php else : ?>
+                                        <span class="oj-status-badge pending-payment-pickup">
+                                            <span class="dashicons dashicons-money-alt"></span>
+                                            <?php _e('Ready for Pickup', 'orders-jet'); ?>
+                                        </span>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -1569,6 +1591,18 @@ $currency_symbol = get_woocommerce_currency_symbol();
     background: #d1ecf1;
     color: #0c5460;
     border: 1px solid #bee5eb;
+}
+
+.oj-status-badge.pending-payment-table {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.oj-status-badge.pending-payment-pickup {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
 }
 
 /* Countdown Status Classes */
