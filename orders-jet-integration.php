@@ -120,6 +120,11 @@ class Orders_Jet_Integration {
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-woofood-integration.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-menu-analyzer.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-menu-integration.php';
+        
+        // Temporary debug page for WooFood orders
+        if (is_admin()) {
+            include_once ORDERS_JET_PLUGIN_DIR . 'debug-woofood-orders.php';
+        }
     }
     
     /**
