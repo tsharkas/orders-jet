@@ -632,10 +632,37 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                         <?php _e('Pending', 'orders-jet'); ?>
                                     </span>
                                 <?php elseif ($order['post_status'] === 'wc-processing') : ?>
-                                    <span class="oj-status-badge processing">
-                                        <span class="dashicons dashicons-admin-tools"></span>
-                                        <?php _e('Cooking', 'orders-jet'); ?>
-                                    </span>
+                                    <?php
+                                    // Enhanced COOKING badge with countdown for timed pickup orders
+                                    $wc_order = wc_get_order($order['ID']);
+                                    $delivery_date = $wc_order->get_meta('exwfood_date_deli');
+                                    $delivery_time = $wc_order->get_meta('exwfood_time_deli');
+                                    $delivery_unix = $wc_order->get_meta('exwfood_datetime_deli_unix');
+                                    
+                                    // Check if it's a timed pickup order
+                                    if (!empty($delivery_date) && !empty($delivery_time)) {
+                                        $time_remaining = OJ_Time_Helper::get_time_remaining($delivery_date, $delivery_time, $delivery_unix);
+                                        $countdown_data = OJ_Time_Helper::get_countdown_data($delivery_date, $delivery_time, $delivery_unix);
+                                        ?>
+                                        <span class="oj-status-badge processing oj-countdown-badge <?php echo esc_attr($time_remaining['class']); ?>" 
+                                              data-countdown-target="<?php echo esc_attr($countdown_data['target_timestamp']); ?>"
+                                              data-countdown-seconds="<?php echo esc_attr($countdown_data['diff_seconds']); ?>">
+                                            <span class="dashicons dashicons-admin-tools"></span>
+                                            <span class="oj-cooking-text"><?php _e('COOKING', 'orders-jet'); ?></span>
+                                            <span class="oj-countdown-text">(<?php echo esc_html($time_remaining['short_text']); ?>)</span>
+                                        </span>
+                                        <?php
+                                    } else {
+                                        // Regular cooking badge for non-timed orders
+                                        ?>
+                                        <span class="oj-status-badge processing">
+                                            <span class="dashicons dashicons-admin-tools"></span>
+                                            <?php _e('COOKING', 'orders-jet'); ?>
+                                        </span>
+                                        <?php
+                                    }
+                                    ?>
+                                
                                 <?php endif; ?>
                             </div>
                         </div>
@@ -1567,6 +1594,91 @@ $currency_symbol = get_woocommerce_currency_symbol();
     border: 1px solid #bee5eb;
 }
 
+/* Enhanced countdown badge styles */
+.oj-countdown-badge {
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.oj-countdown-badge .oj-countdown-text {
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 4px;
+}
+
+/* Time remaining urgency styles */
+.oj-countdown-badge.oj-time-normal .oj-countdown-text {
+    color: #0c5460;
+}
+
+.oj-countdown-badge.oj-time-soon {
+    background: #fff3cd !important;
+    color: #856404 !important;
+    border-color: #ffeaa7 !important;
+    animation: pulse-soon 2s infinite;
+}
+
+.oj-countdown-badge.oj-time-soon .oj-countdown-text {
+    color: #856404;
+}
+
+.oj-countdown-badge.oj-time-urgent {
+    background: #f8d7da !important;
+    color: #721c24 !important;
+    border-color: #f5c6cb !important;
+    animation: pulse-urgent 1s infinite;
+}
+
+.oj-countdown-badge.oj-time-urgent .oj-countdown-text {
+    color: #721c24;
+    font-weight: 700;
+}
+
+.oj-countdown-badge.oj-time-now {
+    background: #ff6b6b !important;
+    color: white !important;
+    border-color: #ff5252 !important;
+    animation: flash-now 0.8s infinite alternate;
+}
+
+.oj-countdown-badge.oj-time-now .oj-countdown-text {
+    color: white;
+    font-weight: 700;
+}
+
+.oj-countdown-badge.oj-time-overdue {
+    background: #dc3545 !important;
+    color: white !important;
+    border-color: #c82333 !important;
+    animation: flash-overdue 0.5s infinite alternate;
+}
+
+.oj-countdown-badge.oj-time-overdue .oj-countdown-text {
+    color: white;
+    font-weight: 700;
+}
+
+/* Countdown animations */
+@keyframes pulse-soon {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.02); }
+}
+
+@keyframes pulse-urgent {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.9; transform: scale(1.05); }
+}
+
+@keyframes flash-now {
+    0% { background: #ff6b6b !important; }
+    100% { background: #ff5252 !important; }
+}
+
+@keyframes flash-overdue {
+    0% { background: #dc3545 !important; }
+    100% { background: #c82333 !important; }
+}
+
 .oj-status-badge .dashicons {
     font-size: 14px;
 }
@@ -1881,6 +1993,70 @@ jQuery(document).ready(function($) {
     setTimeout(function() {
         $('.notice.is-dismissible').fadeOut();
     }, 5000);
+    
+    // Real-time countdown updates
+    function initCountdownTimers() {
+        const countdownElements = document.querySelectorAll('.oj-countdown-badge[data-countdown-target]');
+        
+        countdownElements.forEach(element => {
+            const targetTimestamp = parseInt(element.dataset.countdownTarget);
+            
+            function updateCountdown() {
+                const now = Math.floor(Date.now() / 1000); // Current timestamp in seconds
+                const distance = targetTimestamp - now;
+                
+                const countdownText = element.querySelector('.oj-countdown-text');
+                if (!countdownText) return;
+                
+                // Remove existing urgency classes
+                element.classList.remove('oj-time-normal', 'oj-time-soon', 'oj-time-urgent', 'oj-time-now', 'oj-time-overdue');
+                
+                if (distance < 0) {
+                    countdownText.textContent = '(OVERDUE)';
+                    element.classList.add('oj-time-overdue');
+                    return;
+                }
+                
+                if (distance <= 0) {
+                    countdownText.textContent = '(NOW)';
+                    element.classList.add('oj-time-now');
+                    return;
+                }
+                
+                const hours = Math.floor(distance / 3600);
+                const minutes = Math.floor((distance % 3600) / 60);
+                
+                let timeText = '';
+                if (hours > 0) {
+                    if (minutes > 0) {
+                        timeText = hours + 'h ' + minutes + 'm';
+                    } else {
+                        timeText = hours + 'h';
+                    }
+                } else {
+                    timeText = minutes + 'm';
+                }
+                
+                countdownText.textContent = '(' + timeText + ')';
+                
+                // Update urgency classes
+                if (distance <= 1800) { // 30 minutes
+                    element.classList.add('oj-time-urgent');
+                } else if (distance <= 3600) { // 1 hour
+                    element.classList.add('oj-time-soon');
+                } else {
+                    element.classList.add('oj-time-normal');
+                }
+            }
+            
+            // Update immediately and then every minute
+            updateCountdown();
+            setInterval(updateCountdown, 60000); // Update every minute
+        });
+    }
+    
+    // Initialize countdown timers
+    initCountdownTimers();
     
     // Order Filtering Functionality
     const filterBtns = $('.oj-filter-btn');

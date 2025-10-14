@@ -154,6 +154,96 @@ class OJ_Time_Helper {
     }
     
     /**
+     * Calculate time remaining until delivery
+     * Returns human-readable time difference for countdown
+     */
+    public static function get_time_remaining($delivery_date, $delivery_time, $unix_timestamp = null) {
+        $analysis = self::analyze_woofood_delivery($delivery_date, $delivery_time, $unix_timestamp);
+        
+        if ($analysis['is_past']) {
+            return array(
+                'status' => 'overdue',
+                'text' => 'OVERDUE',
+                'short_text' => 'OVERDUE',
+                'class' => 'oj-time-overdue',
+                'seconds' => 0
+            );
+        }
+        
+        $local_now = self::get_local_time('Y-m-d H:i:s');
+        $delivery_timestamp = strtotime($analysis['local_datetime']);
+        $current_timestamp = strtotime($local_now);
+        
+        $diff_seconds = $delivery_timestamp - $current_timestamp;
+        
+        if ($diff_seconds <= 0) {
+            return array(
+                'status' => 'now',
+                'text' => 'DUE NOW',
+                'short_text' => 'NOW',
+                'class' => 'oj-time-now',
+                'seconds' => 0
+            );
+        }
+        
+        // Calculate time components
+        $hours = floor($diff_seconds / 3600);
+        $minutes = floor(($diff_seconds % 3600) / 60);
+        
+        // Format display text
+        if ($hours > 0) {
+            if ($minutes > 0) {
+                $text = $hours . 'h ' . $minutes . 'm left';
+                $short_text = $hours . 'h ' . $minutes . 'm';
+            } else {
+                $text = $hours . 'h left';
+                $short_text = $hours . 'h';
+            }
+        } else {
+            $text = $minutes . 'm left';
+            $short_text = $minutes . 'm';
+        }
+        
+        // Determine urgency class
+        $class = 'oj-time-normal';
+        if ($diff_seconds <= 1800) { // 30 minutes
+            $class = 'oj-time-urgent';
+        } elseif ($diff_seconds <= 3600) { // 1 hour
+            $class = 'oj-time-soon';
+        }
+        
+        return array(
+            'status' => 'remaining',
+            'text' => $text,
+            'short_text' => $short_text,
+            'class' => $class,
+            'seconds' => $diff_seconds,
+            'hours' => $hours,
+            'minutes' => $minutes
+        );
+    }
+    
+    /**
+     * Get countdown data for JavaScript timers
+     */
+    public static function get_countdown_data($delivery_date, $delivery_time, $unix_timestamp = null) {
+        $analysis = self::analyze_woofood_delivery($delivery_date, $delivery_time, $unix_timestamp);
+        $local_now = self::get_local_time('Y-m-d H:i:s');
+        
+        $delivery_timestamp = strtotime($analysis['local_datetime']);
+        $current_timestamp = strtotime($local_now);
+        
+        return array(
+            'target_timestamp' => $delivery_timestamp,
+            'current_timestamp' => $current_timestamp,
+            'target_iso' => date('c', $delivery_timestamp), // ISO format for JS
+            'current_iso' => date('c', $current_timestamp),
+            'diff_seconds' => $delivery_timestamp - $current_timestamp,
+            'is_past' => ($delivery_timestamp < $current_timestamp)
+        );
+    }
+    
+    /**
      * Get timezone info for debugging
      */
     public static function get_timezone_info() {
