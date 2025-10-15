@@ -804,6 +804,11 @@ $currency_symbol = get_woocommerce_currency_symbol();
 }
 
 .oj-status-badge.oj-status-on-hold {
+    background: #c6f6d5;
+    color: #22543d;
+}
+
+.oj-status-badge.oj-status-on-hold {
     background: #fed7d7;
     color: #c53030;
 }
