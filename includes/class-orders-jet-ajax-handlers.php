@@ -849,38 +849,23 @@ class Orders_Jet_AJAX_Handlers {
             wp_send_json_error(array('message' => __('Table number is required', 'orders-jet')));
         }
         
-        // Get the current active session ID for this table
-        $current_session_id = $this->get_or_create_table_session($table_number);
-        error_log('Orders Jet: Current session ID for table ' . $table_number . ': ' . $current_session_id);
-        
-        // Always show only orders from the current session to ensure privacy
+        // For guest order history, only show pending/processing orders (exclude completed)
+        // This prevents guests from seeing completed orders from previous sessions
         $post_statuses = array(
             'wc-pending',
-            'wc-processing', 
-            'wc-pending',
-            'wc-completed',
-            'wc-cancelled',
-            'wc-refunded',
-            'wc-failed'
+            'wc-processing'
         );
         
-        error_log('Orders Jet: Showing orders for current session only: ' . $current_session_id);
+        error_log('Orders Jet: Showing only pending/processing orders for guest privacy');
         
-        // Get orders for this table using WooCommerce's proper method
-        // Filter by both table number AND current session ID for privacy
+        // Get orders for this table - only pending/processing orders for guest privacy
         $args = array(
             'post_type' => 'shop_order',
             'post_status' => $post_statuses,
             'meta_query' => array(
-                'relation' => 'AND',
                 array(
                     'key' => '_oj_table_number',
                     'value' => $table_number,
-                    'compare' => '='
-                ),
-                array(
-                    'key' => '_oj_session_id',
-                    'value' => $current_session_id,
                     'compare' => '='
                 )
             ),
@@ -948,19 +933,8 @@ class Orders_Jet_AJAX_Handlers {
             
             $wc_orders = wc_get_orders(array(
                 'status' => $wc_statuses,
-                'meta_query' => array(
-                    'relation' => 'AND',
-                    array(
-                        'key' => '_oj_table_number',
-                        'value' => $table_number,
-                        'compare' => '='
-                    ),
-                    array(
-                        'key' => '_oj_session_id',
-                        'value' => $current_session_id,
-                        'compare' => '='
-                    )
-                ),
+                'meta_key' => '_oj_table_number',
+                'meta_value' => $table_number,
                 'limit' => -1,
                 'orderby' => 'date',
                 'order' => 'DESC'
