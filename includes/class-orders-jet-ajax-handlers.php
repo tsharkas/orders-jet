@@ -2102,30 +2102,117 @@ class Orders_Jet_AJAX_Handlers {
      * Generate PDF from HTML using available PDF library
      */
     private function generate_pdf_from_html($html, $table_number, $force_download = false) {
-        // Try to use WooCommerce PDF plugin if available
-        if (class_exists('TCPDF')) {
-            $pdf = new TCPDF();
-            $pdf->AddPage();
-            $pdf->writeHTML($html);
-            
-            $filename = 'table-' . $table_number . '-invoice.pdf';
-            $pdf_content = $pdf->Output('', 'S');
-            
-            header('Content-Type: application/pdf');
-            header('Content-Length: ' . strlen($pdf_content));
-            
-            if ($force_download) {
-                header('Content-Disposition: attachment; filename="' . $filename . '"');
-            } else {
-                header('Content-Disposition: inline; filename="' . $filename . '"');
-            }
-            
-            echo $pdf_content;
-        } else {
-            // Fallback: return HTML with print styles
-            header('Content-Type: text/html; charset=utf-8');
-            echo $html;
+        // Clean any previous output to prevent PDF corruption
+        if (ob_get_level()) {
+            ob_end_clean();
         }
+        
+        // Try to use TCPDF if available
+        if (class_exists('TCPDF')) {
+            try {
+                // Create new PDF document
+                $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
+                
+                // Set document information
+                $pdf->SetCreator('Orders Jet');
+                $pdf->SetAuthor('Restaurant');
+                $pdf->SetTitle('Table ' . $table_number . ' Invoice');
+                
+                // Set default header data
+                $pdf->SetHeaderData('', 0, 'Restaurant Invoice', 'Table ' . $table_number);
+                
+                // Set header and footer fonts
+                $pdf->setHeaderFont(Array(PDF_FONT_NAME_MAIN, '', PDF_FONT_SIZE_MAIN));
+                $pdf->setFooterFont(Array(PDF_FONT_NAME_DATA, '', PDF_FONT_SIZE_DATA));
+                
+                // Set default monospaced font
+                $pdf->SetDefaultMonospacedFont(PDF_FONT_MONOSPACED);
+                
+                // Set margins
+                $pdf->SetMargins(PDF_MARGIN_LEFT, PDF_MARGIN_TOP, PDF_MARGIN_RIGHT);
+                $pdf->SetHeaderMargin(PDF_MARGIN_HEADER);
+                $pdf->SetFooterMargin(PDF_MARGIN_FOOTER);
+                
+                // Set auto page breaks
+                $pdf->SetAutoPageBreak(TRUE, PDF_MARGIN_BOTTOM);
+                
+                // Add a page
+                $pdf->AddPage();
+                
+                // Clean HTML for PDF compatibility
+                $clean_html = $this->clean_html_for_pdf($html);
+                
+                // Write HTML content
+                $pdf->writeHTML($clean_html, true, false, true, false, '');
+                
+                // Generate filename
+                $filename = 'table-' . $table_number . '-combined-invoice.pdf';
+                
+                // Output PDF
+                if ($force_download) {
+                    $pdf->Output($filename, 'D'); // Force download
+                } else {
+                    $pdf->Output($filename, 'I'); // Display in browser
+                }
+                
+            } catch (Exception $e) {
+                error_log('Orders Jet: TCPDF Error: ' . $e->getMessage());
+                // Fallback to HTML
+                $this->output_html_fallback($html, $table_number, $force_download);
+            }
+        } else {
+            error_log('Orders Jet: TCPDF not available, using HTML fallback');
+            // Fallback to HTML
+            $this->output_html_fallback($html, $table_number, $force_download);
+        }
+    }
+    
+    /**
+     * Clean HTML for PDF compatibility
+     */
+    private function clean_html_for_pdf($html) {
+        // Remove problematic CSS and elements for PDF
+        $html = preg_replace('/<style[^>]*>.*?<\/style>/is', '', $html);
+        
+        // Add basic PDF-friendly styles
+        $pdf_styles = '
+        <style>
+            body { font-family: Arial, sans-serif; font-size: 12px; }
+            h1 { color: #c41e3a; font-size: 18px; text-align: center; }
+            h2 { font-size: 14px; color: #333; }
+            table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f8f9fa; font-weight: bold; }
+            .invoice-total { background-color: #c41e3a; color: white; padding: 15px; text-align: center; }
+            .order-block { border: 1px solid #ddd; margin: 10px 0; padding: 10px; }
+            .order-header { background-color: #f8f9fa; padding: 8px; font-weight: bold; }
+        </style>';
+        
+        // Insert styles after <head>
+        $html = str_replace('<head>', '<head>' . $pdf_styles, $html);
+        
+        return $html;
+    }
+    
+    /**
+     * Output HTML fallback when PDF generation fails
+     */
+    private function output_html_fallback($html, $table_number, $force_download) {
+        $filename = 'table-' . $table_number . '-invoice.html';
+        
+        header('Content-Type: text/html; charset=utf-8');
+        
+        if ($force_download) {
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+        }
+        
+        // Add print-friendly styles and print button
+        $print_html = str_replace('<body>', '<body>
+            <div style="text-align: center; margin: 20px; print:none;">
+                <button onclick="window.print()" style="background: #c41e3a; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">🖨️ Print Invoice</button>
+            </div>', $html);
+        
+        echo $print_html;
     }
     
 }
