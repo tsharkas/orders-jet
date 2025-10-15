@@ -94,6 +94,16 @@ class Orders_Jet_Admin_Dashboard {
                 'manager-settings',
                 array($this, 'render_manager_settings')
             );
+            
+            // Invoice page (hidden from menu)
+            add_submenu_page(
+                null, // No parent menu (hidden)
+                __('Order Invoice', 'orders-jet'),
+                __('Order Invoice', 'orders-jet'),
+                'read', // Minimal capability - anyone who can read
+                'orders-jet-invoice',
+                array($this, 'render_invoice_page')
+            );
         }
         
         // Add Kitchen Dashboard (available to kitchen staff and admins)
@@ -283,6 +293,44 @@ class Orders_Jet_Admin_Dashboard {
         } else {
             $this->render_manager_placeholder('Settings', 'Configure restaurant settings, preferences, and system options.');
         }
+    }
+    
+    /**
+     * Render invoice page
+     */
+    public function render_invoice_page() {
+        // Get order ID from URL
+        $order_id = intval($_GET['order_id'] ?? 0);
+        
+        if (empty($order_id)) {
+            wp_die(__('Order ID is required', 'orders-jet'));
+        }
+        
+        // Get the order
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            wp_die(__('Order not found', 'orders-jet'));
+        }
+        
+        // Check if it's a table order or individual order
+        $table_number = $order->get_meta('_oj_table_number');
+        
+        if (!empty($table_number)) {
+            // Table order - redirect to table invoice
+            $invoice_url = site_url('/wp-content/plugins/orders-jet-integration/table-invoice.php?table=' . urlencode($table_number) . '&payment_method=cash');
+        } else {
+            // Individual order - redirect to individual order invoice
+            $invoice_url = site_url('/wp-content/plugins/orders-jet-integration/table-invoice.php?order_id=' . $order_id . '&payment_method=cash');
+        }
+        
+        // Check if print parameter is set
+        if (isset($_GET['print']) && $_GET['print'] == '1') {
+            $invoice_url .= '&print=1';
+        }
+        
+        // Redirect to the invoice
+        wp_redirect($invoice_url);
+        exit;
     }
     
     /**
