@@ -3704,7 +3704,7 @@ if (class_exists('Orders_Jet_Menu_Integration')) {
             });
         }
         
-        // Show payment success message
+        // Show payment success message with PDF invoice options
         function showPaymentSuccess(total, paymentMethod) {
             const paySection = document.querySelector('.pay-section');
             if (!paySection) return;
@@ -3715,6 +3715,27 @@ if (class_exists('Orders_Jet_Menu_Integration')) {
                     <h3><?php _e('Payment Successful!', 'orders-jet'); ?></h3>
                     <p><?php _e('Amount:', 'orders-jet'); ?> <strong>${total} EGP</strong></p>
                     <p><?php _e('Method:', 'orders-jet'); ?> <strong>${paymentMethod.toUpperCase()}</strong></p>
+                    
+                    <div class="invoice-options" style="margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 8px;">
+                        <h4 style="margin-bottom: 15px; color: #333;"><?php _e('Get Your Invoice', 'orders-jet'); ?></h4>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+                            <button class="cart-btn cart-btn-secondary" onclick="viewPDFInvoice()" style="flex: 1; min-width: 120px;">
+                                📄 <?php _e('View PDF', 'orders-jet'); ?>
+                            </button>
+                            <button class="cart-btn cart-btn-secondary" onclick="printPDFInvoice()" style="flex: 1; min-width: 120px;">
+                                🖨️ <?php _e('Print PDF', 'orders-jet'); ?>
+                            </button>
+                            <button class="cart-btn cart-btn-secondary" onclick="downloadPDFInvoice()" style="flex: 1; min-width: 120px;">
+                                💾 <?php _e('Download PDF', 'orders-jet'); ?>
+                            </button>
+                        </div>
+                        <div style="margin-top: 15px;">
+                            <button class="cart-btn cart-btn-outline" onclick="viewHTMLInvoice()" style="width: 100%;">
+                                📋 <?php _e('View Simple Invoice', 'orders-jet'); ?>
+                            </button>
+                        </div>
+                    </div>
+                    
                     <div class="thank-you-message">
                         <h4><?php _e('Thank you for dining with us!', 'orders-jet'); ?></h4>
                         <p><?php _e('We hope you enjoyed your meal. Please come again!', 'orders-jet'); ?></p>
@@ -3729,7 +3750,112 @@ if (class_exists('Orders_Jet_Menu_Integration')) {
             showAppNotification('<?php _e('Payment completed successfully!', 'orders-jet'); ?>', 'success');
         }
         
+        // PDF Invoice Functions for Guests
+        function viewPDFInvoice() {
+            // Get completed orders for this table and generate PDF URLs
+            getCompletedOrdersForPDF('view');
+        }
         
+        function printPDFInvoice() {
+            // Get completed orders for this table and generate PDF URLs for printing
+            getCompletedOrdersForPDF('print');
+        }
+        
+        function downloadPDFInvoice() {
+            // Get completed orders for this table and generate PDF URLs for download
+            getCompletedOrdersForPDF('download');
+        }
+        
+        function viewHTMLInvoice() {
+            // Open the existing HTML invoice
+            const invoiceUrl = `<?php echo ORDERS_JET_PLUGIN_URL; ?>table-invoice.php?table=<?php echo urlencode($table_number); ?>&payment_method=cash`;
+            window.open(invoiceUrl, '_blank');
+        }
+        
+        function getCompletedOrdersForPDF(action) {
+            // Get completed orders for this table
+            fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    action: 'oj_get_completed_orders_for_pdf',
+                    table_number: '<?php echo esc_js($table_number); ?>',
+                    nonce: '<?php echo wp_create_nonce('oj_table_nonce'); ?>'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.data.order_ids && data.data.order_ids.length > 0) {
+                    const orderIds = data.data.order_ids;
+                    
+                    // Generate PDF URLs for each order
+                    orderIds.forEach((orderId, index) => {
+                        setTimeout(() => {
+                            let pdfUrl;
+                            
+                            if (action === 'view') {
+                                // For guests, we need to use a different approach since admin URLs won't work
+                                // We'll create a guest-accessible PDF endpoint
+                                pdfUrl = `<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_guest_pdf&order_id=${orderId}&document_type=invoice&output=html&table=${encodeURIComponent('<?php echo esc_js($table_number); ?>')}&nonce=<?php echo wp_create_nonce('oj_guest_pdf'); ?>`;
+                            } else if (action === 'print') {
+                                pdfUrl = `<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_guest_pdf&order_id=${orderId}&document_type=invoice&output=pdf&table=${encodeURIComponent('<?php echo esc_js($table_number); ?>')}&nonce=<?php echo wp_create_nonce('oj_guest_pdf'); ?>`;
+                                
+                                // Create hidden iframe for printing
+                                const iframe = document.createElement('iframe');
+                                iframe.style.display = 'none';
+                                iframe.src = pdfUrl;
+                                document.body.appendChild(iframe);
+                                
+                                iframe.onload = function() {
+                                    try {
+                                        iframe.contentWindow.print();
+                                    } catch (e) {
+                                        window.open(pdfUrl, '_blank');
+                                    }
+                                    setTimeout(() => {
+                                        if (document.body.contains(iframe)) {
+                                            document.body.removeChild(iframe);
+                                        }
+                                    }, 2000);
+                                };
+                                
+                                iframe.onerror = function() {
+                                    window.open(pdfUrl, '_blank');
+                                    if (document.body.contains(iframe)) {
+                                        document.body.removeChild(iframe);
+                                    }
+                                };
+                                return; // Don't open window for print action
+                            } else if (action === 'download') {
+                                pdfUrl = `<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_guest_pdf&order_id=${orderId}&document_type=invoice&output=pdf&force_download=1&table=${encodeURIComponent('<?php echo esc_js($table_number); ?>')}&nonce=<?php echo wp_create_nonce('oj_guest_pdf'); ?>`;
+                                
+                                // Create temporary link for download
+                                const link = document.createElement('a');
+                                link.href = pdfUrl;
+                                link.download = `invoice-${orderId}.pdf`;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                return; // Don't open window for download action
+                            }
+                            
+                            // Open in new window for view action
+                            if (action === 'view') {
+                                window.open(pdfUrl, '_blank');
+                            }
+                        }, index * 500); // Delay each action by 500ms
+                    });
+                } else {
+                    showAppNotification('<?php _e('No completed orders found for PDF generation', 'orders-jet'); ?>', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error getting orders for PDF:', error);
+                showAppNotification('<?php _e('Error loading orders for PDF generation', 'orders-jet'); ?>', 'error');
+            });
+        }
         
         // Initialize when DOM is ready
         if (document.readyState === 'loading') {

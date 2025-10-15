@@ -24,6 +24,8 @@ class Orders_Jet_AJAX_Handlers {
         add_action('wp_ajax_oj_get_table_summary', array($this, 'get_table_summary'));
         add_action('wp_ajax_oj_complete_table_cash', array($this, 'complete_table_cash'));
         add_action('wp_ajax_oj_complete_individual_order', array($this, 'complete_individual_order'));
+        add_action('wp_ajax_oj_get_completed_orders_for_pdf', array($this, 'get_completed_orders_for_pdf'));
+        add_action('wp_ajax_oj_generate_guest_pdf', array($this, 'generate_guest_pdf'));
         
         // AJAX handlers for non-logged in users (guests)
         add_action('wp_ajax_nopriv_oj_submit_table_order', array($this, 'submit_table_order'));
@@ -32,6 +34,8 @@ class Orders_Jet_AJAX_Handlers {
         add_action('wp_ajax_nopriv_oj_get_product_details', array($this, 'get_product_details'));
         add_action('wp_ajax_nopriv_oj_get_table_orders', array($this, 'get_table_orders'));
         add_action('wp_ajax_nopriv_oj_close_table', array($this, 'close_table'));
+        add_action('wp_ajax_nopriv_oj_get_completed_orders_for_pdf', array($this, 'get_completed_orders_for_pdf'));
+        add_action('wp_ajax_nopriv_oj_generate_guest_pdf', array($this, 'generate_guest_pdf'));
     }
     
     /**
@@ -1725,6 +1729,120 @@ class Orders_Jet_AJAX_Handlers {
         wp_send_json_success(array(
             'message' => sprintf(__('Order #%d completed successfully!', 'orders-jet'), $order_id)
         ));
+    }
+    
+    /**
+     * Get completed orders for PDF generation (for guests)
+     */
+    public function get_completed_orders_for_pdf() {
+        check_ajax_referer('oj_table_nonce', 'nonce');
+        
+        $table_number = sanitize_text_field($_POST['table_number']);
+        
+        if (empty($table_number)) {
+            wp_send_json_error(array('message' => __('Table number is required', 'orders-jet')));
+        }
+        
+        // Get completed orders for this table
+        $wc_orders = wc_get_orders(array(
+            'status' => 'completed',
+            'meta_key' => '_oj_table_number',
+            'meta_value' => $table_number,
+            'limit' => -1,
+            'orderby' => 'date',
+            'order' => 'DESC'
+        ));
+        
+        $order_ids = array();
+        foreach ($wc_orders as $order) {
+            $order_ids[] = $order->get_id();
+        }
+        
+        if (empty($order_ids)) {
+            wp_send_json_error(array('message' => __('No completed orders found for this table', 'orders-jet')));
+        }
+        
+        wp_send_json_success(array(
+            'order_ids' => $order_ids,
+            'table_number' => $table_number
+        ));
+    }
+    
+    /**
+     * Generate PDF invoice for guests (public access with validation)
+     */
+    public function generate_guest_pdf() {
+        // Verify nonce for security
+        if (!wp_verify_nonce($_GET['nonce'] ?? '', 'oj_guest_pdf')) {
+            wp_die(__('Security check failed', 'orders-jet'));
+        }
+        
+        $order_id = intval($_GET['order_id'] ?? 0);
+        $table_number = sanitize_text_field($_GET['table'] ?? '');
+        $document_type = sanitize_text_field($_GET['document_type'] ?? 'invoice');
+        $output = sanitize_text_field($_GET['output'] ?? 'pdf');
+        $force_download = isset($_GET['force_download']);
+        
+        if (!$order_id || !$table_number) {
+            wp_die(__('Invalid order or table information', 'orders-jet'));
+        }
+        
+        // Verify the order belongs to the specified table
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            wp_die(__('Order not found', 'orders-jet'));
+        }
+        
+        $order_table = $order->get_meta('_oj_table_number');
+        if ($order_table !== $table_number) {
+            wp_die(__('Order does not belong to this table', 'orders-jet'));
+        }
+        
+        // Verify the order is completed
+        if ($order->get_status() !== 'completed') {
+            wp_die(__('Order is not completed', 'orders-jet'));
+        }
+        
+        // Check if PDF Invoices plugin is available
+        if (!function_exists('wcpdf_get_document')) {
+            wp_die(__('PDF invoice functionality is not available', 'orders-jet'));
+        }
+        
+        try {
+            // Get the PDF document
+            $document = wcpdf_get_document($document_type, $order);
+            
+            if (!$document) {
+                wp_die(__('Could not generate PDF document', 'orders-jet'));
+            }
+            
+            // Set appropriate headers
+            if ($output === 'html') {
+                header('Content-Type: text/html; charset=utf-8');
+                echo $document->get_html();
+            } else {
+                // PDF output
+                $pdf_data = $document->get_pdf();
+                $filename = $document->get_filename();
+                
+                header('Content-Type: application/pdf');
+                header('Content-Length: ' . strlen($pdf_data));
+                
+                if ($force_download) {
+                    header('Content-Disposition: attachment; filename="' . $filename . '"');
+                } else {
+                    header('Content-Disposition: inline; filename="' . $filename . '"');
+                }
+                
+                echo $pdf_data;
+            }
+            
+            exit;
+            
+        } catch (Exception $e) {
+            error_log('Orders Jet: PDF generation error: ' . $e->getMessage());
+            wp_die(__('Error generating PDF: ', 'orders-jet') . $e->getMessage());
+        }
     }
     
 }
