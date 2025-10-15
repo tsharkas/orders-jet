@@ -148,7 +148,8 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
                 <select id="oj-bulk-action-select">
                     <option value=""><?php _e('Bulk Actions', 'orders-jet'); ?></option>
                     <option value="mark_ready"><?php _e('Mark as Ready', 'orders-jet'); ?></option>
-                    <option value="complete_orders"><?php _e('Complete Orders', 'orders-jet'); ?></option>
+                    <option value="complete_pickup_orders" class="pickup-only"><?php _e('Complete Pickup Orders', 'orders-jet'); ?></option>
+                    <option value="close_tables" class="table-only"><?php _e('Close Tables', 'orders-jet'); ?></option>
                     <option value="cancel_orders"><?php _e('Cancel Orders', 'orders-jet'); ?></option>
                 </select>
                 <button type="button" class="button oj-apply-bulk-action"><?php _e('Apply', 'orders-jet'); ?></button>
@@ -894,8 +895,64 @@ jQuery(document).ready(function($) {
         if (selectedCount > 0) {
             $('.oj-bulk-actions-bar').show();
             $('.oj-selected-count').text(selectedCount + ' <?php _e("orders selected", "orders-jet"); ?>');
+            
+            // Update available actions based on selected order types
+            updateAvailableActions();
         } else {
             $('.oj-bulk-actions-bar').hide();
+            // Reset all options to visible when no selection
+            $('#oj-bulk-action-select option').show();
+        }
+    }
+    
+    // Update available actions based on selected order types
+    function updateAvailableActions() {
+        const selectedOrders = $('.oj-order-checkbox:checked');
+        let hasPickupOrders = false;
+        let hasTableOrders = false;
+        let tableNumbers = new Set();
+        
+        selectedOrders.each(function() {
+            const row = $(this).closest('tr');
+            const orderType = row.data('type');
+            
+            if (orderType === 'pickup') {
+                hasPickupOrders = true;
+            } else if (orderType === 'table') {
+                hasTableOrders = true;
+                // Extract table number from the row
+                const tableText = row.find('td:nth-child(5)').text(); // Type column
+                const tableMatch = tableText.match(/Table (\w+)/);
+                if (tableMatch) {
+                    tableNumbers.add(tableMatch[1]);
+                }
+            }
+        });
+        
+        // Show/hide options based on selection
+        if (hasPickupOrders && !hasTableOrders) {
+            // Only pickup orders selected
+            $('#oj-bulk-action-select .pickup-only').show();
+            $('#oj-bulk-action-select .table-only').hide();
+            $('.oj-selected-count').text(selectedOrders.length + ' <?php _e("pickup orders selected", "orders-jet"); ?>');
+        } else if (hasTableOrders && !hasPickupOrders) {
+            // Only table orders selected
+            $('#oj-bulk-action-select .pickup-only').hide();
+            $('#oj-bulk-action-select .table-only').show();
+            
+            if (tableNumbers.size === 1) {
+                $('.oj-selected-count').text('<?php _e("Table", "orders-jet"); ?> ' + Array.from(tableNumbers)[0] + ' (' + selectedOrders.length + ' <?php _e("orders selected", "orders-jet"); ?>)');
+            } else {
+                $('.oj-selected-count').text(tableNumbers.size + ' <?php _e("tables selected", "orders-jet"); ?> (' + selectedOrders.length + ' <?php _e("orders", "orders-jet"); ?>)');
+            }
+        } else if (hasPickupOrders && hasTableOrders) {
+            // Mixed selection - show warning and limited actions
+            $('#oj-bulk-action-select .pickup-only').hide();
+            $('#oj-bulk-action-select .table-only').hide();
+            $('.oj-selected-count').html('<span style="color: #d63638;"><?php _e("Mixed selection: pickup + table orders", "orders-jet"); ?></span>');
+        } else {
+            // Show all options
+            $('#oj-bulk-action-select option').show();
         }
     }
     
@@ -935,6 +992,13 @@ jQuery(document).ready(function($) {
             return;
         }
         
+        // Validate action based on selection
+        const validationResult = validateBulkAction(selectedAction, selectedOrders);
+        if (!validationResult.valid) {
+            alert(validationResult.message);
+            return;
+        }
+        
         // Confirm action
         const actionText = $('#oj-bulk-action-select option:selected').text();
         if (!confirm('<?php _e("Are you sure you want to", "orders-jet"); ?> ' + actionText.toLowerCase() + ' <?php _e("for", "orders-jet"); ?> ' + selectedOrders.length + ' <?php _e("orders?", "orders-jet"); ?>')) {
@@ -944,6 +1008,75 @@ jQuery(document).ready(function($) {
         // Execute bulk action
         executeBulkAction(selectedAction, selectedOrders);
     });
+    
+    // Validate bulk action based on order types
+    function validateBulkAction(action, orderIds) {
+        const selectedOrders = $('.oj-order-checkbox:checked');
+        let hasPickupOrders = false;
+        let hasTableOrders = false;
+        let tableNumbers = new Set();
+        
+        selectedOrders.each(function() {
+            const row = $(this).closest('tr');
+            const orderType = row.data('type');
+            
+            if (orderType === 'pickup') {
+                hasPickupOrders = true;
+            } else if (orderType === 'table') {
+                hasTableOrders = true;
+                const tableText = row.find('td:nth-child(5)').text();
+                const tableMatch = tableText.match(/Table (\w+)/);
+                if (tableMatch) {
+                    tableNumbers.add(tableMatch[1]);
+                }
+            }
+        });
+        
+        switch (action) {
+            case 'complete_pickup_orders':
+                if (hasTableOrders) {
+                    return {
+                        valid: false,
+                        message: '<?php _e("Cannot complete table orders individually. Use Close Tables action instead.", "orders-jet"); ?>'
+                    };
+                }
+                if (!hasPickupOrders) {
+                    return {
+                        valid: false,
+                        message: '<?php _e("No pickup orders selected.", "orders-jet"); ?>'
+                    };
+                }
+                break;
+                
+            case 'close_tables':
+                if (hasPickupOrders) {
+                    return {
+                        valid: false,
+                        message: '<?php _e("Cannot close tables for pickup orders. Use Complete Pickup Orders instead.", "orders-jet"); ?>'
+                    };
+                }
+                if (!hasTableOrders) {
+                    return {
+                        valid: false,
+                        message: '<?php _e("No table orders selected.", "orders-jet"); ?>'
+                    };
+                }
+                break;
+                
+            case 'mark_ready':
+            case 'cancel_orders':
+                // These actions are safe for both types
+                break;
+                
+            default:
+                return {
+                    valid: false,
+                    message: '<?php _e("Unknown action selected.", "orders-jet"); ?>'
+                };
+        }
+        
+        return { valid: true };
+    }
     
     // Execute bulk action via AJAX
     function executeBulkAction(action, orderIds) {

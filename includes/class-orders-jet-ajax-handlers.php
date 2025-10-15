@@ -2640,6 +2640,9 @@ class Orders_Jet_AJAX_Handlers {
             $current_status = $order->get_status();
             $order_number = $order->get_order_number();
             
+            $table_number = $order->get_meta('_oj_table_number');
+            $is_table_order = !empty($table_number);
+            
             switch ($bulk_action) {
                 case 'mark_ready':
                     if ($current_status === 'processing') {
@@ -2655,18 +2658,45 @@ class Orders_Jet_AJAX_Handlers {
                     }
                     break;
                     
-                case 'complete_orders':
+                case 'complete_pickup_orders':
+                    // CRITICAL: Only allow pickup orders to be completed individually
+                    if ($is_table_order) {
+                        $error_count++;
+                        error_log('Orders Jet: Bulk Action - BLOCKED: Attempted to complete table order #' . $order_number . ' individually. Table: ' . $table_number);
+                        continue 2; // Skip to next order
+                    }
+                    
                     if (in_array($current_status, ['processing', 'pending'])) {
                         $order->set_status('completed');
-                        $order->add_order_note(__('Order completed via bulk action', 'orders-jet'));
+                        $order->add_order_note(__('Pickup order completed via bulk action', 'orders-jet'));
                         $order->save();
                         $success_count++;
                         $processed_orders[] = $order_number;
-                        error_log('Orders Jet: Bulk Action - Completed order #' . $order_number);
+                        error_log('Orders Jet: Bulk Action - Completed pickup order #' . $order_number);
                     } else {
                         $error_count++;
-                        error_log('Orders Jet: Bulk Action - Cannot complete order #' . $order_number . '. Current status: ' . $current_status);
+                        error_log('Orders Jet: Bulk Action - Cannot complete pickup order #' . $order_number . '. Current status: ' . $current_status);
                     }
+                    break;
+                    
+                case 'close_tables':
+                    // CRITICAL: Only allow table orders for this action
+                    if (!$is_table_order) {
+                        $error_count++;
+                        error_log('Orders Jet: Bulk Action - BLOCKED: Attempted to close table for pickup order #' . $order_number);
+                        continue 2; // Skip to next order
+                    }
+                    
+                    // Group table orders by table number for proper closing
+                    if (!isset($table_groups)) {
+                        $table_groups = array();
+                    }
+                    
+                    if (!isset($table_groups[$table_number])) {
+                        $table_groups[$table_number] = array();
+                    }
+                    
+                    $table_groups[$table_number][] = $order_id;
                     break;
                     
                 case 'cancel_orders':
@@ -2689,10 +2719,26 @@ class Orders_Jet_AJAX_Handlers {
             }
         }
         
+        // Handle table closing if that was the action
+        if ($bulk_action === 'close_tables' && isset($table_groups)) {
+            foreach ($table_groups as $table_num => $table_order_ids) {
+                $table_success = $this->close_table_orders($table_num, $table_order_ids);
+                if ($table_success) {
+                    $success_count += count($table_order_ids);
+                    $processed_orders = array_merge($processed_orders, $table_order_ids);
+                    error_log('Orders Jet: Bulk Action - Closed table ' . $table_num . ' with ' . count($table_order_ids) . ' orders');
+                } else {
+                    $error_count += count($table_order_ids);
+                    error_log('Orders Jet: Bulk Action - Failed to close table ' . $table_num);
+                }
+            }
+        }
+        
         // Prepare response message
         $action_names = array(
             'mark_ready' => __('marked as ready', 'orders-jet'),
-            'complete_orders' => __('completed', 'orders-jet'),
+            'complete_pickup_orders' => __('completed', 'orders-jet'),
+            'close_tables' => __('closed', 'orders-jet'),
             'cancel_orders' => __('cancelled', 'orders-jet')
         );
         
@@ -2736,6 +2782,49 @@ class Orders_Jet_AJAX_Handlers {
             'error_count' => $error_count,
             'processed_orders' => $processed_orders
         ));
+    }
+    
+    /**
+     * Close table orders properly (used by bulk actions)
+     */
+    private function close_table_orders($table_number, $order_ids) {
+        try {
+            // Generate session ID for this table closure
+            $session_id = 'bulk_' . time() . '_' . $table_number;
+            
+            foreach ($order_ids as $order_id) {
+                $order = wc_get_order($order_id);
+                if (!$order) {
+                    error_log('Orders Jet: Close Table - Order not found: ' . $order_id);
+                    continue;
+                }
+                
+                // Verify this is actually a table order for the correct table
+                $order_table = $order->get_meta('_oj_table_number');
+                if ($order_table !== $table_number) {
+                    error_log('Orders Jet: Close Table - Order #' . $order_id . ' does not belong to table ' . $table_number);
+                    continue;
+                }
+                
+                // Only close orders that are processing or pending
+                if (in_array($order->get_status(), ['processing', 'pending'])) {
+                    $order->set_status('completed');
+                    $order->update_meta_data('_oj_session_id', $session_id);
+                    $order->update_meta_data('_oj_payment_method', 'bulk_action');
+                    $order->update_meta_data('_oj_table_closed', current_time('mysql'));
+                    $order->add_order_note(__('Table closed via bulk action', 'orders-jet'));
+                    $order->save();
+                    
+                    error_log('Orders Jet: Close Table - Completed order #' . $order_id . ' for table ' . $table_number);
+                }
+            }
+            
+            return true;
+            
+        } catch (Exception $e) {
+            error_log('Orders Jet: Close Table Error - ' . $e->getMessage());
+            return false;
+        }
     }
     
 }
