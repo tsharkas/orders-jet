@@ -91,15 +91,25 @@ if (function_exists('wc_get_orders')) {
         );
     }
     
-    // Combine all orders
+    // Combine active orders only (exclude completed from main operations)
+    $active_orders = array_merge($processing_orders, $ready_orders);
+    
+    // All orders including completed (for display purposes)
     $all_orders = array_merge($processing_orders, $ready_orders, $recent_completed_orders);
 }
 
 // Calculate statistics
+$active_orders_count = count($active_orders);
 $total_orders = count($all_orders);
 $processing_count = count($processing_orders);
 $ready_count = count($ready_orders);
 $recent_completed_count = count($recent_completed_orders);
+
+// Active orders only (exclude completed)
+$active_table_orders = array_filter($active_orders, function($order) { return $order['type'] === 'table'; });
+$active_pickup_orders = array_filter($active_orders, function($order) { return $order['type'] === 'pickup'; });
+
+// All orders including completed (for backward compatibility)
 $table_orders = array_filter($all_orders, function($order) { return $order['type'] === 'table'; });
 $pickup_orders = array_filter($all_orders, function($order) { return $order['type'] === 'pickup'; });
 
@@ -156,7 +166,7 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
     <!-- Filters -->
     <div class="oj-filters">
         <button class="oj-filter-btn active" data-filter="all">
-            <?php _e('All Orders', 'orders-jet'); ?> (<?php echo $total_orders; ?>)
+            <?php _e('Active Orders', 'orders-jet'); ?> (<?php echo $active_orders_count; ?>)
         </button>
         <button class="oj-filter-btn" data-filter="processing">
             <?php _e('In Kitchen', 'orders-jet'); ?> (<?php echo $processing_count; ?>)
@@ -165,10 +175,10 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
             <?php _e('Ready Orders', 'orders-jet'); ?> (<?php echo $ready_count; ?>)
         </button>
         <button class="oj-filter-btn" data-filter="table">
-            <?php _e('Table Orders', 'orders-jet'); ?> (<?php echo count($table_orders); ?>)
+            <?php _e('Table Orders', 'orders-jet'); ?> (<?php echo count($active_table_orders); ?>)
         </button>
         <button class="oj-filter-btn" data-filter="pickup">
-            <?php _e('Pickup Orders', 'orders-jet'); ?> (<?php echo count($pickup_orders); ?>)
+            <?php _e('Pickup Orders', 'orders-jet'); ?> (<?php echo count($active_pickup_orders); ?>)
         </button>
         <button class="oj-filter-btn" data-filter="completed">
             ✅ <?php _e('Recent', 'orders-jet'); ?> (<?php echo $recent_completed_count; ?>)
@@ -590,7 +600,8 @@ jQuery(document).ready(function($) {
             
             switch(filter) {
                 case 'all':
-                    show = true;
+                    // Show only active orders (exclude completed)
+                    show = status !== 'completed';
                     break;
                 case 'processing':
                     show = status === 'processing';
@@ -599,10 +610,12 @@ jQuery(document).ready(function($) {
                     show = status === 'pending';
                     break;
                 case 'table':
-                    show = type === 'table';
+                    // Show only active table orders (exclude completed)
+                    show = type === 'table' && status !== 'completed';
                     break;
                 case 'pickup':
-                    show = type === 'pickup';
+                    // Show only active pickup orders (exclude completed)
+                    show = type === 'pickup' && status !== 'completed';
                     break;
                 case 'completed':
                     show = status === 'completed';
