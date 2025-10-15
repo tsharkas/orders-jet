@@ -26,28 +26,28 @@ $ready_orders = array();
 
 // Get orders using WooCommerce native function
 if (function_exists('wc_get_orders')) {
-    // Get processing orders (cooking)
+    // Get processing orders (cooking) - FIFO approach like kitchen dashboard
     $processing_wc_orders = wc_get_orders(array(
         'status' => 'processing',
         'limit' => -1,
         'orderby' => 'date',
-        'order' => 'DESC'
+        'order' => 'ASC' // Oldest first - operational priority (FIFO)
     ));
     
-    // Get ready orders (pending - awaiting payment)
+    // Get ready orders (pending - awaiting payment) - FIFO approach like kitchen dashboard
     $ready_wc_orders = wc_get_orders(array(
         'status' => 'pending',
         'limit' => -1,
         'orderby' => 'date',
-        'order' => 'DESC'
+        'order' => 'ASC' // Oldest first - operational priority (FIFO)
     ));
     
-    // Get recent completed orders (minimal load - only latest 15)
+    // Get recent completed orders (minimal load - only latest 15) - newest first for recent view
     $recent_completed_wc_orders = wc_get_orders(array(
         'status' => 'completed',
         'limit' => 15, // Only latest 15 for performance
         'orderby' => 'date_modified',
-        'order' => 'DESC'
+        'order' => 'DESC' // Newest first for completed orders (recent view)
     ));
     
     // Process processing orders
