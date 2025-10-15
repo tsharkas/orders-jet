@@ -581,16 +581,16 @@ jQuery(document).ready(function($) {
         // Handle view PDF invoice
         modal.find('.oj-view-invoice').on('click', function() {
             const orderId = $(this).data('order-id');
-            // Use WooCommerce PDF Invoices plugin URL for HTML view
-            const invoiceUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=generate_wpo_wcpdf&document_type=invoice&order_ids=' + orderId + '&output=html';
+            // Use admin-authenticated approach for PDF generation
+            const invoiceUrl = '<?php echo admin_url('edit.php'); ?>?post_type=shop_order&page=wc-orders&action=edit&id=' + orderId + '&wpo_wcpdf_action=generate_pdf&document_type=invoice&output=html';
             window.open(invoiceUrl, '_blank');
         });
         
         // Handle print PDF invoice
         modal.find('.oj-print-invoice').on('click', function() {
             const orderId = $(this).data('order-id');
-            // Direct PDF for printing
-            const pdfUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=generate_wpo_wcpdf&document_type=invoice&order_ids=' + orderId + '&output=pdf';
+            // Use admin-authenticated approach for PDF printing
+            const pdfUrl = '<?php echo admin_url('edit.php'); ?>?post_type=shop_order&page=wc-orders&action=edit&id=' + orderId + '&wpo_wcpdf_action=generate_pdf&document_type=invoice&output=pdf';
             
             // Create hidden iframe for printing
             const iframe = document.createElement('iframe');
@@ -626,8 +626,8 @@ jQuery(document).ready(function($) {
         // Handle download PDF invoice
         modal.find('.oj-download-invoice').on('click', function() {
             const orderId = $(this).data('order-id');
-            // Force download PDF
-            const downloadUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=generate_wpo_wcpdf&document_type=invoice&order_ids=' + orderId + '&output=pdf&force_download=1';
+            // Use admin-authenticated approach for PDF download
+            const downloadUrl = '<?php echo admin_url('edit.php'); ?>?post_type=shop_order&page=wc-orders&action=edit&id=' + orderId + '&wpo_wcpdf_action=generate_pdf&document_type=invoice&output=pdf&force_download=1';
             
             // Create temporary link for download
             const link = document.createElement('a');
@@ -690,9 +690,12 @@ jQuery(document).ready(function($) {
         modal.find('.oj-view-table-invoice').on('click', function() {
             const orderIds = $(this).data('orders');
             if (orderIds) {
-                // Use WooCommerce PDF Invoices plugin URL for multiple orders (table invoice)
-                const invoiceUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=generate_wpo_wcpdf&document_type=invoice&order_ids=' + orderIds + '&output=html';
-                window.open(invoiceUrl, '_blank');
+                // For multiple orders, open each invoice in separate tabs (admin-authenticated)
+                const orderIdArray = orderIds.split(',');
+                orderIdArray.forEach(function(orderId) {
+                    const invoiceUrl = '<?php echo admin_url('edit.php'); ?>?post_type=shop_order&page=wc-orders&action=edit&id=' + orderId.trim() + '&wpo_wcpdf_action=generate_pdf&document_type=invoice&output=html';
+                    window.open(invoiceUrl, '_blank');
+                });
             } else {
                 alert('<?php _e('No orders found for this table.', 'orders-jet'); ?>');
             }
@@ -702,38 +705,43 @@ jQuery(document).ready(function($) {
         modal.find('.oj-print-table-invoice').on('click', function() {
             const orderIds = $(this).data('orders');
             if (orderIds) {
-                // Direct PDF for printing multiple orders
-                const pdfUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=generate_wpo_wcpdf&document_type=invoice&order_ids=' + orderIds + '&output=pdf';
-                
-                // Create hidden iframe for printing
-                const iframe = document.createElement('iframe');
-                iframe.style.display = 'none';
-                iframe.src = pdfUrl;
-                document.body.appendChild(iframe);
-                
-                iframe.onload = function() {
-                    try {
-                        // Try to print the PDF directly
-                        iframe.contentWindow.print();
-                    } catch (e) {
-                        // Fallback: open in new window for manual printing
-                        window.open(pdfUrl, '_blank');
-                    }
-                    // Remove iframe after printing
-                    setTimeout(() => {
-                        if (document.body.contains(iframe)) {
-                            document.body.removeChild(iframe);
-                        }
-                    }, 2000);
-                };
-                
-                // Fallback if iframe fails to load
-                iframe.onerror = function() {
-                    window.open(pdfUrl, '_blank');
-                    if (document.body.contains(iframe)) {
-                        document.body.removeChild(iframe);
-                    }
-                };
+                // For multiple orders, print each invoice separately (admin-authenticated)
+                const orderIdArray = orderIds.split(',');
+                orderIdArray.forEach(function(orderId, index) {
+                    setTimeout(function() {
+                        const pdfUrl = '<?php echo admin_url('edit.php'); ?>?post_type=shop_order&page=wc-orders&action=edit&id=' + orderId.trim() + '&wpo_wcpdf_action=generate_pdf&document_type=invoice&output=pdf';
+                        
+                        // Create hidden iframe for printing
+                        const iframe = document.createElement('iframe');
+                        iframe.style.display = 'none';
+                        iframe.src = pdfUrl;
+                        document.body.appendChild(iframe);
+                        
+                        iframe.onload = function() {
+                            try {
+                                // Try to print the PDF directly
+                                iframe.contentWindow.print();
+                            } catch (e) {
+                                // Fallback: open in new window for manual printing
+                                window.open(pdfUrl, '_blank');
+                            }
+                            // Remove iframe after printing
+                            setTimeout(() => {
+                                if (document.body.contains(iframe)) {
+                                    document.body.removeChild(iframe);
+                                }
+                            }, 2000);
+                        };
+                        
+                        // Fallback if iframe fails to load
+                        iframe.onerror = function() {
+                            window.open(pdfUrl, '_blank');
+                            if (document.body.contains(iframe)) {
+                                document.body.removeChild(iframe);
+                            }
+                        };
+                    }, index * 1000); // Delay each print by 1 second to avoid conflicts
+                });
             } else {
                 alert('<?php _e('No orders found for this table.', 'orders-jet'); ?>');
             }
@@ -744,16 +752,21 @@ jQuery(document).ready(function($) {
             const tableNumber = $(this).data('table');
             const orderIds = $(this).data('orders');
             if (orderIds) {
-                // Force download PDF for table
-                const downloadUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=generate_wpo_wcpdf&document_type=invoice&order_ids=' + orderIds + '&output=pdf&force_download=1';
-                
-                // Create temporary link for download
-                const link = document.createElement('a');
-                link.href = downloadUrl;
-                link.download = 'table-' + tableNumber + '-invoice.pdf';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                // For multiple orders, download each invoice separately (admin-authenticated)
+                const orderIdArray = orderIds.split(',');
+                orderIdArray.forEach(function(orderId, index) {
+                    setTimeout(function() {
+                        const downloadUrl = '<?php echo admin_url('edit.php'); ?>?post_type=shop_order&page=wc-orders&action=edit&id=' + orderId.trim() + '&wpo_wcpdf_action=generate_pdf&document_type=invoice&output=pdf&force_download=1';
+                        
+                        // Create temporary link for download
+                        const link = document.createElement('a');
+                        link.href = downloadUrl;
+                        link.download = 'table-' + tableNumber + '-order-' + orderId.trim() + '-invoice.pdf';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    }, index * 500); // Delay each download by 500ms to avoid conflicts
+                });
             } else {
                 alert('<?php _e('No orders found for this table.', 'orders-jet'); ?>');
             }
