@@ -28,7 +28,7 @@ global $wpdb;
 $actionable_orders = array();
 if (function_exists('wc_get_orders')) {
     $wc_orders = wc_get_orders(array(
-        'status' => array('processing', 'pending-payment', 'on-hold'), // Only actionable statuses
+        'status' => array('processing', 'pending_payment', 'on-hold'), // Only actionable statuses
         'limit' => -1,
         'orderby' => 'date',
         'order' => 'DESC' // Newest first for managers
@@ -138,7 +138,7 @@ foreach ($table_orders as $order) {
 
 // Calculate statistics
 $ready_orders = array_filter($actionable_orders, function($order) {
-    return $order['post_status'] === 'wc-pending-payment' || $order['post_status'] === 'wc-on-hold';
+    return $order['post_status'] === 'wc-pending_payment' || $order['post_status'] === 'wc-on-hold';
 });
 
 $processing_orders = array_filter($actionable_orders, function($order) {
@@ -327,7 +327,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
                             $status_class = str_replace('wc-', '', $order['post_status']);
                             $status_labels = array(
                                 'processing' => __('Cooking', 'orders-jet'),
-                                'pending-payment' => __('Ready', 'orders-jet'),
+                                'pending_payment' => __('Ready', 'orders-jet'),
                                 'on-hold' => __('Ready', 'orders-jet')
                             );
                             $status_label = $status_labels[$status_class] ?? ucfirst(str_replace('-', ' ', $status_class));
@@ -352,7 +352,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
                             <div class="oj-action-buttons">
                                 <?php if ($order['order_category'] === 'table') : ?>
                                     <!-- Table Order Actions -->
-                                    <?php if (in_array($order['post_status'], ['wc-pending-payment', 'wc-on-hold'])) : ?>
+                                    <?php if (in_array($order['post_status'], ['wc-pending_payment', 'wc-on-hold'])) : ?>
                                         <button class="oj-btn oj-btn-primary oj-close-table" 
                                                 data-table="<?php echo esc_attr($order['table_number']); ?>"
                                                 title="<?php _e('Close Table & Generate Invoice', 'orders-jet'); ?>">
@@ -362,7 +362,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                     <?php endif; ?>
                                 <?php else : ?>
                                     <!-- Individual Order Actions -->
-                                    <?php if (in_array($order['post_status'], ['wc-pending-payment', 'wc-on-hold'])) : ?>
+                                    <?php if (in_array($order['post_status'], ['wc-pending_payment', 'wc-on-hold'])) : ?>
                                         <button class="oj-btn oj-btn-success oj-complete-order" 
                                                 data-order-id="<?php echo esc_attr($order['ID']); ?>"
                                                 title="<?php _e('Mark as Completed', 'orders-jet'); ?>">
@@ -798,7 +798,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
     color: #2c5282;
 }
 
-.oj-status-badge.oj-status-pending-payment {
+.oj-status-badge.oj-status-pending_payment {
     background: #c6f6d5;
     color: #22543d;
 }
@@ -1208,7 +1208,7 @@ jQuery(document).ready(function($) {
                     show = category === 'individual';
                     break;
                 case 'ready':
-                    show = status === 'pending-payment' || status === 'on-hold';
+                    show = status === 'pending_payment' || status === 'on-hold';
                     break;
                 case 'processing':
                     show = status === 'processing';
@@ -1249,7 +1249,7 @@ jQuery(document).ready(function($) {
                         matches = category === 'individual';
                         break;
                     case 'ready':
-                        matches = status === 'pending-payment' || status === 'on-hold';
+                        matches = status === 'pending_payment' || status === 'on-hold';
                         break;
                     case 'processing':
                         matches = status === 'processing';

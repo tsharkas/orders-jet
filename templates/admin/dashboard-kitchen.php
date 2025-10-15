@@ -46,7 +46,7 @@ if (isset($_POST['oj_mark_ready']) && isset($_POST['order_id']) && isset($_POST[
                         $old_status = $order->get_status();
                         
                         // UNIFIED APPROACH: Mark order as ready and awaiting payment
-                        $order->set_status('pending-payment');
+                        $order->set_status('pending_payment');
                         
                         // Add context-aware order note
                         if (!empty($table_number)) {
@@ -70,8 +70,8 @@ if (isset($_POST['oj_mark_ready']) && isset($_POST['order_id']) && isset($_POST[
                         
                         error_log('Orders Jet Kitchen: Status change attempt - Old: ' . $old_status . ', New: ' . $new_status . ', Save result: ' . $save_result);
                         
-                        if ($new_status === 'pending-payment') {
-                            error_log('Orders Jet Kitchen: SUCCESS - Order #' . $order_id . ' status changed to pending-payment by user #' . get_current_user_id());
+                        if ($new_status === 'pending_payment') {
+                            error_log('Orders Jet Kitchen: SUCCESS - Order #' . $order_id . ' status changed to pending_payment by user #' . get_current_user_id());
                             
                             // Context-aware success message
                             if (!empty($table_number)) {
@@ -84,8 +84,8 @@ if (isset($_POST['oj_mark_ready']) && isset($_POST['order_id']) && isset($_POST[
                             wp_redirect(add_query_arg('success', urlencode($success_message), $_SERVER['REQUEST_URI']));
                             exit;
                         } else {
-                            error_log('Orders Jet Kitchen: ERROR - Status did not change as expected. Expected: pending-payment, Actual: ' . $new_status);
-                            $error_message = sprintf(__('Status change failed. Expected: pending-payment, Got: %s', 'orders-jet'), $new_status);
+                            error_log('Orders Jet Kitchen: ERROR - Status did not change as expected. Expected: pending_payment, Actual: ' . $new_status);
+                            $error_message = sprintf(__('Status change failed. Expected: pending_payment, Got: %s', 'orders-jet'), $new_status);
                         }
                         
                     } catch (Exception $e) {
@@ -644,14 +644,14 @@ $currency_symbol = get_woocommerce_currency_symbol();
                     }
                     ?>
                                 
-                                <?php elseif ($order['post_status'] === 'wc-pending-payment') : ?>
+                                <?php elseif ($order['post_status'] === 'wc-pending_payment') : ?>
                                     <?php if (!empty($order['table_number'])) : ?>
-                                        <span class="oj-status-badge pending-payment-table">
+                                        <span class="oj-status-badge pending_payment-table">
                                             <span class="dashicons dashicons-money-alt"></span>
                                             <?php _e('Ready - Awaiting Payment', 'orders-jet'); ?>
                                         </span>
                                     <?php else : ?>
-                                        <span class="oj-status-badge pending-payment-pickup">
+                                        <span class="oj-status-badge pending_payment-pickup">
                                             <span class="dashicons dashicons-money-alt"></span>
                                             <?php _e('Ready for Pickup', 'orders-jet'); ?>
                                         </span>
@@ -1589,13 +1589,13 @@ $currency_symbol = get_woocommerce_currency_symbol();
     border: 1px solid #bee5eb;
 }
 
-.oj-status-badge.pending-payment-table {
+.oj-status-badge.pending_payment-table {
     background: #fff3cd;
     color: #856404;
     border: 1px solid #ffeaa7;
 }
 
-.oj-status-badge.pending-payment-pickup {
+.oj-status-badge.pending_payment-pickup {
     background: #d4edda;
     color: #155724;
     border: 1px solid #c3e6cb;
