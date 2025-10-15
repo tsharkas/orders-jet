@@ -21,6 +21,9 @@ class Orders_Jet_AJAX_Handlers {
         add_action('wp_ajax_oj_mark_order_ready', array($this, 'mark_order_ready'));
         add_action('wp_ajax_oj_mark_order_delivered', array($this, 'mark_order_delivered'));
         add_action('wp_ajax_oj_confirm_pickup_payment', array($this, 'confirm_pickup_payment'));
+        add_action('wp_ajax_oj_get_table_summary', array($this, 'get_table_summary'));
+        add_action('wp_ajax_oj_complete_table_cash', array($this, 'complete_table_cash'));
+        add_action('wp_ajax_oj_complete_individual_order', array($this, 'complete_individual_order'));
         
         // AJAX handlers for non-logged in users (guests)
         add_action('wp_ajax_nopriv_oj_submit_table_order', array($this, 'submit_table_order'));
@@ -1578,6 +1581,149 @@ class Orders_Jet_AJAX_Handlers {
             error_log('Orders Jet Manager: Error confirming pickup payment: ' . $e->getMessage());
             wp_send_json_error(array('message' => __('Failed to confirm payment. Please try again.', 'orders-jet')));
         }
+    }
+    
+    /**
+     * Get table summary for smart close table
+     */
+    public function get_table_summary() {
+        check_ajax_referer('oj_dashboard_nonce', 'nonce');
+        
+        $table_number = sanitize_text_field($_POST['table']);
+        
+        if (empty($table_number)) {
+            wp_send_json_error(array('message' => __('Table number is required', 'orders-jet')));
+        }
+        
+        // Get all pending_payment orders for this table
+        $orders = wc_get_orders(array(
+            'status' => array('pending_payment'),
+            'limit' => -1,
+            'meta_query' => array(
+                array(
+                    'key' => '_oj_table_number',
+                    'value' => $table_number,
+                    'compare' => '='
+                )
+            )
+        ));
+        
+        if (empty($orders)) {
+            wp_send_json_error(array('message' => __('No orders found for this table', 'orders-jet')));
+        }
+        
+        $order_data = array();
+        $total_amount = 0;
+        
+        foreach ($orders as $order) {
+            $order_data[] = array(
+                'id' => $order->get_id(),
+                'total' => wc_price($order->get_total()),
+                'items_count' => count($order->get_items())
+            );
+            $total_amount += $order->get_total();
+        }
+        
+        // Get available payment gateways
+        $available_gateways = WC()->payment_gateways->get_available_payment_gateways();
+        $has_online_gateways = !empty($available_gateways);
+        
+        wp_send_json_success(array(
+            'table' => $table_number,
+            'orders' => $order_data,
+            'total' => $total_amount,
+            'total_formatted' => wc_price($total_amount),
+            'has_online_gateways' => $has_online_gateways,
+            'invoice_url' => site_url("/wp-content/plugins/orders-jet-integration/table-invoice.php?table=$table_number")
+        ));
+    }
+    
+    /**
+     * Complete table with cash payment
+     */
+    public function complete_table_cash() {
+        check_ajax_referer('oj_dashboard_nonce', 'nonce');
+        
+        $table_number = sanitize_text_field($_POST['table']);
+        $payment_method = sanitize_text_field($_POST['payment_method']);
+        
+        if (empty($table_number)) {
+            wp_send_json_error(array('message' => __('Table number is required', 'orders-jet')));
+        }
+        
+        // Get all pending_payment orders for this table
+        $orders = wc_get_orders(array(
+            'status' => array('pending_payment'),
+            'limit' => -1,
+            'meta_query' => array(
+                array(
+                    'key' => '_oj_table_number',
+                    'value' => $table_number,
+                    'compare' => '='
+                )
+            )
+        ));
+        
+        if (empty($orders)) {
+            wp_send_json_error(array('message' => __('No orders found for this table', 'orders-jet')));
+        }
+        
+        $completed_orders = array();
+        
+        foreach ($orders as $order) {
+            // Mark order as completed
+            $order->set_status('completed');
+            $order->add_order_note(sprintf(
+                __('Table %s closed with cash payment by manager (%s)', 'orders-jet'),
+                $table_number,
+                wp_get_current_user()->display_name
+            ));
+            $order->save();
+            
+            $completed_orders[] = $order->get_id();
+        }
+        
+        wp_send_json_success(array(
+            'message' => sprintf(__('Table %s closed successfully! %d orders completed.', 'orders-jet'), $table_number, count($completed_orders)),
+            'completed_orders' => $completed_orders
+        ));
+    }
+    
+    /**
+     * Complete individual order
+     */
+    public function complete_individual_order() {
+        check_ajax_referer('oj_dashboard_nonce', 'nonce');
+        
+        $order_id = intval($_POST['order_id']);
+        
+        if (empty($order_id)) {
+            wp_send_json_error(array('message' => __('Order ID is required', 'orders-jet')));
+        }
+        
+        $order = wc_get_order($order_id);
+        
+        if (!$order) {
+            wp_send_json_error(array('message' => __('Order not found', 'orders-jet')));
+        }
+        
+        // Check if it's an individual order (no table number)
+        $table_number = $order->get_meta('_oj_table_number');
+        if (!empty($table_number)) {
+            wp_send_json_error(array('message' => __('This is a table order. Use Close Table instead.', 'orders-jet')));
+        }
+        
+        // Mark order as completed
+        $order->set_status('completed');
+        $order->add_order_note(sprintf(
+            __('Individual order completed by manager (%s)', 'orders-jet'),
+            wp_get_current_user()->display_name
+        ));
+        $order->save();
+        
+        wp_send_json_success(array(
+            'message' => sprintf(__('Order #%d completed successfully!', 'orders-jet'), $order_id)
+        ));
     }
     
 }

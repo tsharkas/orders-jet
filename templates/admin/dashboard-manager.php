@@ -750,18 +750,46 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                     <span class="dashicons dashicons-admin-users"></span>
                                     <?php _e('Customer', 'orders-jet'); ?>
                                 </button>
+                                
+                                <?php if (!empty($order['table_number'])) : ?>
+                                    <!-- TABLE ORDER ACTIONS -->
+                                    <button class="oj-action-btn oj-smart-close-table" data-table="<?php echo esc_attr($order['table_number']); ?>">
+                                        <span class="dashicons dashicons-money-alt"></span>
+                                        <?php _e('Close & Pay Table', 'orders-jet'); ?>
+                                    </button>
+                                    <button class="oj-action-btn oj-table-invoice" data-table="<?php echo esc_attr($order['table_number']); ?>">
+                                        <span class="dashicons dashicons-media-text"></span>
+                                        <?php _e('Table Invoice', 'orders-jet'); ?>
+                                    </button>
+                                <?php else : ?>
+                                    <!-- INDIVIDUAL ORDER ACTIONS -->
+                                    <?php if (in_array($order['post_status'], ['wc-pending', 'wc-processing'])) : ?>
+                                        <button class="oj-action-btn oj-complete-order" data-order-id="<?php echo esc_attr($order['ID']); ?>">
+                                            <span class="dashicons dashicons-yes-alt"></span>
+                                            <?php _e('Complete Order', 'orders-jet'); ?>
+                                        </button>
+                                    <?php endif; ?>
+                                    
+                                    <?php if ($order['post_status'] === 'wc-completed') : ?>
+                                        <button class="oj-action-btn oj-print-invoice" data-order-id="<?php echo esc_attr($order['ID']); ?>">
+                                            <span class="dashicons dashicons-media-text"></span>
+                                            <?php _e('Print Invoice', 'orders-jet'); ?>
+                                        </button>
+                                    <?php endif; ?>
+                                    
+                                    <!-- Payment Confirmation Button for Pickup Orders -->
+                                    <?php if ($order['post_status'] === 'wc-pending_payment') : ?>
+                                        <button class="oj-action-btn oj-confirm-payment" data-order-id="<?php echo esc_attr($order['ID']); ?>">
+                                            <span class="dashicons dashicons-money-alt"></span>
+                                            <?php _e('Confirm Payment', 'orders-jet'); ?>
+                                        </button>
+                                    <?php endif; ?>
+                                <?php endif; ?>
+                                
                                 <?php if ($order['post_status'] === 'wc-processing') : ?>
                                     <button class="oj-action-btn oj-priority" data-order-id="<?php echo esc_attr($order['ID']); ?>">
                                         <span class="dashicons dashicons-flag"></span>
                                         <?php _e('Priority', 'orders-jet'); ?>
-                                    </button>
-                                <?php endif; ?>
-                                
-                                <!-- Payment Confirmation Button for Pickup Orders -->
-                                <?php if ($order['post_status'] === 'wc-pending_payment' && empty($order['table_number'])) : ?>
-                                    <button class="oj-action-btn oj-confirm-payment" data-order-id="<?php echo esc_attr($order['ID']); ?>">
-                                        <span class="dashicons dashicons-money-alt"></span>
-                                        <?php _e('Confirm Payment', 'orders-jet'); ?>
                                     </button>
                                 <?php endif; ?>
                             </div>
@@ -776,6 +804,54 @@ $currency_symbol = get_woocommerce_currency_symbol();
         <?php endif; ?>
     </div>
 
+</div>
+
+<!-- Smart Close Table Modal -->
+<div id="oj-smart-payment-modal" class="oj-modal" style="display: none;">
+    <div class="oj-modal-content">
+        <div class="oj-modal-header">
+            <h3 id="oj-modal-title"><?php _e('Close Table', 'orders-jet'); ?></h3>
+            <span class="oj-modal-close">&times;</span>
+        </div>
+        <div class="oj-modal-body">
+            <div id="oj-table-summary">
+                <div class="oj-orders-list">
+                    <h4><?php _e('Orders Summary:', 'orders-jet'); ?></h4>
+                    <div id="oj-orders-content"></div>
+                </div>
+                <div class="oj-total-section">
+                    <h3 id="oj-total-amount"><?php _e('Total: $0.00', 'orders-jet'); ?></h3>
+                </div>
+            </div>
+            
+            <div class="oj-payment-methods">
+                <h4><?php _e('Payment Method:', 'orders-jet'); ?></h4>
+                <div class="oj-payment-options">
+                    <button class="oj-payment-btn oj-cash-payment" data-method="cash">
+                        <span class="dashicons dashicons-money-alt"></span>
+                        <?php _e('Cash Payment', 'orders-jet'); ?>
+                    </button>
+                    <button class="oj-payment-btn oj-online-payment" data-method="online">
+                        <span class="dashicons dashicons-admin-site-alt3"></span>
+                        <?php _e('Online Payment', 'orders-jet'); ?>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="oj-modal-footer">
+            <button class="oj-btn oj-btn-secondary" id="oj-print-invoice-btn">
+                <span class="dashicons dashicons-media-text"></span>
+                <?php _e('Print Invoice', 'orders-jet'); ?>
+            </button>
+            <button class="oj-btn oj-btn-primary" id="oj-process-payment-btn" style="display: none;">
+                <span class="dashicons dashicons-yes-alt"></span>
+                <?php _e('Process Payment', 'orders-jet'); ?>
+            </button>
+            <button class="oj-btn oj-btn-secondary" id="oj-cancel-btn">
+                <?php _e('Cancel', 'orders-jet'); ?>
+            </button>
+        </div>
+    </div>
 </div>
 
 <style>
@@ -2294,9 +2370,167 @@ $currency_symbol = get_woocommerce_currency_symbol();
     }
     
     .oj-action-btn {
-        padding: 16px;
-        font-size: 15px;
-    }
+    padding: 16px;
+    font-size: 15px;
+}
+
+/* Smart Payment Modal */
+.oj-modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.oj-modal-content {
+    background-color: #fff;
+    margin: 5% auto;
+    padding: 0;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 600px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.oj-modal-header {
+    padding: 20px;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.oj-modal-header h3 {
+    margin: 0;
+    color: #1976d2;
+}
+
+.oj-modal-close {
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    color: #999;
+}
+
+.oj-modal-close:hover {
+    color: #333;
+}
+
+.oj-modal-body {
+    padding: 20px;
+}
+
+.oj-orders-list {
+    margin-bottom: 20px;
+}
+
+.oj-orders-list h4 {
+    margin: 0 0 10px 0;
+    color: #333;
+}
+
+.oj-order-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.oj-order-item:last-child {
+    border-bottom: none;
+}
+
+.oj-total-section {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 6px;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.oj-total-section h3 {
+    margin: 0;
+    color: #1976d2;
+    font-size: 24px;
+}
+
+.oj-payment-methods h4 {
+    margin: 0 0 15px 0;
+    color: #333;
+}
+
+.oj-payment-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.oj-payment-btn {
+    padding: 15px;
+    border: 2px solid #ddd;
+    background: #fff;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 16px;
+}
+
+.oj-payment-btn:hover {
+    border-color: #1976d2;
+    background: #f0f7ff;
+}
+
+.oj-payment-btn.selected {
+    border-color: #1976d2;
+    background: #1976d2;
+    color: white;
+}
+
+.oj-modal-footer {
+    padding: 20px;
+    border-top: 1px solid #ddd;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.oj-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.3s ease;
+}
+
+.oj-btn-primary {
+    background: #1976d2;
+    color: white;
+}
+
+.oj-btn-primary:hover {
+    background: #1565c0;
+}
+
+.oj-btn-secondary {
+    background: #f5f5f5;
+    color: #333;
+    border: 1px solid #ddd;
+}
+
+.oj-btn-secondary:hover {
+    background: #e0e0e0;
+}
 }
 </style>
 
@@ -2643,6 +2877,206 @@ jQuery(document).ready(function($) {
                     button.html('<span class="dashicons dashicons-money-alt"></span> <?php _e('Confirm Payment', 'orders-jet'); ?>');
                 }
             });
+        }
+    });
+    
+    // Smart Close Table functionality
+    let currentTable = '';
+    let selectedPaymentMethod = '';
+    let tableData = {};
+    
+    // Smart Close Table button
+    $('.oj-smart-close-table').on('click', function() {
+        currentTable = $(this).data('table');
+        
+        // Get table summary
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'oj_get_table_summary',
+                table: currentTable,
+                nonce: '<?php echo wp_create_nonce('oj_dashboard_nonce'); ?>'
+            },
+            success: function(response) {
+                if (response.success) {
+                    tableData = response.data;
+                    showSmartPaymentModal(response.data);
+                } else {
+                    alert('<?php _e('Error getting table data:', 'orders-jet'); ?> ' + response.data.message);
+                }
+            },
+            error: function() {
+                alert('<?php _e('Connection error. Please try again.', 'orders-jet'); ?>');
+            }
+        });
+    });
+    
+    function showSmartPaymentModal(data) {
+        // Update modal title
+        $('#oj-modal-title').text('<?php _e('Close Table', 'orders-jet'); ?> ' + currentTable);
+        
+        // Update orders content
+        let ordersHtml = '';
+        data.orders.forEach(function(order) {
+            ordersHtml += '<div class="oj-order-item">';
+            ordersHtml += '<span><?php _e('Order', 'orders-jet'); ?> #' + order.id + '</span>';
+            ordersHtml += '<span>' + order.total + '</span>';
+            ordersHtml += '</div>';
+        });
+        $('#oj-orders-content').html(ordersHtml);
+        
+        // Update total
+        $('#oj-total-amount').text('<?php _e('Total:', 'orders-jet'); ?> ' + data.total_formatted);
+        
+        // Show modal
+        $('#oj-smart-payment-modal').show();
+    }
+    
+    // Payment method selection
+    $('.oj-payment-btn').on('click', function() {
+        $('.oj-payment-btn').removeClass('selected');
+        $(this).addClass('selected');
+        selectedPaymentMethod = $(this).data('method');
+        
+        // Show process button
+        $('#oj-process-payment-btn').show();
+        
+        // Update button text based on method
+        if (selectedPaymentMethod === 'cash') {
+            $('#oj-process-payment-btn').html('<span class="dashicons dashicons-yes-alt"></span> <?php _e('Complete (Cash)', 'orders-jet'); ?>');
+        } else {
+            $('#oj-process-payment-btn').html('<span class="dashicons dashicons-admin-site-alt3"></span> <?php _e('Pay Online', 'orders-jet'); ?>');
+        }
+    });
+    
+    // Process payment
+    $('#oj-process-payment-btn').on('click', function() {
+        if (!selectedPaymentMethod) {
+            alert('<?php _e('Please select a payment method', 'orders-jet'); ?>');
+            return;
+        }
+        
+        if (selectedPaymentMethod === 'cash') {
+            // Process cash payment
+            processCashPayment();
+        } else {
+            // Redirect to online payment
+            processOnlinePayment();
+        }
+    });
+    
+    function processCashPayment() {
+        const button = $('#oj-process-payment-btn');
+        button.prop('disabled', true);
+        button.html('<span class="dashicons dashicons-update"></span> <?php _e('Processing...', 'orders-jet'); ?>');
+        
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'oj_complete_table_cash',
+                table: currentTable,
+                payment_method: 'cash',
+                nonce: '<?php echo wp_create_nonce('oj_dashboard_nonce'); ?>'
+            },
+            success: function(response) {
+                if (response.success) {
+                    alert('<?php _e('Table closed successfully!', 'orders-jet'); ?>');
+                    $('#oj-smart-payment-modal').hide();
+                    window.location.reload();
+                } else {
+                    alert('<?php _e('Error:', 'orders-jet'); ?> ' + response.data.message);
+                    button.prop('disabled', false);
+                    button.html('<span class="dashicons dashicons-yes-alt"></span> <?php _e('Complete (Cash)', 'orders-jet'); ?>');
+                }
+            },
+            error: function() {
+                alert('<?php _e('Connection error. Please try again.', 'orders-jet'); ?>');
+                button.prop('disabled', false);
+                button.html('<span class="dashicons dashicons-yes-alt"></span> <?php _e('Complete (Cash)', 'orders-jet'); ?>');
+            }
+        });
+    }
+    
+    function processOnlinePayment() {
+        // Create online payment URL
+        const paymentUrl = '<?php echo site_url(); ?>/table-invoice.php?table=' + currentTable + '&payment_method=online&action=checkout';
+        window.open(paymentUrl, '_blank');
+        $('#oj-smart-payment-modal').hide();
+    }
+    
+    // Print invoice
+    $('#oj-print-invoice-btn').on('click', function() {
+        const invoiceUrl = '<?php echo site_url(); ?>/wp-content/plugins/orders-jet-integration/table-invoice.php?table=' + currentTable;
+        window.open(invoiceUrl, '_blank');
+    });
+    
+    // Table invoice button
+    $('.oj-table-invoice').on('click', function() {
+        const table = $(this).data('table');
+        const invoiceUrl = '<?php echo site_url(); ?>/wp-content/plugins/orders-jet-integration/table-invoice.php?table=' + table;
+        window.open(invoiceUrl, '_blank');
+    });
+    
+    // Complete individual order
+    $('.oj-complete-order').on('click', function() {
+        const orderId = $(this).data('order-id');
+        const button = $(this);
+        
+        if (confirm('<?php _e('Mark this order as completed?', 'orders-jet'); ?>')) {
+            button.prop('disabled', true);
+            button.html('<span class="dashicons dashicons-update"></span> <?php _e('Processing...', 'orders-jet'); ?>');
+            
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'oj_complete_individual_order',
+                    order_id: orderId,
+                    nonce: '<?php echo wp_create_nonce('oj_dashboard_nonce'); ?>'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        alert('<?php _e('Order completed successfully!', 'orders-jet'); ?>');
+                        window.location.reload();
+                    } else {
+                        alert('<?php _e('Error:', 'orders-jet'); ?> ' + response.data.message);
+                        button.prop('disabled', false);
+                        button.html('<span class="dashicons dashicons-yes-alt"></span> <?php _e('Complete Order', 'orders-jet'); ?>');
+                    }
+                },
+                error: function() {
+                    alert('<?php _e('Connection error. Please try again.', 'orders-jet'); ?>');
+                    button.prop('disabled', false);
+                    button.html('<span class="dashicons dashicons-yes-alt"></span> <?php _e('Complete Order', 'orders-jet'); ?>');
+                }
+            });
+        }
+    });
+    
+    // Print individual invoice
+    $('.oj-print-invoice').on('click', function() {
+        const orderId = $(this).data('order-id');
+        const invoiceUrl = '<?php echo site_url(); ?>/wp-content/plugins/orders-jet-integration/table-invoice.php?order_id=' + orderId;
+        window.open(invoiceUrl, '_blank');
+    });
+    
+    // Modal close functionality
+    $('.oj-modal-close, #oj-cancel-btn').on('click', function() {
+        $('#oj-smart-payment-modal').hide();
+        selectedPaymentMethod = '';
+        $('.oj-payment-btn').removeClass('selected');
+        $('#oj-process-payment-btn').hide();
+    });
+    
+    // Close modal when clicking outside
+    $(window).on('click', function(event) {
+        if (event.target.id === 'oj-smart-payment-modal') {
+            $('#oj-smart-payment-modal').hide();
+            selectedPaymentMethod = '';
+            $('.oj-payment-btn').removeClass('selected');
+            $('#oj-process-payment-btn').hide();
         }
     });
 });

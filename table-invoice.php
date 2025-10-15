@@ -25,31 +25,251 @@ if (!$wp_loaded) {
     die('WordPress not found. Please ensure this file is in the correct plugin directory.');
 }
 
+/**
+ * Handle online payment checkout
+ */
+function handle_online_payment_checkout() {
+    global $table_number;
+    
+    // Get available payment gateways
+    $available_gateways = WC()->payment_gateways->get_available_payment_gateways();
+    
+    if (empty($available_gateways)) {
+        wp_die(__('No payment methods available', 'orders-jet'));
+    }
+    
+    // Get table orders
+    $orders = get_posts(array(
+        'post_type' => 'shop_order',
+        'post_status' => array('wc-pending_payment'),
+        'meta_query' => array(
+            array(
+                'key' => '_oj_table_number',
+                'value' => $table_number,
+                'compare' => '='
+            )
+        ),
+        'posts_per_page' => -1
+    ));
+    
+    if (empty($orders)) {
+        wp_die(__('No orders found for payment', 'orders-jet'));
+    }
+    
+    // Calculate total amount
+    $total_amount = 0;
+    foreach ($orders as $order_post) {
+        $order = wc_get_order($order_post->ID);
+        if ($order) {
+            $total_amount += $order->get_total();
+        }
+    }
+    
+    // Display payment checkout page
+    display_payment_checkout($orders, $total_amount, $available_gateways);
+}
+
+/**
+ * Display payment checkout page
+ */
+function display_payment_checkout($orders, $total_amount, $gateways) {
+    global $table_number;
+    ?>
+    <!DOCTYPE html>
+    <html <?php language_attributes(); ?>>
+    <head>
+        <meta charset="<?php bloginfo('charset'); ?>">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title><?php printf(__('Pay for Table %s', 'orders-jet'), $table_number); ?></title>
+        <style>
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: #f8f9fa;
+                margin: 0;
+                padding: 20px;
+            }
+            .payment-container {
+                max-width: 500px;
+                margin: 0 auto;
+                background: white;
+                border-radius: 10px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                padding: 30px;
+            }
+            .payment-header {
+                text-align: center;
+                margin-bottom: 30px;
+            }
+            .payment-header h1 {
+                color: #c41e3a;
+                margin-bottom: 10px;
+            }
+            .total-amount {
+                background: #c41e3a;
+                color: white;
+                padding: 20px;
+                border-radius: 8px;
+                text-align: center;
+                margin-bottom: 30px;
+            }
+            .total-amount h2 {
+                margin: 0;
+                font-size: 28px;
+            }
+            .payment-methods {
+                margin-bottom: 30px;
+            }
+            .payment-methods h3 {
+                margin-bottom: 20px;
+                color: #333;
+            }
+            .payment-gateway {
+                border: 2px solid #ddd;
+                border-radius: 8px;
+                padding: 15px;
+                margin-bottom: 15px;
+                cursor: pointer;
+                transition: all 0.3s ease;
+            }
+            .payment-gateway:hover {
+                border-color: #c41e3a;
+                background: #fff5f5;
+            }
+            .payment-gateway.selected {
+                border-color: #c41e3a;
+                background: #c41e3a;
+                color: white;
+            }
+            .pay-button {
+                width: 100%;
+                background: #28a745;
+                color: white;
+                border: none;
+                padding: 15px;
+                border-radius: 8px;
+                font-size: 18px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.3s ease;
+            }
+            .pay-button:hover {
+                background: #218838;
+            }
+            .pay-button:disabled {
+                background: #6c757d;
+                cursor: not-allowed;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="payment-container">
+            <div class="payment-header">
+                <h1><?php printf(__('Pay for Table %s', 'orders-jet'), $table_number); ?></h1>
+                <p><?php printf(__('%d orders ready for payment', 'orders-jet'), count($orders)); ?></p>
+            </div>
+            
+            <div class="total-amount">
+                <h2><?php echo wc_price($total_amount); ?></h2>
+                <p><?php _e('Total Amount', 'orders-jet'); ?></p>
+            </div>
+            
+            <div class="payment-methods">
+                <h3><?php _e('Select Payment Method:', 'orders-jet'); ?></h3>
+                <?php foreach ($gateways as $gateway_id => $gateway): ?>
+                    <div class="payment-gateway" data-gateway="<?php echo esc_attr($gateway_id); ?>">
+                        <strong><?php echo esc_html($gateway->get_title()); ?></strong>
+                        <?php if ($gateway->get_description()): ?>
+                            <br><small><?php echo esc_html($gateway->get_description()); ?></small>
+                        <?php endif; ?>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            
+            <button class="pay-button" id="proceed-payment" disabled>
+                <?php _e('Proceed to Payment', 'orders-jet'); ?>
+            </button>
+        </div>
+        
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const gateways = document.querySelectorAll('.payment-gateway');
+                const payButton = document.getElementById('proceed-payment');
+                let selectedGateway = '';
+                
+                gateways.forEach(gateway => {
+                    gateway.addEventListener('click', function() {
+                        // Remove selected class from all gateways
+                        gateways.forEach(g => g.classList.remove('selected'));
+                        
+                        // Add selected class to clicked gateway
+                        this.classList.add('selected');
+                        selectedGateway = this.dataset.gateway;
+                        
+                        // Enable pay button
+                        payButton.disabled = false;
+                    });
+                });
+                
+                payButton.addEventListener('click', function() {
+                    if (selectedGateway) {
+                        // Process payment with selected gateway
+                        processPayment(selectedGateway);
+                    }
+                });
+                
+                function processPayment(gateway) {
+                    // For now, redirect to WooCommerce checkout
+                    // In a real implementation, you'd integrate with the specific gateway
+                    alert('Payment processing with ' + gateway + ' would be implemented here.');
+                    
+                    // Redirect back to invoice with cash payment for now
+                    window.location.href = '<?php echo site_url(); ?>/wp-content/plugins/orders-jet-integration/table-invoice.php?table=<?php echo urlencode($table_number); ?>&payment_method=online';
+                }
+            });
+        </script>
+    </body>
+    </html>
+    <?php
+}
+
 // Get table number and payment method from URL
 $table_number = sanitize_text_field($_GET['table'] ?? '');
 $payment_method = sanitize_text_field($_GET['payment_method'] ?? 'cash');
-$session_id = sanitize_text_field($_GET['session'] ?? '');
+$action = sanitize_text_field($_GET['action'] ?? 'invoice');
+$order_id = intval($_GET['order_id'] ?? 0);
 
-if (empty($table_number)) {
-    wp_die(__('Table number is required', 'orders-jet'));
+if (empty($table_number) && empty($order_id)) {
+    wp_die(__('Table number or Order ID is required', 'orders-jet'));
 }
 
-// Get orders that are ready for invoice generation (pending_payment status)
-// These are the current session orders that have been marked ready but haven't been invoiced yet
-$orders = get_posts(array(
-    'post_type' => 'shop_order',
-    'post_status' => array('wc-pending_payment'),
-    'meta_query' => array(
-        array(
-            'key' => '_oj_table_number',
-            'value' => $table_number,
-            'compare' => '='
-        )
-    ),
-    'posts_per_page' => -1,
-    'orderby' => 'date',
-    'order' => 'DESC'
-));
+// Handle online payment checkout
+if ($action === 'checkout' && $payment_method === 'online') {
+    handle_online_payment_checkout();
+    return;
+}
+
+// Get orders based on whether it's a table or individual order
+if (!empty($order_id)) {
+    // Individual order invoice
+    $orders = array(get_post($order_id));
+    $orders = array_filter($orders); // Remove null values
+} else {
+    // Table orders invoice
+    $orders = get_posts(array(
+        'post_type' => 'shop_order',
+        'post_status' => array('wc-pending_payment'),
+        'meta_query' => array(
+            array(
+                'key' => '_oj_table_number',
+                'value' => $table_number,
+                'compare' => '='
+            )
+        ),
+        'posts_per_page' => -1,
+        'orderby' => 'date',
+        'order' => 'DESC'
+    ));
+}
 
 error_log('Orders Jet Invoice: Found ' . count($orders) . ' pending_payment orders for table ' . $table_number);
 
