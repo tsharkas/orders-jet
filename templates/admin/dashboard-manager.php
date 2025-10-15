@@ -27,12 +27,18 @@ global $wpdb;
 // Get actionable orders only (not completed/cancelled)
 $actionable_orders = array();
 if (function_exists('wc_get_orders')) {
+    // DEBUG: Log what we're querying for
+    error_log('Orders Jet Manager: Querying for orders with statuses: processing, pending-payment');
+    
     $wc_orders = wc_get_orders(array(
-        'status' => array('processing', 'pending_payment'), // Only actionable statuses - clean cycle
+        'status' => array('processing', 'pending-payment'), // Only actionable statuses - clean cycle
         'limit' => -1,
         'orderby' => 'date',
         'order' => 'DESC' // Newest first for managers
     ));
+    
+    // DEBUG: Log what we found
+    error_log('Orders Jet Manager: Found ' . count($wc_orders) . ' orders total');
     
     foreach ($wc_orders as $wc_order) {
         $table_number = $wc_order->get_meta('_oj_table_number');
@@ -87,10 +93,14 @@ if (function_exists('wc_get_orders')) {
             );
         }
         
+        // DEBUG: Log each order we're processing
+        $order_status = $wc_order->get_status();
+        error_log('Orders Jet Manager: Processing Order #' . $wc_order->get_id() . ' with status: ' . $order_status);
+        
         $actionable_orders[] = array(
             'ID' => $wc_order->get_id(),
             'post_date' => OJ_Universal_Time_Manager::format(OJ_Universal_Time_Manager::get_order_created_timestamp($wc_order), 'Y-m-d H:i:s'),
-            'post_status' => 'wc-' . $wc_order->get_status(),
+            'post_status' => 'wc-' . $order_status,
             'order_total' => $wc_order->get_total(),
             'table_number' => $table_number,
             'customer_name' => $wc_order->get_billing_first_name() ?: 'Guest',
@@ -138,8 +148,15 @@ foreach ($table_orders as $order) {
 
 // Calculate statistics
 $ready_orders = array_filter($actionable_orders, function($order) {
-    return $order['post_status'] === 'wc-pending_payment';
+    $is_ready = $order['post_status'] === 'wc-pending-payment';
+    if ($is_ready) {
+        error_log('Orders Jet Manager: Found ready order #' . $order['ID'] . ' with status: ' . $order['post_status']);
+    }
+    return $is_ready;
 });
+
+// DEBUG: Log statistics
+error_log('Orders Jet Manager: Ready orders count: ' . count($ready_orders));
 
 $processing_orders = array_filter($actionable_orders, function($order) {
     return $order['post_status'] === 'wc-processing';
@@ -327,7 +344,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
                             $status_class = str_replace('wc-', '', $order['post_status']);
                             $status_labels = array(
                                 'processing' => __('Cooking', 'orders-jet'),
-                                'pending_payment' => __('Ready', 'orders-jet')
+                                'pending-payment' => __('Ready', 'orders-jet')
                             );
                             $status_label = $status_labels[$status_class] ?? ucfirst(str_replace('-', ' ', $status_class));
                             ?>
@@ -351,7 +368,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
                             <div class="oj-action-buttons">
                                 <?php if ($order['order_category'] === 'table') : ?>
                                     <!-- Table Order Actions -->
-                                    <?php if (in_array($order['post_status'], ['wc-pending_payment'])) : ?>
+                                    <?php if (in_array($order['post_status'], ['wc-pending-payment'])) : ?>
                                         <button class="oj-btn oj-btn-primary oj-close-table" 
                                                 data-table="<?php echo esc_attr($order['table_number']); ?>"
                                                 title="<?php _e('Close Table & Generate Invoice', 'orders-jet'); ?>">
@@ -361,7 +378,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                     <?php endif; ?>
                                 <?php else : ?>
                                     <!-- Individual Order Actions -->
-                                    <?php if (in_array($order['post_status'], ['wc-pending_payment'])) : ?>
+                                    <?php if (in_array($order['post_status'], ['wc-pending-payment'])) : ?>
                                         <button class="oj-btn oj-btn-success oj-complete-order" 
                                                 data-order-id="<?php echo esc_attr($order['ID']); ?>"
                                                 title="<?php _e('Mark as Completed', 'orders-jet'); ?>">
@@ -1207,7 +1224,7 @@ jQuery(document).ready(function($) {
                     show = category === 'individual';
                     break;
                 case 'ready':
-                    show = status === 'pending_payment';
+                    show = status === 'pending-payment';
                     break;
                 case 'processing':
                     show = status === 'processing';
@@ -1248,7 +1265,7 @@ jQuery(document).ready(function($) {
                         matches = category === 'individual';
                         break;
                     case 'ready':
-                        matches = status === 'pending_payment';
+                        matches = status === 'pending-payment';
                         break;
                     case 'processing':
                         matches = status === 'processing';
