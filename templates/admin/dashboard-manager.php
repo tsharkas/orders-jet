@@ -19,28 +19,60 @@ include ORDERS_JET_PLUGIN_DIR . 'templates/admin/manager-navigation.php';
 // Get current date
 $today_formatted = date('F j, Y');
 
-// Simple, clean order retrieval
+// DEBUG: Retrieve ALL orders to see what exists
 $all_orders = array();
 $processing_orders = array();
 $ready_orders = array();
 
 // Get orders using WooCommerce native function
 if (function_exists('wc_get_orders')) {
-    // Get processing orders (cooking)
-    $processing_wc_orders = wc_get_orders(array(
-        'status' => 'processing',
+    // DEBUG: Get ALL orders to see what statuses exist
+    $all_wc_orders = wc_get_orders(array(
         'limit' => -1,
         'orderby' => 'date',
         'order' => 'DESC'
     ));
     
-    // Get ready orders (pending payment)
-    $ready_wc_orders = wc_get_orders(array(
-        'status' => 'pending-payment',
-        'limit' => -1,
-        'orderby' => 'date',
-        'order' => 'DESC'
-    ));
+    // DEBUG: Log what we found
+    error_log('Orders Jet Manager DEBUG: Found ' . count($all_wc_orders) . ' total orders');
+    
+    // DEBUG: Check each order status
+    $status_counts = array();
+    foreach ($all_wc_orders as $order) {
+        $status = $order->get_status();
+        if (!isset($status_counts[$status])) {
+            $status_counts[$status] = 0;
+        }
+        $status_counts[$status]++;
+        
+        // Log first few orders for debugging
+        if (count($all_orders) < 10) {
+            error_log('Orders Jet Manager DEBUG: Order #' . $order->get_id() . ' has status: ' . $status);
+        }
+    }
+    
+    // DEBUG: Log status summary
+    foreach ($status_counts as $status => $count) {
+        error_log('Orders Jet Manager DEBUG: Status "' . $status . '": ' . $count . ' orders');
+    }
+    
+    // Now separate by status for display
+    $processing_wc_orders = array();
+    $ready_wc_orders = array();
+    
+    // Separate orders by status
+    foreach ($all_wc_orders as $order) {
+        $status = $order->get_status();
+        
+        if ($status === 'processing') {
+            $processing_wc_orders[] = $order;
+        } elseif ($status === 'pending-payment') {
+            $ready_wc_orders[] = $order;
+        }
+    }
+    
+    error_log('Orders Jet Manager DEBUG: Processing orders: ' . count($processing_wc_orders));
+    error_log('Orders Jet Manager DEBUG: Ready orders: ' . count($ready_wc_orders));
     
     // Process processing orders
     foreach ($processing_wc_orders as $order) {
@@ -95,6 +127,20 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
             <?php _e('Refresh', 'orders-jet'); ?>
         </button>
     </div>
+    
+    <!-- DEBUG INFO -->
+    <?php if (isset($status_counts) && !empty($status_counts)) : ?>
+    <div class="oj-debug-info" style="background: #fff3cd; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
+        <h3>🔍 DEBUG: Order Status Summary</h3>
+        <p><strong>Total Orders Found:</strong> <?php echo count($all_wc_orders); ?></p>
+        <ul>
+            <?php foreach ($status_counts as $status => $count) : ?>
+                <li><strong><?php echo esc_html($status); ?>:</strong> <?php echo $count; ?> orders</li>
+            <?php endforeach; ?>
+        </ul>
+        <p><em>Check error logs for detailed order information.</em></p>
+    </div>
+    <?php endif; ?>
     
     <!-- Statistics -->
     <div class="oj-stats">
