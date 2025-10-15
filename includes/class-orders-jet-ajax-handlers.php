@@ -836,7 +836,7 @@ class Orders_Jet_AJAX_Handlers {
     }
     
     /**
-     * Get table orders for order history
+     * Get table orders for order history (current session only)
      */
     public function get_table_orders() {
         check_ajax_referer('oj_table_order', 'nonce');
@@ -849,36 +849,38 @@ class Orders_Jet_AJAX_Handlers {
             wp_send_json_error(array('message' => __('Table number is required', 'orders-jet')));
         }
         
-        // Check table status to determine which orders to show
-        $table_id = oj_get_table_id_by_number($table_number);
-        $table_status = $table_id ? get_post_meta($table_id, '_oj_table_status', true) : '';
+        // Get the current active session ID for this table
+        $current_session_id = $this->get_or_create_table_session($table_number);
+        error_log('Orders Jet: Current session ID for table ' . $table_number . ': ' . $current_session_id);
         
-        // If table is available, only show pending/processing/pending orders (new session)
-        // If table is occupied, show all orders (current session)
-        if ($table_status === 'available') {
-            $post_statuses = array('wc-pending', 'wc-processing', 'wc-pending');
-            error_log('Orders Jet: Table is available - showing only pending orders for new session');
-        } else {
-            $post_statuses = array(
-                'wc-pending',
-                'wc-processing', 
-                'wc-pending',
-                'wc-completed',
-                'wc-cancelled',
-                'wc-refunded',
-                'wc-failed'
-            );
-            error_log('Orders Jet: Table is occupied - showing all orders for current session');
-        }
+        // Always show only orders from the current session to ensure privacy
+        $post_statuses = array(
+            'wc-pending',
+            'wc-processing', 
+            'wc-pending',
+            'wc-completed',
+            'wc-cancelled',
+            'wc-refunded',
+            'wc-failed'
+        );
+        
+        error_log('Orders Jet: Showing orders for current session only: ' . $current_session_id);
         
         // Get orders for this table using WooCommerce's proper method
+        // Filter by both table number AND current session ID for privacy
         $args = array(
             'post_type' => 'shop_order',
             'post_status' => $post_statuses,
             'meta_query' => array(
+                'relation' => 'AND',
                 array(
                     'key' => '_oj_table_number',
                     'value' => $table_number,
+                    'compare' => '='
+                ),
+                array(
+                    'key' => '_oj_session_id',
+                    'value' => $current_session_id,
                     'compare' => '='
                 )
             ),
@@ -946,8 +948,19 @@ class Orders_Jet_AJAX_Handlers {
             
             $wc_orders = wc_get_orders(array(
                 'status' => $wc_statuses,
-                'meta_key' => '_oj_table_number',
-                'meta_value' => $table_number,
+                'meta_query' => array(
+                    'relation' => 'AND',
+                    array(
+                        'key' => '_oj_table_number',
+                        'value' => $table_number,
+                        'compare' => '='
+                    ),
+                    array(
+                        'key' => '_oj_session_id',
+                        'value' => $current_session_id,
+                        'compare' => '='
+                    )
+                ),
                 'limit' => -1,
                 'orderby' => 'date',
                 'order' => 'DESC'
