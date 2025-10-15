@@ -582,6 +582,9 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
 <script>
 jQuery(document).ready(function($) {
     
+    // Apply default filter on page load (Active Orders)
+    applyFilter('all');
+    
     // Filter functionality
     $('.oj-filter-btn').on('click', function() {
         const filter = $(this).data('filter');
@@ -590,7 +593,12 @@ jQuery(document).ready(function($) {
         $('.oj-filter-btn').removeClass('active');
         $(this).addClass('active');
         
-        // Filter orders
+        // Apply filter
+        applyFilter(filter);
+    });
+    
+    // Reusable filter function
+    function applyFilter(filter) {
         $('.oj-order-row').each(function() {
             const $row = $(this);
             const status = $row.data('status');
@@ -628,7 +636,7 @@ jQuery(document).ready(function($) {
                 $row.addClass('hidden');
             }
         });
-    });
+    }
     
     // Close table action with payment method selection
     $('.oj-close-table').on('click', function() {
