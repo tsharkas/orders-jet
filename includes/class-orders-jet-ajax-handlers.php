@@ -1265,6 +1265,8 @@ class Orders_Jet_AJAX_Handlers {
         $session_id = 'session_' . $table_number . '_' . time();
         
         // Update all orders with session ID, payment method, and table closed timestamp
+        // Also collect order IDs for PDF invoice generation
+        $completed_order_ids = array();
         foreach ($orders as $order_post) {
             $order = wc_get_order($order_post->ID);
             if ($order && in_array($order->get_status(), array('processing', 'pending', 'pending'))) {
@@ -1272,6 +1274,7 @@ class Orders_Jet_AJAX_Handlers {
                 $order->update_meta_data('_oj_payment_method', $payment_method);
                 $order->update_meta_data('_oj_table_closed', current_time('mysql'));
                 $order->save();
+                $completed_order_ids[] = $order->get_id();
             }
         }
         
@@ -1286,7 +1289,8 @@ class Orders_Jet_AJAX_Handlers {
             'message' => __('Table closed successfully', 'orders-jet'),
             'total' => $total_amount,
             'payment_method' => $payment_method,
-            'invoice_url' => $invoice_url
+            'invoice_url' => $invoice_url,
+            'order_ids' => $completed_order_ids
         ));
     }
     

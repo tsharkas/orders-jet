@@ -537,7 +537,11 @@ jQuery(document).ready(function($) {
             success: function(response) {
                 if (response.success) {
                     // Show success message and invoice option
-                    showInvoiceModal(orderId, response.data);
+                    if (orderType === 'table') {
+                        showTableInvoiceModal(tableNumber, response.data);
+                    } else {
+                        showInvoiceModal(orderId, response.data);
+                    }
                 } else {
                     alert(response.data.message || '<?php _e('Error completing order', 'orders-jet'); ?>');
                 }
@@ -556,10 +560,13 @@ jQuery(document).ready(function($) {
                     <p><?php _e('Order', 'orders-jet'); ?> #${orderId} <?php _e('has been completed.', 'orders-jet'); ?></p>
                     <div class="oj-invoice-actions">
                         <button class="button button-primary oj-view-invoice" data-order-id="${orderId}">
-                            📄 <?php _e('View Invoice', 'orders-jet'); ?>
+                            📄 <?php _e('View PDF Invoice', 'orders-jet'); ?>
                         </button>
                         <button class="button button-secondary oj-print-invoice" data-order-id="${orderId}">
-                            🖨️ <?php _e('Print Invoice', 'orders-jet'); ?>
+                            🖨️ <?php _e('Print PDF Invoice', 'orders-jet'); ?>
+                        </button>
+                        <button class="button button-secondary oj-download-invoice" data-order-id="${orderId}">
+                            💾 <?php _e('Download PDF', 'orders-jet'); ?>
                         </button>
                         <button class="button oj-close-success">
                             <?php _e('Close', 'orders-jet'); ?>
@@ -571,19 +578,185 @@ jQuery(document).ready(function($) {
         
         $('body').append(modal);
         
-        // Handle view invoice
+        // Handle view PDF invoice
         modal.find('.oj-view-invoice').on('click', function() {
-        const orderId = $(this).data('order-id');
-            window.open('<?php echo admin_url('admin.php?page=orders-jet-invoice&order_id='); ?>' + orderId, '_blank');
+            const orderId = $(this).data('order-id');
+            // Use WooCommerce PDF Invoices plugin URL for HTML view
+            const invoiceUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=generate_wpo_wcpdf&document_type=invoice&order_ids=' + orderId + '&output=html';
+            window.open(invoiceUrl, '_blank');
         });
         
-        // Handle print invoice
+        // Handle print PDF invoice
         modal.find('.oj-print-invoice').on('click', function() {
-        const orderId = $(this).data('order-id');
-            const printWindow = window.open('<?php echo admin_url('admin.php?page=orders-jet-invoice&order_id='); ?>' + orderId + '&print=1', '_blank');
-            printWindow.onload = function() {
-                printWindow.print();
+            const orderId = $(this).data('order-id');
+            // Direct PDF for printing
+            const pdfUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=generate_wpo_wcpdf&document_type=invoice&order_ids=' + orderId + '&output=pdf';
+            
+            // Create hidden iframe for printing
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = pdfUrl;
+            document.body.appendChild(iframe);
+            
+            iframe.onload = function() {
+                try {
+                    // Try to print the PDF directly
+                    iframe.contentWindow.print();
+                } catch (e) {
+                    // Fallback: open in new window for manual printing
+                    window.open(pdfUrl, '_blank');
+                }
+                // Remove iframe after printing
+                setTimeout(() => {
+                    if (document.body.contains(iframe)) {
+                        document.body.removeChild(iframe);
+                    }
+                }, 2000);
             };
+            
+            // Fallback if iframe fails to load
+            iframe.onerror = function() {
+                window.open(pdfUrl, '_blank');
+                if (document.body.contains(iframe)) {
+                    document.body.removeChild(iframe);
+                }
+            };
+        });
+        
+        // Handle download PDF invoice
+        modal.find('.oj-download-invoice').on('click', function() {
+            const orderId = $(this).data('order-id');
+            // Force download PDF
+            const downloadUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=generate_wpo_wcpdf&document_type=invoice&order_ids=' + orderId + '&output=pdf&force_download=1';
+            
+            // Create temporary link for download
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.download = 'invoice-' + orderId + '.pdf';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+        
+        // Handle close
+        modal.find('.oj-close-success').on('click', function() {
+            modal.remove();
+            location.reload();
+        });
+        
+        // Close on overlay click
+        modal.on('click', function(e) {
+            if (e.target === this) {
+                modal.remove();
+                location.reload();
+            }
+        });
+    }
+    
+    function showTableInvoiceModal(tableNumber, responseData) {
+        // Extract order IDs from response data for table orders
+        let orderIds = [];
+        if (responseData && responseData.order_ids) {
+            orderIds = responseData.order_ids;
+        }
+        
+        const modal = $(`
+            <div class="oj-invoice-modal-overlay">
+                <div class="oj-invoice-modal">
+                    <h3>✅ <?php _e('Table Closed Successfully!', 'orders-jet'); ?></h3>
+                    <p><?php _e('Table', 'orders-jet'); ?> #${tableNumber} <?php _e('has been closed and invoice generated.', 'orders-jet'); ?></p>
+                    ${orderIds.length > 0 ? `<p><small><?php _e('Orders:', 'orders-jet'); ?> ${orderIds.join(', ')}</small></p>` : ''}
+                    <div class="oj-invoice-actions">
+                        <button class="button button-primary oj-view-table-invoice" data-table="${tableNumber}" data-orders="${orderIds.join(',')}">
+                            📄 <?php _e('View PDF Invoice', 'orders-jet'); ?>
+                        </button>
+                        <button class="button button-secondary oj-print-table-invoice" data-table="${tableNumber}" data-orders="${orderIds.join(',')}">
+                            🖨️ <?php _e('Print PDF Invoice', 'orders-jet'); ?>
+                        </button>
+                        <button class="button button-secondary oj-download-table-invoice" data-table="${tableNumber}" data-orders="${orderIds.join(',')}">
+                            💾 <?php _e('Download PDF', 'orders-jet'); ?>
+                        </button>
+                        <button class="button oj-close-success">
+                            <?php _e('Close', 'orders-jet'); ?>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `);
+        
+        $('body').append(modal);
+        
+        // Handle view PDF invoice for table
+        modal.find('.oj-view-table-invoice').on('click', function() {
+            const orderIds = $(this).data('orders');
+            if (orderIds) {
+                // Use WooCommerce PDF Invoices plugin URL for multiple orders (table invoice)
+                const invoiceUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=generate_wpo_wcpdf&document_type=invoice&order_ids=' + orderIds + '&output=html';
+                window.open(invoiceUrl, '_blank');
+            } else {
+                alert('<?php _e('No orders found for this table.', 'orders-jet'); ?>');
+            }
+        });
+        
+        // Handle print PDF invoice for table
+        modal.find('.oj-print-table-invoice').on('click', function() {
+            const orderIds = $(this).data('orders');
+            if (orderIds) {
+                // Direct PDF for printing multiple orders
+                const pdfUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=generate_wpo_wcpdf&document_type=invoice&order_ids=' + orderIds + '&output=pdf';
+                
+                // Create hidden iframe for printing
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.src = pdfUrl;
+                document.body.appendChild(iframe);
+                
+                iframe.onload = function() {
+                    try {
+                        // Try to print the PDF directly
+                        iframe.contentWindow.print();
+                    } catch (e) {
+                        // Fallback: open in new window for manual printing
+                        window.open(pdfUrl, '_blank');
+                    }
+                    // Remove iframe after printing
+                    setTimeout(() => {
+                        if (document.body.contains(iframe)) {
+                            document.body.removeChild(iframe);
+                        }
+                    }, 2000);
+                };
+                
+                // Fallback if iframe fails to load
+                iframe.onerror = function() {
+                    window.open(pdfUrl, '_blank');
+                    if (document.body.contains(iframe)) {
+                        document.body.removeChild(iframe);
+                    }
+                };
+            } else {
+                alert('<?php _e('No orders found for this table.', 'orders-jet'); ?>');
+            }
+        });
+        
+        // Handle download PDF invoice for table
+        modal.find('.oj-download-table-invoice').on('click', function() {
+            const tableNumber = $(this).data('table');
+            const orderIds = $(this).data('orders');
+            if (orderIds) {
+                // Force download PDF for table
+                const downloadUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=generate_wpo_wcpdf&document_type=invoice&order_ids=' + orderIds + '&output=pdf&force_download=1';
+                
+                // Create temporary link for download
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = 'table-' + tableNumber + '-invoice.pdf';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } else {
+                alert('<?php _e('No orders found for this table.', 'orders-jet'); ?>');
+            }
         });
         
         // Handle close
