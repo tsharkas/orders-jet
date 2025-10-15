@@ -444,17 +444,17 @@ foreach ($active_orders as $order) {
     }
 }
 
-// Get completed orders (on-hold) - ultra simple
+// Get completed orders (pending_payment) - ultra simple
 if (function_exists('wc_get_orders')) {
     $completed_wc_orders = wc_get_orders(array(
-        'status' => array('on-hold'), // Ready orders
+        'status' => array('pending_payment'), // Ready orders
         'limit' => -1
     ));
     $completed_orders = count($completed_wc_orders);
 } else {
     $completed_orders_posts = get_posts(array(
         'post_type' => 'shop_order',
-        'post_status' => array('wc-on-hold'),
+        'post_status' => array('wc-pending_payment'),
         'posts_per_page' => -1
     ));
     $completed_orders = count($completed_orders_posts);
@@ -469,7 +469,7 @@ error_log('Orders Jet Kitchen Stats: Active Orders Count = ' . count($active_ord
 if (function_exists('wc_get_orders')) {
     error_log('Orders Jet Kitchen Stats: Using wc_get_orders for completed orders');
     if (isset($completed_wc_orders)) {
-        error_log('Orders Jet Kitchen Stats: Found ' . count($completed_wc_orders) . ' on-hold orders');
+        error_log('Orders Jet Kitchen Stats: Found ' . count($completed_wc_orders) . ' pending_payment orders');
         foreach ($completed_wc_orders as $completed_order) {
             error_log('Orders Jet Kitchen Stats: On-hold Order #' . $completed_order->get_id() . ' - Status: ' . $completed_order->get_status() . ' - Table: ' . $completed_order->get_meta('_oj_table_number'));
         }

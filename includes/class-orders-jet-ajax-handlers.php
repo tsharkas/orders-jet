@@ -850,14 +850,13 @@ class Orders_Jet_AJAX_Handlers {
         // If table is available, only show pending/processing/pending-payment orders (new session)
         // If table is occupied, show all orders (current session)
         if ($table_status === 'available') {
-            $post_statuses = array('wc-pending', 'wc-processing', 'wc-pending_payment', 'wc-on-hold');
+            $post_statuses = array('wc-pending', 'wc-processing', 'wc-pending_payment');
             error_log('Orders Jet: Table is available - showing only pending orders for new session');
         } else {
             $post_statuses = array(
                 'wc-pending',
                 'wc-processing', 
                 'wc-pending_payment',
-                'wc-on-hold',
                 'wc-completed',
                 'wc-cancelled',
                 'wc-refunded',
@@ -891,7 +890,6 @@ class Orders_Jet_AJAX_Handlers {
                 'wc-pending',
                 'wc-processing', 
                 'wc-pending_payment',
-                'wc-on-hold',
                 'wc-completed',
                 'wc-cancelled',
                 'wc-refunded',
@@ -1176,7 +1174,6 @@ class Orders_Jet_AJAX_Handlers {
                 'wc-pending',
                 'wc-processing', 
                 'wc-pending_payment',
-                'wc-on-hold',
                 'wc-completed',
                 'wc-cancelled',
                 'wc-refunded',
@@ -1202,7 +1199,7 @@ class Orders_Jet_AJAX_Handlers {
             error_log('Orders Jet: Close table - Trying WooCommerce native method...');
             
             $wc_orders = wc_get_orders(array(
-                'status' => array('pending', 'processing', 'on-hold', 'completed', 'cancelled', 'refunded', 'failed'),
+                'status' => array('pending', 'processing', 'pending_payment', 'completed', 'cancelled', 'refunded', 'failed'),
                 'meta_key' => '_oj_table_number',
                 'meta_value' => $table_number,
                 'limit' => -1
@@ -1232,11 +1229,11 @@ class Orders_Jet_AJAX_Handlers {
                 error_log('Orders Jet: Close table - Order #' . $order->get_id() . ' - Status: "' . $status . '" - Total: ' . $total . ' - Table Meta: "' . $table_meta . '"');
                 
                 // Include orders that are processing or pending (not completed yet)
-                if (in_array($status, array('processing', 'pending', 'on-hold'))) {
+                if (in_array($status, array('processing', 'pending', 'pending_payment'))) {
                     $total_amount += $total;
                     error_log('Orders Jet: Close table - Added order #' . $order->get_id() . ' to total. New total: ' . $total_amount);
                 } else {
-                    error_log('Orders Jet: Close table - Skipped order #' . $order->get_id() . ' because status "' . $status . '" is not pending/processing/on-hold');
+                    error_log('Orders Jet: Close table - Skipped order #' . $order->get_id() . ' because status "' . $status . '" is not pending/processing/pending_payment');
                 }
             } else {
                 error_log('Orders Jet: Close table - Failed to get order object for post ID: ' . $order_post->ID);
@@ -1255,7 +1252,7 @@ class Orders_Jet_AJAX_Handlers {
         // Mark all pending/processing orders as completed
         foreach ($orders as $order_post) {
             $order = wc_get_order($order_post->ID);
-            if ($order && in_array($order->get_status(), array('processing', 'pending', 'on-hold'))) {
+            if ($order && in_array($order->get_status(), array('processing', 'pending', 'pending_payment'))) {
                 $order->set_status('completed');
                 $order->update_meta_data('_oj_payment_method', $payment_method);
                 $order->update_meta_data('_oj_table_closed', current_time('mysql'));
@@ -1270,7 +1267,7 @@ class Orders_Jet_AJAX_Handlers {
         // Update all orders with session ID, payment method, and table closed timestamp
         foreach ($orders as $order_post) {
             $order = wc_get_order($order_post->ID);
-            if ($order && in_array($order->get_status(), array('processing', 'pending', 'on-hold'))) {
+            if ($order && in_array($order->get_status(), array('processing', 'pending', 'pending_payment'))) {
                 $order->update_meta_data('_oj_session_id', $session_id);
                 $order->update_meta_data('_oj_payment_method', $payment_method);
                 $order->update_meta_data('_oj_table_closed', current_time('mysql'));
@@ -1300,7 +1297,7 @@ class Orders_Jet_AJAX_Handlers {
         // Check if there are any recent pending/processing/pending-payment orders for this table
         $recent_orders = get_posts(array(
             'post_type' => 'shop_order',
-            'post_status' => array('wc-processing', 'wc-pending', 'wc-pending_payment', 'wc-on-hold'),
+            'post_status' => array('wc-processing', 'wc-pending', 'wc-pending_payment'),
             'meta_query' => array(
                 array(
                     'key' => '_oj_table_number',
@@ -1329,7 +1326,7 @@ class Orders_Jet_AJAX_Handlers {
         // Check if there's an active session for this table (last 2 hours)
         $recent_orders = get_posts(array(
             'post_type' => 'shop_order',
-            'post_status' => array('wc-processing', 'wc-pending', 'wc-pending_payment', 'wc-on-hold'),
+            'post_status' => array('wc-processing', 'wc-pending', 'wc-pending_payment'),
             'meta_query' => array(
                 array(
                     'key' => '_oj_table_number',
@@ -1400,8 +1397,8 @@ class Orders_Jet_AJAX_Handlers {
         }
         
         try {
-            // Mark order as ready (on-hold status means ready for pickup)
-            $order->set_status('on-hold');
+            // Mark order as ready (pending_payment status means ready for pickup/payment)
+            $order->set_status('pending_payment');
             
             // Add order note
             $order->add_order_note(sprintf(
@@ -1412,7 +1409,7 @@ class Orders_Jet_AJAX_Handlers {
             // Save the order
             $order->save();
             
-            error_log('Orders Jet Kitchen: Order #' . $order_id . ' marked as ready (on-hold) by user #' . get_current_user_id());
+            error_log('Orders Jet Kitchen: Order #' . $order_id . ' marked as ready (pending_payment) by user #' . get_current_user_id());
             
             // Send notifications to manager and waiter dashboards
             $this->send_ready_notifications($order, $table_number);
@@ -1421,7 +1418,7 @@ class Orders_Jet_AJAX_Handlers {
                 'message' => sprintf(__('Order #%d marked as ready for pickup!', 'orders-jet'), $order_id),
                 'order_id' => $order_id,
                 'table_number' => $table_number,
-                'new_status' => 'on-hold'
+                'new_status' => 'pending_payment'
             ));
             
         } catch (Exception $e) {
@@ -1489,9 +1486,9 @@ class Orders_Jet_AJAX_Handlers {
             wp_send_json_error(array('message' => __('This is not a table order.', 'orders-jet')));
         }
         
-        // Check current status (should be on-hold)
+        // Check current status (should be pending_payment)
         $current_status = $order->get_status();
-        if ($current_status !== 'on-hold') {
+        if ($current_status !== 'pending_payment') {
             wp_send_json_error(array('message' => sprintf(__('Order cannot be marked delivered from status: %s', 'orders-jet'), $current_status)));
         }
         
