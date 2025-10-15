@@ -496,7 +496,7 @@ jQuery(document).ready(function($) {
         // Handle payment method selection
         modal.find('.oj-payment-btn').on('click', function() {
             const paymentMethod = $(this).data('method');
-            completeOrderWithPayment(orderId, paymentMethod, orderType);
+            completeOrderWithPayment(orderId, paymentMethod, orderType, tableNumber);
             modal.remove();
         });
         
@@ -518,15 +518,16 @@ jQuery(document).ready(function($) {
         
         let requestData = {
             action: actionName,
-            payment_method: paymentMethod,
-            nonce: '<?php echo wp_create_nonce('oj_complete_order'); ?>'
+            payment_method: paymentMethod
         };
         
-        // Add appropriate ID parameter
+        // Add appropriate ID parameter and nonce
         if (orderType === 'table') {
             requestData.table_number = tableNumber;
+            requestData.nonce = '<?php echo wp_create_nonce('oj_table_order'); ?>';
         } else {
             requestData.order_id = orderId;
+            requestData.nonce = '<?php echo wp_create_nonce('oj_dashboard_nonce'); ?>';
         }
         
         $.ajax({
