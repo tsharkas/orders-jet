@@ -19,60 +19,28 @@ include ORDERS_JET_PLUGIN_DIR . 'templates/admin/manager-navigation.php';
 // Get current date
 $today_formatted = date('F j, Y');
 
-// DEBUG: Retrieve ALL orders to see what exists
+// Clean order retrieval
 $all_orders = array();
 $processing_orders = array();
 $ready_orders = array();
 
 // Get orders using WooCommerce native function
 if (function_exists('wc_get_orders')) {
-    // DEBUG: Get ALL orders to see what statuses exist
-    $all_wc_orders = wc_get_orders(array(
+    // Get processing orders (cooking)
+    $processing_wc_orders = wc_get_orders(array(
+        'status' => 'processing',
         'limit' => -1,
         'orderby' => 'date',
         'order' => 'DESC'
     ));
     
-    // DEBUG: Log what we found
-    error_log('Orders Jet Manager DEBUG: Found ' . count($all_wc_orders) . ' total orders');
-    
-    // DEBUG: Check each order status
-    $status_counts = array();
-    foreach ($all_wc_orders as $order) {
-        $status = $order->get_status();
-        if (!isset($status_counts[$status])) {
-            $status_counts[$status] = 0;
-        }
-        $status_counts[$status]++;
-        
-        // Log first few orders for debugging
-        if (count($all_orders) < 10) {
-            error_log('Orders Jet Manager DEBUG: Order #' . $order->get_id() . ' has status: ' . $status);
-        }
-    }
-    
-    // DEBUG: Log status summary
-    foreach ($status_counts as $status => $count) {
-        error_log('Orders Jet Manager DEBUG: Status "' . $status . '": ' . $count . ' orders');
-    }
-    
-    // Now separate by status for display
-    $processing_wc_orders = array();
-    $ready_wc_orders = array();
-    
-    // Separate orders by status
-    foreach ($all_wc_orders as $order) {
-        $status = $order->get_status();
-        
-        if ($status === 'processing') {
-            $processing_wc_orders[] = $order;
-        } elseif ($status === 'pending') {
-            $ready_wc_orders[] = $order;
-        }
-    }
-    
-    error_log('Orders Jet Manager DEBUG: Processing orders: ' . count($processing_wc_orders));
-    error_log('Orders Jet Manager DEBUG: Ready orders: ' . count($ready_wc_orders));
+    // Get ready orders (pending - awaiting payment)
+    $ready_wc_orders = wc_get_orders(array(
+        'status' => 'pending',
+        'limit' => -1,
+        'orderby' => 'date',
+        'order' => 'DESC'
+    ));
     
     // Process processing orders
     foreach ($processing_wc_orders as $order) {
@@ -119,53 +87,40 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
     <div class="oj-header">
         <h1>
             <span class="dashicons dashicons-clipboard"></span>
-            <?php _e('Orders Management', 'orders-jet'); ?>
+                <?php _e('Orders Management', 'orders-jet'); ?>
         </h1>
         <p><?php echo sprintf(__('Manage all restaurant orders - %s', 'orders-jet'), $today_formatted); ?></p>
         <button onclick="location.reload()" class="button">
-            <span class="dashicons dashicons-update"></span>
+                <span class="dashicons dashicons-update"></span>
             <?php _e('Refresh', 'orders-jet'); ?>
-        </button>
+    </button>
     </div>
     
-    <!-- DEBUG INFO -->
-    <?php if (isset($status_counts) && !empty($status_counts)) : ?>
-    <div class="oj-debug-info" style="background: #fff3cd; padding: 15px; margin-bottom: 20px; border-radius: 4px;">
-        <h3>🔍 DEBUG: Order Status Summary</h3>
-        <p><strong>Total Orders Found:</strong> <?php echo count($all_wc_orders); ?></p>
-        <ul>
-            <?php foreach ($status_counts as $status => $count) : ?>
-                <li><strong><?php echo esc_html($status); ?>:</strong> <?php echo $count; ?> orders</li>
-            <?php endforeach; ?>
-        </ul>
-        <p><em>Check error logs for detailed order information.</em></p>
-    </div>
-    <?php endif; ?>
     
     <!-- Statistics -->
     <div class="oj-stats">
         <div class="oj-stat-card">
             <div class="stat-number"><?php echo $total_orders; ?></div>
             <div class="stat-label"><?php _e('Active Orders', 'orders-jet'); ?></div>
-        </div>
+            </div>
         <div class="oj-stat-card">
             <div class="stat-number"><?php echo count($table_orders); ?></div>
             <div class="stat-label"><?php _e('Table Orders', 'orders-jet'); ?></div>
-        </div>
+            </div>
         <div class="oj-stat-card">
             <div class="stat-number"><?php echo count($pickup_orders); ?></div>
             <div class="stat-label"><?php _e('Pickup Orders', 'orders-jet'); ?></div>
-        </div>
+            </div>
         <div class="oj-stat-card">
             <div class="stat-number"><?php echo $processing_count; ?></div>
             <div class="stat-label"><?php _e('In Kitchen', 'orders-jet'); ?></div>
-        </div>
+            </div>
         <div class="oj-stat-card">
             <div class="stat-number"><?php echo $ready_count; ?></div>
             <div class="stat-label"><?php _e('Ready Orders', 'orders-jet'); ?></div>
         </div>
     </div>
-    
+
     <!-- Filters -->
     <div class="oj-filters">
         <button class="oj-filter-btn active" data-filter="all">
@@ -213,9 +168,9 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
                             <td>
                                 <?php if ($order['type'] === 'table') : ?>
                                     🍽️ <?php echo sprintf(__('Table %s', 'orders-jet'), $order['table']); ?>
-                                <?php else : ?>
+                                    <?php else : ?>
                                     🥡 <?php _e('Pickup', 'orders-jet'); ?>
-                                <?php endif; ?>
+                                    <?php endif; ?>
                             </td>
                             
                             <td>
@@ -237,8 +192,8 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
                                                 data-order-id="<?php echo $order['id']; ?>"
                                                 data-table="<?php echo esc_attr($order['table']); ?>">
                                             <?php _e('Close Table', 'orders-jet'); ?>
-                                        </button>
-                                    <?php else : ?>
+                                    </button>
+                                <?php else : ?>
                                         <button class="button button-primary oj-complete-order" 
                                                 data-order-id="<?php echo $order['id']; ?>">
                                             <?php _e('Complete Order', 'orders-jet'); ?>
@@ -246,21 +201,21 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
                                     <?php endif; ?>
                                 <?php else : ?>
                                     <span class="oj-status-note"><?php _e('In Kitchen', 'orders-jet'); ?></span>
-                                <?php endif; ?>
+                                    <?php endif; ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>
-                <?php else : ?>
+        <?php else : ?>
                     <tr>
                         <td colspan="7" class="oj-no-orders">
                             <?php _e('No active orders found.', 'orders-jet'); ?>
                         </td>
                     </tr>
-                <?php endif; ?>
+        <?php endif; ?>
             </tbody>
         </table>
     </div>
-    
+
 </div>
 
 <style>
@@ -316,9 +271,9 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
-}
-
-.oj-filter-btn {
+    }
+    
+    .oj-filter-btn {
     padding: 8px 16px;
     border: 1px solid #ddd;
     background: white;
@@ -372,6 +327,79 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
     padding: 40px;
     color: #666;
 }
+
+/* Modal Styles */
+.oj-payment-modal-overlay,
+.oj-invoice-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+}
+
+.oj-payment-modal,
+.oj-invoice-modal {
+    background: white;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    max-width: 500px;
+    width: 90%;
+    text-align: center;
+}
+
+.oj-payment-modal h3,
+.oj-invoice-modal h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.oj-payment-methods {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.oj-payment-btn {
+    padding: 15px 20px;
+    border: 2px solid #ddd;
+    background: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.oj-payment-btn:hover {
+    border-color: #2271b1;
+    background: #f0f6fc;
+    transform: translateY(-2px);
+}
+
+.oj-modal-actions,
+.oj-invoice-actions {
+    margin-top: 25px;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.oj-invoice-actions .button {
+    margin: 5px;
+}
 </style>
 
 <script>
@@ -419,56 +447,158 @@ jQuery(document).ready(function($) {
         });
     });
     
-    // Close table action
+    // Close table action with payment method selection
     $('.oj-close-table').on('click', function() {
         const orderId = $(this).data('order-id');
         const table = $(this).data('table');
         
         if (confirm('<?php _e('Close this table and complete all orders?', 'orders-jet'); ?>')) {
-            // AJAX call to close table
-            $.ajax({
-                url: ajaxurl,
-                type: 'POST',
-                data: {
-                    action: 'oj_close_table',
-                    table_number: table,
-                    nonce: '<?php echo wp_create_nonce('oj_close_table'); ?>'
-                },
-                success: function(response) {
-                    if (response.success) {
-                        location.reload();
-                    } else {
-                        alert(response.data.message || '<?php _e('Error closing table', 'orders-jet'); ?>');
-                    }
-                }
-            });
+            // Show payment method modal for table
+            showPaymentMethodModal(orderId, 'table', table);
         }
     });
     
-    // Complete order action
+    // Complete order action with payment method selection
     $('.oj-complete-order').on('click', function() {
         const orderId = $(this).data('order-id');
         
-        if (confirm('<?php _e('Complete this order?', 'orders-jet'); ?>')) {
-            // AJAX call to complete order
-            $.ajax({
-                url: ajaxurl,
-                type: 'POST',
-                data: {
-                    action: 'oj_complete_individual_order',
-                    order_id: orderId,
-                    nonce: '<?php echo wp_create_nonce('oj_complete_order'); ?>'
-                },
-                success: function(response) {
-                    if (response.success) {
-                        location.reload();
-                    } else {
-                        alert(response.data.message || '<?php _e('Error completing order', 'orders-jet'); ?>');
-                    }
-                }
-            });
-        }
+        // Show payment method modal
+        showPaymentMethodModal(orderId, 'individual');
     });
+    
+    // Payment method modal functionality
+    function showPaymentMethodModal(orderId, orderType, tableNumber = null) {
+        const modal = $(`
+            <div class="oj-payment-modal-overlay">
+                <div class="oj-payment-modal">
+                    <h3><?php _e('Complete Order', 'orders-jet'); ?> #${orderId}</h3>
+                    <p><?php _e('Select payment method:', 'orders-jet'); ?></p>
+                    <div class="oj-payment-methods">
+                        <button class="oj-payment-btn" data-method="cash">
+                            💰 <?php _e('Cash', 'orders-jet'); ?>
+                        </button>
+                        <button class="oj-payment-btn" data-method="card">
+                            💳 <?php _e('Card', 'orders-jet'); ?>
+                        </button>
+                        <button class="oj-payment-btn" data-method="digital">
+                            📱 <?php _e('Digital Payment', 'orders-jet'); ?>
+                        </button>
+                    </div>
+                    <div class="oj-modal-actions">
+                        <button class="button oj-cancel-payment"><?php _e('Cancel', 'orders-jet'); ?></button>
+                    </div>
+                </div>
+            </div>
+        `);
+        
+        $('body').append(modal);
+        
+        // Handle payment method selection
+        modal.find('.oj-payment-btn').on('click', function() {
+            const paymentMethod = $(this).data('method');
+            completeOrderWithPayment(orderId, paymentMethod, orderType);
+            modal.remove();
+        });
+        
+        // Handle cancel
+        modal.find('.oj-cancel-payment').on('click', function() {
+            modal.remove();
+        });
+        
+        // Close on overlay click
+        modal.on('click', function(e) {
+            if (e.target === this) {
+                modal.remove();
+            }
+        });
+    }
+    
+    function completeOrderWithPayment(orderId, paymentMethod, orderType, tableNumber = null) {
+        const actionName = orderType === 'table' ? 'oj_close_table' : 'oj_complete_individual_order';
+        
+        let requestData = {
+            action: actionName,
+            payment_method: paymentMethod,
+            nonce: '<?php echo wp_create_nonce('oj_complete_order'); ?>'
+        };
+        
+        // Add appropriate ID parameter
+        if (orderType === 'table') {
+            requestData.table_number = tableNumber;
+        } else {
+            requestData.order_id = orderId;
+        }
+        
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: requestData,
+            success: function(response) {
+                if (response.success) {
+                    // Show success message and invoice option
+                    showInvoiceModal(orderId, response.data);
+                } else {
+                    alert(response.data.message || '<?php _e('Error completing order', 'orders-jet'); ?>');
+                }
+            },
+            error: function() {
+                alert('<?php _e('Network error. Please try again.', 'orders-jet'); ?>');
+            }
+        });
+    }
+    
+    function showInvoiceModal(orderId, responseData) {
+        const modal = $(`
+            <div class="oj-invoice-modal-overlay">
+                <div class="oj-invoice-modal">
+                    <h3>✅ <?php _e('Order Completed Successfully!', 'orders-jet'); ?></h3>
+                    <p><?php _e('Order', 'orders-jet'); ?> #${orderId} <?php _e('has been completed.', 'orders-jet'); ?></p>
+                    <div class="oj-invoice-actions">
+                        <button class="button button-primary oj-view-invoice" data-order-id="${orderId}">
+                            📄 <?php _e('View Invoice', 'orders-jet'); ?>
+                        </button>
+                        <button class="button button-secondary oj-print-invoice" data-order-id="${orderId}">
+                            🖨️ <?php _e('Print Invoice', 'orders-jet'); ?>
+                        </button>
+                        <button class="button oj-close-success">
+                            <?php _e('Close', 'orders-jet'); ?>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `);
+        
+        $('body').append(modal);
+        
+        // Handle view invoice
+        modal.find('.oj-view-invoice').on('click', function() {
+        const orderId = $(this).data('order-id');
+            window.open('<?php echo admin_url('admin.php?page=orders-jet-invoice&order_id='); ?>' + orderId, '_blank');
+        });
+        
+        // Handle print invoice
+        modal.find('.oj-print-invoice').on('click', function() {
+        const orderId = $(this).data('order-id');
+            const printWindow = window.open('<?php echo admin_url('admin.php?page=orders-jet-invoice&order_id='); ?>' + orderId + '&print=1', '_blank');
+            printWindow.onload = function() {
+                printWindow.print();
+            };
+        });
+        
+        // Handle close
+        modal.find('.oj-close-success').on('click', function() {
+            modal.remove();
+            location.reload();
+        });
+        
+        // Close on overlay click
+        modal.on('click', function(e) {
+            if (e.target === this) {
+                modal.remove();
+                location.reload();
+            }
+        });
+    }
     
 });
 </script>
