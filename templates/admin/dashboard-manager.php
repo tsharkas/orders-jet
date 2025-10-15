@@ -66,7 +66,7 @@ if (function_exists('wc_get_orders')) {
         
         if ($status === 'processing') {
             $processing_wc_orders[] = $order;
-        } elseif ($status === 'pending-payment') {
+        } elseif ($status === 'pending') {
             $ready_wc_orders[] = $order;
         }
     }
@@ -221,7 +221,7 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
                             <td>
                                 <?php if ($order['status'] === 'processing') : ?>
                                     <span class="oj-status cooking">🍳 <?php _e('Cooking', 'orders-jet'); ?></span>
-                                <?php elseif ($order['status'] === 'pending-payment') : ?>
+                                <?php elseif ($order['status'] === 'pending') : ?>
                                     <span class="oj-status ready">✅ <?php _e('Ready', 'orders-jet'); ?></span>
                                 <?php endif; ?>
                             </td>
@@ -231,7 +231,7 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
                             <td><?php echo $order['date']; ?></td>
                             
                             <td>
-                                <?php if ($order['status'] === 'pending-payment') : ?>
+                                <?php if ($order['status'] === 'pending') : ?>
                                     <?php if ($order['type'] === 'table') : ?>
                                         <button class="button button-primary oj-close-table" 
                                                 data-order-id="<?php echo $order['id']; ?>"
@@ -401,7 +401,7 @@ jQuery(document).ready(function($) {
                     show = status === 'processing';
                     break;
                 case 'ready':
-                    show = status === 'pending-payment';
+                    show = status === 'pending';
                     break;
                 case 'table':
                     show = type === 'table';
