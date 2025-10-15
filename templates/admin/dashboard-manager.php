@@ -28,7 +28,7 @@ global $wpdb;
 $actionable_orders = array();
 if (function_exists('wc_get_orders')) {
     $wc_orders = wc_get_orders(array(
-        'status' => array('processing', 'pending_payment', 'on-hold'), // Only actionable statuses
+        'status' => array('processing', 'pending-payment', 'on-hold'), // Only actionable statuses
         'limit' => -1,
         'orderby' => 'date',
         'order' => 'DESC' // Newest first for managers
@@ -138,7 +138,7 @@ foreach ($table_orders as $order) {
 
 // Calculate statistics
 $ready_orders = array_filter($actionable_orders, function($order) {
-    return $order['post_status'] === 'wc-pending_payment' || $order['post_status'] === 'wc-on-hold';
+    return $order['post_status'] === 'wc-pending-payment' || $order['post_status'] === 'wc-on-hold';
 });
 
 $processing_orders = array_filter($actionable_orders, function($order) {
@@ -164,30 +164,30 @@ $currency_symbol = get_woocommerce_currency_symbol();
             <button type="button" class="oj-refresh-btn" onclick="location.reload();">
                 <span class="dashicons dashicons-update"></span>
                 <?php _e('Refresh Orders', 'orders-jet'); ?>
-            </button>
-        </div>
+    </button>
     </div>
-
+    </div>
+    
     <!-- Statistics Cards -->
     <div class="oj-manager-stats-row">
         <div class="oj-stat-card oj-stat-total">
             <div class="stat-number"><?php echo count($actionable_orders); ?></div>
             <div class="stat-label"><?php _e('Active Orders', 'orders-jet'); ?></div>
-        </div>
+            </div>
         <div class="oj-stat-card oj-stat-tables">
             <div class="stat-number"><?php echo count($tables_with_orders); ?></div>
             <div class="stat-label"><?php _e('Occupied Tables', 'orders-jet'); ?></div>
-        </div>
+            </div>
         <div class="oj-stat-card oj-stat-pickup">
             <div class="stat-number"><?php echo count($individual_orders); ?></div>
             <div class="stat-label"><?php _e('Pickup Orders', 'orders-jet'); ?></div>
-        </div>
+            </div>
         <div class="oj-stat-card oj-stat-ready">
             <div class="stat-number"><?php echo count($ready_orders); ?></div>
             <div class="stat-label"><?php _e('Ready Orders', 'orders-jet'); ?></div>
+            </div>
         </div>
-    </div>
-
+        
     <!-- Filter Tabs (Keep existing scrolling filters) -->
     <div class="oj-order-filters">
         <button class="oj-filter-btn active" data-filter="all">
@@ -230,13 +230,13 @@ $currency_symbol = get_woocommerce_currency_symbol();
             </select>
             <button class="oj-btn oj-btn-primary oj-apply-bulk-action">
                 <?php _e('Apply', 'orders-jet'); ?>
-            </button>
+        </button>
             <button class="oj-btn oj-btn-secondary oj-clear-selection">
                 <?php _e('Clear Selection', 'orders-jet'); ?>
-            </button>
+        </button>
         </div>
     </div>
-
+    
     <!-- Orders Table -->
     <div class="oj-manager-orders-table">
         <div class="oj-table-header">
@@ -269,14 +269,14 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                    value="<?php echo esc_attr($order['ID']); ?>"
                                    data-category="<?php echo esc_attr($order['order_category']); ?>"
                                    data-table="<?php echo esc_attr($order['table_number'] ?? ''); ?>">
-                        </div>
+            </div>
 
                         <!-- Order Number & ID -->
                         <div class="oj-col-order">
                             <div class="oj-order-number">#<?php echo esc_html($order['ID']); ?></div>
-                            <?php if (!empty($order['table_number'])) : ?>
+                                    <?php if (!empty($order['table_number'])) : ?>
                                 <div class="oj-table-badge">Table <?php echo esc_html($order['table_number']); ?></div>
-                            <?php endif; ?>
+                                    <?php endif; ?>
                         </div>
 
                         <!-- Order Type -->
@@ -284,15 +284,15 @@ $currency_symbol = get_woocommerce_currency_symbol();
                             <span class="oj-type-badge <?php echo esc_attr($order['order_type_class']); ?>">
                                 <span class="oj-type-icon"><?php echo esc_html($order['order_type_icon']); ?></span>
                                 <span class="oj-type-label"><?php echo esc_html($order['order_type_label']); ?></span>
-                            </span>
+                                    </span>
                         </div>
 
                         <!-- Customer -->
                         <div class="oj-col-customer">
-                            <div class="oj-customer-name"><?php echo esc_html($order['customer_name']); ?></div>
+                                <div class="oj-customer-name"><?php echo esc_html($order['customer_name']); ?></div>
                             <?php if (!empty($order['customer_phone']) && $order['customer_phone'] !== 'N/A') : ?>
                                 <div class="oj-customer-phone"><?php echo esc_html($order['customer_phone']); ?></div>
-                            <?php endif; ?>
+                                <?php endif; ?>
                         </div>
 
                         <!-- Items Summary -->
@@ -302,24 +302,24 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                 $item_count = $order['items_count'];
                                 echo $item_count . ' ' . _n('item', 'items', $item_count, 'orders-jet');
                                 ?>
-                            </div>
+                                                </div>
                             <div class="oj-items-preview">
                                 <?php 
                                 $preview_items = array_slice($order['items'], 0, 2);
                                 foreach ($preview_items as $item) :
                                 ?>
                                     <span class="oj-item-preview"><?php echo esc_html($item['quantity']); ?>× <?php echo esc_html($item['name']); ?></span>
-                                <?php endforeach; ?>
+                                                    <?php endforeach; ?>
                                 <?php if ($item_count > 2) : ?>
                                     <span class="oj-more-items">+<?php echo ($item_count - 2); ?> more</span>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-
+                                            <?php endif; ?>
+                                                </div>
+                                </div>
+                                
                         <!-- Total -->
                         <div class="oj-col-total">
                             <div class="oj-order-total"><?php echo wc_price($order['order_total']); ?></div>
-                        </div>
+                                    </div>
 
                         <!-- Status -->
                         <div class="oj-col-status">
@@ -327,7 +327,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
                             $status_class = str_replace('wc-', '', $order['post_status']);
                             $status_labels = array(
                                 'processing' => __('Cooking', 'orders-jet'),
-                                'pending_payment' => __('Ready', 'orders-jet'),
+                                'pending-payment' => __('Ready', 'orders-jet'),
                                 'on-hold' => __('Ready', 'orders-jet')
                             );
                             $status_label = $status_labels[$status_class] ?? ucfirst(str_replace('-', ' ', $status_class));
@@ -335,16 +335,16 @@ $currency_symbol = get_woocommerce_currency_symbol();
                             <span class="oj-status-badge oj-status-<?php echo esc_attr($status_class); ?>">
                                 <?php echo esc_html($status_label); ?>
                             </span>
-                        </div>
+                                    </div>
 
                         <!-- Time -->
                         <div class="oj-col-time">
                             <div class="oj-order-time">
                                 <?php echo esc_html(OJ_Universal_Time_Manager::format(strtotime($order['post_date']), 'g:i A')); ?>
-                            </div>
+                                    </div>
                             <div class="oj-order-date">
                                 <?php echo esc_html(OJ_Universal_Time_Manager::format(strtotime($order['post_date']), 'M j')); ?>
-                            </div>
+                                    </div>
                         </div>
 
                         <!-- Actions -->
@@ -352,17 +352,17 @@ $currency_symbol = get_woocommerce_currency_symbol();
                             <div class="oj-action-buttons">
                                 <?php if ($order['order_category'] === 'table') : ?>
                                     <!-- Table Order Actions -->
-                                    <?php if (in_array($order['post_status'], ['wc-pending_payment', 'wc-on-hold'])) : ?>
+                                    <?php if (in_array($order['post_status'], ['wc-pending-payment', 'wc-on-hold'])) : ?>
                                         <button class="oj-btn oj-btn-primary oj-close-table" 
                                                 data-table="<?php echo esc_attr($order['table_number']); ?>"
                                                 title="<?php _e('Close Table & Generate Invoice', 'orders-jet'); ?>">
-                                            <span class="dashicons dashicons-money-alt"></span>
+                                        <span class="dashicons dashicons-money-alt"></span>
                                             <?php _e('Close Table', 'orders-jet'); ?>
-                                        </button>
+                                    </button>
                                     <?php endif; ?>
                                 <?php else : ?>
                                     <!-- Individual Order Actions -->
-                                    <?php if (in_array($order['post_status'], ['wc-pending_payment', 'wc-on-hold'])) : ?>
+                                    <?php if (in_array($order['post_status'], ['wc-pending-payment', 'wc-on-hold'])) : ?>
                                         <button class="oj-btn oj-btn-success oj-complete-order" 
                                                 data-order-id="<?php echo esc_attr($order['ID']); ?>"
                                                 title="<?php _e('Mark as Completed', 'orders-jet'); ?>">
@@ -370,28 +370,28 @@ $currency_symbol = get_woocommerce_currency_symbol();
                                             <?php _e('Complete', 'orders-jet'); ?>
                                         </button>
                                     <?php endif; ?>
-                                <?php endif; ?>
-                                
+                                    <?php endif; ?>
+                                    
                                 <!-- View Details (Always available) -->
                                 <button class="oj-btn oj-btn-secondary oj-view-details" 
                                         data-order-id="<?php echo esc_attr($order['ID']); ?>"
                                         title="<?php _e('View Order Details', 'orders-jet'); ?>">
                                     <span class="dashicons dashicons-visibility"></span>
                                     <?php _e('Details', 'orders-jet'); ?>
-                                </button>
+                                        </button>
                             </div>
                         </div>
                     </div>
-                <?php endforeach; ?>
-            <?php else : ?>
-                <div class="oj-no-orders">
+                    <?php endforeach; ?>
+        <?php else : ?>
+            <div class="oj-no-orders">
                     <div class="oj-no-orders-icon">
                         <span class="dashicons dashicons-clipboard" style="font-size: 64px; color: #ddd;"></span>
                     </div>
                     <h3><?php _e('No Active Orders', 'orders-jet'); ?></h3>
                     <p><?php _e('All orders have been completed or there are no new orders yet.', 'orders-jet'); ?></p>
-                </div>
-            <?php endif; ?>
+            </div>
+        <?php endif; ?>
         </div>
     </div>
 
@@ -798,7 +798,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
     color: #2c5282;
 }
 
-.oj-status-badge.oj-status-pending_payment {
+.oj-status-badge.oj-status-pending-payment {
     background: #c6f6d5;
     color: #22543d;
 }
@@ -876,9 +876,9 @@ $currency_symbol = get_woocommerce_currency_symbol();
 }
 
 .oj-btn .dashicons {
-    font-size: 14px;
-}
-
+        font-size: 14px;
+    }
+    
 /* No Orders State */
 .oj-no-orders {
     text-align: center;
@@ -1062,7 +1062,7 @@ $currency_symbol = get_woocommerce_currency_symbol();
     .oj-bulk-actions-right {
         flex-wrap: wrap;
         justify-content: center;
-    }
+}
 }
 </style>
 
@@ -1203,7 +1203,7 @@ jQuery(document).ready(function($) {
                     show = category === 'individual';
                     break;
                 case 'ready':
-                    show = status === 'pending_payment' || status === 'on-hold';
+                    show = status === 'pending-payment' || status === 'on-hold';
                     break;
                 case 'processing':
                     show = status === 'processing';
@@ -1244,7 +1244,7 @@ jQuery(document).ready(function($) {
                         matches = category === 'individual';
                         break;
                     case 'ready':
-                        matches = status === 'pending_payment' || status === 'on-hold';
+                        matches = status === 'pending-payment' || status === 'on-hold';
                         break;
                     case 'processing':
                         matches = status === 'processing';
@@ -1265,10 +1265,10 @@ jQuery(document).ready(function($) {
     }
     
     function closeTable(tableNumber, paymentMethod, row) {
-        $.ajax({
-            url: ajaxurl,
-            type: 'POST',
-            data: {
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
                 action: 'oj_close_table',
                 table_number: tableNumber,
                 payment_method: paymentMethod,
@@ -1276,9 +1276,9 @@ jQuery(document).ready(function($) {
             },
             beforeSend: function() {
                 row.find('.oj-close-table').prop('disabled', true).text('Closing...');
-            },
-            success: function(response) {
-                if (response.success) {
+                },
+                success: function(response) {
+                    if (response.success) {
                     // Remove all rows for this table
                     $('.oj-table-row[data-table-number="' + tableNumber + '"]').fadeOut(300, function() {
                         $(this).remove();
@@ -1292,17 +1292,17 @@ jQuery(document).ready(function($) {
                     if (response.data.invoice_url) {
                         window.open(response.data.invoice_url, '_blank');
                     }
-                } else {
+                    } else {
                     showNotification('error', response.data.message);
                     row.find('.oj-close-table').prop('disabled', false).text('Close Table');
-                }
-            },
-            error: function() {
+                    }
+                },
+                error: function() {
                 showNotification('error', 'Failed to close table. Please try again.');
                 row.find('.oj-close-table').prop('disabled', false).text('Close Table');
-            }
-        });
-    }
+                }
+            });
+        }
     
     function completeIndividualOrder(orderId, row) {
         $.ajax({
