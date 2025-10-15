@@ -41,7 +41,7 @@ function handle_online_payment_checkout() {
     // Get table orders
     $orders = get_posts(array(
         'post_type' => 'shop_order',
-        'post_status' => array('wc-pending_payment'),
+        'post_status' => array('wc-pending', 'wc-pending_payment'),
         'meta_query' => array(
             array(
                 'key' => '_oj_table_number',
@@ -257,7 +257,7 @@ if (!empty($order_id)) {
     // Table orders invoice
     $orders = get_posts(array(
         'post_type' => 'shop_order',
-        'post_status' => array('wc-pending_payment'),
+        'post_status' => array('wc-pending', 'wc-pending_payment'),
         'meta_query' => array(
             array(
                 'key' => '_oj_table_number',

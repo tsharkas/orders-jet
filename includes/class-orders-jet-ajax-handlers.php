@@ -1595,9 +1595,9 @@ class Orders_Jet_AJAX_Handlers {
             wp_send_json_error(array('message' => __('Table number is required', 'orders-jet')));
         }
         
-        // Get all pending_payment orders for this table
+        // Get all served orders for this table (both pending and pending_payment)
         $orders = wc_get_orders(array(
-            'status' => array('pending_payment'),
+            'status' => array('pending', 'pending_payment'),
             'limit' => -1,
             'meta_query' => array(
                 array(
@@ -1651,9 +1651,9 @@ class Orders_Jet_AJAX_Handlers {
             wp_send_json_error(array('message' => __('Table number is required', 'orders-jet')));
         }
         
-        // Get all pending_payment orders for this table
+        // Get all served orders for this table (both pending and pending_payment)
         $orders = wc_get_orders(array(
-            'status' => array('pending_payment'),
+            'status' => array('pending', 'pending_payment'),
             'limit' => -1,
             'meta_query' => array(
                 array(

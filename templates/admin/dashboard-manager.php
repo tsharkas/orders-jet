@@ -3001,21 +3001,21 @@ jQuery(document).ready(function($) {
     
     function processOnlinePayment() {
         // Create online payment URL
-        const paymentUrl = '<?php echo site_url(); ?>/table-invoice.php?table=' + currentTable + '&payment_method=online&action=checkout';
+        const paymentUrl = '<?php echo site_url(); ?>/table-invoice/?table=' + currentTable + '&payment_method=online&action=checkout';
         window.open(paymentUrl, '_blank');
         $('#oj-smart-payment-modal').hide();
     }
     
     // Print invoice
     $('#oj-print-invoice-btn').on('click', function() {
-        const invoiceUrl = '<?php echo site_url(); ?>/wp-content/plugins/orders-jet-integration/table-invoice.php?table=' + currentTable;
+        const invoiceUrl = '<?php echo site_url(); ?>/table-invoice/?table=' + currentTable;
         window.open(invoiceUrl, '_blank');
     });
     
     // Table invoice button
     $('.oj-table-invoice').on('click', function() {
         const table = $(this).data('table');
-        const invoiceUrl = '<?php echo site_url(); ?>/wp-content/plugins/orders-jet-integration/table-invoice.php?table=' + table;
+        const invoiceUrl = '<?php echo site_url(); ?>/table-invoice/?table=' + table;
         window.open(invoiceUrl, '_blank');
     });
     
@@ -3058,7 +3058,7 @@ jQuery(document).ready(function($) {
     // Print individual invoice
     $('.oj-print-invoice').on('click', function() {
         const orderId = $(this).data('order-id');
-        const invoiceUrl = '<?php echo site_url(); ?>/wp-content/plugins/orders-jet-integration/table-invoice.php?order_id=' + orderId;
+        const invoiceUrl = '<?php echo site_url(); ?>/table-invoice/?order_id=' + orderId;
         window.open(invoiceUrl, '_blank');
     });
     
