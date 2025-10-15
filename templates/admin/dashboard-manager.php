@@ -581,16 +581,16 @@ jQuery(document).ready(function($) {
         // Handle view PDF invoice
         modal.find('.oj-view-invoice').on('click', function() {
             const orderId = $(this).data('order-id');
-            // Use admin-authenticated approach for PDF generation
-            const invoiceUrl = '<?php echo admin_url('edit.php'); ?>?post_type=shop_order&page=wc-orders&action=edit&id=' + orderId + '&wpo_wcpdf_action=generate_pdf&document_type=invoice&output=html';
+            // Use our secure admin PDF endpoint
+            const invoiceUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_admin_pdf&order_id=' + orderId + '&document_type=invoice&output=html&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
             window.open(invoiceUrl, '_blank');
         });
         
         // Handle print PDF invoice
         modal.find('.oj-print-invoice').on('click', function() {
             const orderId = $(this).data('order-id');
-            // Use admin-authenticated approach for PDF printing
-            const pdfUrl = '<?php echo admin_url('edit.php'); ?>?post_type=shop_order&page=wc-orders&action=edit&id=' + orderId + '&wpo_wcpdf_action=generate_pdf&document_type=invoice&output=pdf';
+            // Use our secure admin PDF endpoint for printing
+            const pdfUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_admin_pdf&order_id=' + orderId + '&document_type=invoice&output=pdf&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
             
             // Create hidden iframe for printing
             const iframe = document.createElement('iframe');
@@ -626,8 +626,8 @@ jQuery(document).ready(function($) {
         // Handle download PDF invoice
         modal.find('.oj-download-invoice').on('click', function() {
             const orderId = $(this).data('order-id');
-            // Use admin-authenticated approach for PDF download
-            const downloadUrl = '<?php echo admin_url('edit.php'); ?>?post_type=shop_order&page=wc-orders&action=edit&id=' + orderId + '&wpo_wcpdf_action=generate_pdf&document_type=invoice&output=pdf&force_download=1';
+            // Use our secure admin PDF endpoint for download
+            const downloadUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_admin_pdf&order_id=' + orderId + '&document_type=invoice&output=pdf&force_download=1&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
             
             // Create temporary link for download
             const link = document.createElement('a');
@@ -690,10 +690,10 @@ jQuery(document).ready(function($) {
         modal.find('.oj-view-table-invoice').on('click', function() {
             const orderIds = $(this).data('orders');
             if (orderIds) {
-                // For multiple orders, open each invoice in separate tabs (admin-authenticated)
+                // For multiple orders, open each invoice in separate tabs using our secure endpoint
                 const orderIdArray = orderIds.split(',');
                 orderIdArray.forEach(function(orderId) {
-                    const invoiceUrl = '<?php echo admin_url('edit.php'); ?>?post_type=shop_order&page=wc-orders&action=edit&id=' + orderId.trim() + '&wpo_wcpdf_action=generate_pdf&document_type=invoice&output=html';
+                    const invoiceUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_admin_pdf&order_id=' + orderId.trim() + '&document_type=invoice&output=html&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
                     window.open(invoiceUrl, '_blank');
                 });
             } else {
@@ -705,11 +705,11 @@ jQuery(document).ready(function($) {
         modal.find('.oj-print-table-invoice').on('click', function() {
             const orderIds = $(this).data('orders');
             if (orderIds) {
-                // For multiple orders, print each invoice separately (admin-authenticated)
+                // For multiple orders, print each invoice separately using our secure endpoint
                 const orderIdArray = orderIds.split(',');
                 orderIdArray.forEach(function(orderId, index) {
                     setTimeout(function() {
-                        const pdfUrl = '<?php echo admin_url('edit.php'); ?>?post_type=shop_order&page=wc-orders&action=edit&id=' + orderId.trim() + '&wpo_wcpdf_action=generate_pdf&document_type=invoice&output=pdf';
+                        const pdfUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_admin_pdf&order_id=' + orderId.trim() + '&document_type=invoice&output=pdf&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
                         
                         // Create hidden iframe for printing
                         const iframe = document.createElement('iframe');
@@ -752,11 +752,11 @@ jQuery(document).ready(function($) {
             const tableNumber = $(this).data('table');
             const orderIds = $(this).data('orders');
             if (orderIds) {
-                // For multiple orders, download each invoice separately (admin-authenticated)
+                // For multiple orders, download each invoice separately using our secure endpoint
                 const orderIdArray = orderIds.split(',');
                 orderIdArray.forEach(function(orderId, index) {
                     setTimeout(function() {
-                        const downloadUrl = '<?php echo admin_url('edit.php'); ?>?post_type=shop_order&page=wc-orders&action=edit&id=' + orderId.trim() + '&wpo_wcpdf_action=generate_pdf&document_type=invoice&output=pdf&force_download=1';
+                        const downloadUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_admin_pdf&order_id=' + orderId.trim() + '&document_type=invoice&output=pdf&force_download=1&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
                         
                         // Create temporary link for download
                         const link = document.createElement('a');

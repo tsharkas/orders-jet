@@ -26,6 +26,7 @@ class Orders_Jet_AJAX_Handlers {
         add_action('wp_ajax_oj_complete_individual_order', array($this, 'complete_individual_order'));
         add_action('wp_ajax_oj_get_completed_orders_for_pdf', array($this, 'get_completed_orders_for_pdf'));
         add_action('wp_ajax_oj_generate_guest_pdf', array($this, 'generate_guest_pdf'));
+        add_action('wp_ajax_oj_generate_admin_pdf', array($this, 'generate_admin_pdf'));
         
         // AJAX handlers for non-logged in users (guests)
         add_action('wp_ajax_nopriv_oj_submit_table_order', array($this, 'submit_table_order'));
@@ -1841,6 +1842,77 @@ class Orders_Jet_AJAX_Handlers {
             
         } catch (Exception $e) {
             error_log('Orders Jet: PDF generation error: ' . $e->getMessage());
+            wp_die(__('Error generating PDF: ', 'orders-jet') . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Generate PDF invoice for admin users (with proper authentication)
+     */
+    public function generate_admin_pdf() {
+        // Verify nonce for security
+        if (!wp_verify_nonce($_GET['nonce'] ?? '', 'oj_admin_pdf')) {
+            wp_die(__('Security check failed', 'orders-jet'));
+        }
+        
+        // Check if user has admin capabilities
+        if (!current_user_can('manage_woocommerce') && !current_user_can('access_oj_manager_dashboard')) {
+            wp_die(__('You do not have permission to access this resource', 'orders-jet'));
+        }
+        
+        $order_id = intval($_GET['order_id'] ?? 0);
+        $document_type = sanitize_text_field($_GET['document_type'] ?? 'invoice');
+        $output = sanitize_text_field($_GET['output'] ?? 'pdf');
+        $force_download = isset($_GET['force_download']);
+        
+        if (!$order_id) {
+            wp_die(__('Invalid order ID', 'orders-jet'));
+        }
+        
+        // Verify the order exists
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            wp_die(__('Order not found', 'orders-jet'));
+        }
+        
+        // Check if PDF Invoices plugin is available
+        if (!function_exists('wcpdf_get_document')) {
+            wp_die(__('PDF invoice functionality is not available', 'orders-jet'));
+        }
+        
+        try {
+            // Get the PDF document using the plugin's function
+            $document = wcpdf_get_document($document_type, $order);
+            
+            if (!$document) {
+                wp_die(__('Could not generate PDF document', 'orders-jet'));
+            }
+            
+            // Set appropriate headers
+            if ($output === 'html') {
+                header('Content-Type: text/html; charset=utf-8');
+                echo $document->get_html();
+            } else {
+                // PDF output
+                $pdf_data = $document->get_pdf();
+                $filename = $document->get_filename();
+                
+                header('Content-Type: application/pdf');
+                header('Content-Length: ' . strlen($pdf_data));
+                
+                if ($force_download) {
+                    header('Content-Disposition: attachment; filename="' . $filename . '"');
+                } else {
+                    header('Content-Disposition: inline; filename="' . $filename . '"');
+                }
+                
+                echo $pdf_data;
+            }
+            
+            exit;
+            
+        } catch (Exception $e) {
+            error_log('Orders Jet: Admin PDF generation error: ' . $e->getMessage());
             wp_die(__('Error generating PDF: ', 'orders-jet') . $e->getMessage());
         }
     }
