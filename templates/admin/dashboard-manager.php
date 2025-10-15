@@ -140,11 +140,31 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
         </button>
     </div>
     
+    <!-- Bulk Actions Bar -->
+    <div class="oj-bulk-actions-bar" style="display: none;">
+        <div class="oj-bulk-actions-content">
+            <span class="oj-selected-count">0 <?php _e('orders selected', 'orders-jet'); ?></span>
+            <div class="oj-bulk-actions-buttons">
+                <select id="oj-bulk-action-select">
+                    <option value=""><?php _e('Bulk Actions', 'orders-jet'); ?></option>
+                    <option value="mark_ready"><?php _e('Mark as Ready', 'orders-jet'); ?></option>
+                    <option value="complete_orders"><?php _e('Complete Orders', 'orders-jet'); ?></option>
+                    <option value="cancel_orders"><?php _e('Cancel Orders', 'orders-jet'); ?></option>
+                </select>
+                <button type="button" class="button oj-apply-bulk-action"><?php _e('Apply', 'orders-jet'); ?></button>
+                <button type="button" class="button oj-clear-selection"><?php _e('Clear Selection', 'orders-jet'); ?></button>
+            </div>
+        </div>
+    </div>
+
     <!-- Orders Table -->
     <div class="oj-orders-table">
         <table class="wp-list-table widefat fixed striped">
             <thead>
                 <tr>
+                    <th class="check-column">
+                        <input type="checkbox" id="cb-select-all" />
+                    </th>
                     <th><?php _e('Order #', 'orders-jet'); ?></th>
                     <th><?php _e('Customer', 'orders-jet'); ?></th>
                     <th><?php _e('Type', 'orders-jet'); ?></th>
@@ -159,7 +179,13 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
                     <?php foreach ($all_orders as $order) : ?>
                         <tr class="oj-order-row" 
                             data-status="<?php echo esc_attr($order['status']); ?>"
-                            data-type="<?php echo esc_attr($order['type']); ?>">
+                            data-type="<?php echo esc_attr($order['type']); ?>"
+                            data-order-id="<?php echo esc_attr($order['id']); ?>">
+                            
+                            <!-- Checkbox column -->
+                            <td class="check-column">
+                                <input type="checkbox" class="oj-order-checkbox" value="<?php echo esc_attr($order['id']); ?>" />
+                            </td>
                             
                             <td><strong>#<?php echo $order['id']; ?></strong></td>
                             
@@ -207,7 +233,7 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
                     <?php endforeach; ?>
         <?php else : ?>
                     <tr>
-                        <td colspan="7" class="oj-no-orders">
+                        <td colspan="8" class="oj-no-orders">
                             <?php _e('No active orders found.', 'orders-jet'); ?>
                         </td>
                     </tr>
@@ -326,6 +352,63 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
     text-align: center;
     padding: 40px;
     color: #666;
+}
+
+/* Bulk Actions Styles */
+.oj-bulk-actions-bar {
+    background: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.oj-bulk-actions-content {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    width: 100%;
+}
+
+.oj-selected-count {
+    font-weight: bold;
+    color: #2271b1;
+}
+
+.oj-bulk-actions-buttons {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#oj-bulk-action-select {
+    padding: 5px 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.oj-apply-bulk-action {
+    background: #2271b1 !important;
+    color: white !important;
+    border-color: #2271b1 !important;
+}
+
+.oj-clear-selection {
+    background: #666 !important;
+    color: white !important;
+    border-color: #666 !important;
+}
+
+.check-column {
+    width: 40px;
+    text-align: center;
+}
+
+.oj-order-row.selected {
+    background-color: #e7f3ff !important;
 }
 
 /* Modal Styles */
@@ -781,6 +864,125 @@ jQuery(document).ready(function($) {
             }
         });
     }
+    
+    // ===== BULK ACTIONS FUNCTIONALITY =====
+    
+    // Select All functionality
+    $('#cb-select-all').on('change', function() {
+        const isChecked = $(this).is(':checked');
+        $('.oj-order-checkbox:visible').prop('checked', isChecked);
+        updateBulkActionsBar();
+        updateRowHighlighting();
+    });
+    
+    // Individual checkbox functionality
+    $(document).on('change', '.oj-order-checkbox', function() {
+        updateBulkActionsBar();
+        updateRowHighlighting();
+        
+        // Update "select all" checkbox state
+        const totalCheckboxes = $('.oj-order-checkbox:visible').length;
+        const checkedCheckboxes = $('.oj-order-checkbox:visible:checked').length;
+        $('#cb-select-all').prop('indeterminate', checkedCheckboxes > 0 && checkedCheckboxes < totalCheckboxes);
+        $('#cb-select-all').prop('checked', checkedCheckboxes === totalCheckboxes);
+    });
+    
+    // Update bulk actions bar visibility and count
+    function updateBulkActionsBar() {
+        const selectedCount = $('.oj-order-checkbox:checked').length;
+        
+        if (selectedCount > 0) {
+            $('.oj-bulk-actions-bar').show();
+            $('.oj-selected-count').text(selectedCount + ' <?php _e("orders selected", "orders-jet"); ?>');
+        } else {
+            $('.oj-bulk-actions-bar').hide();
+        }
+    }
+    
+    // Update row highlighting
+    function updateRowHighlighting() {
+        $('.oj-order-checkbox').each(function() {
+            const row = $(this).closest('tr');
+            if ($(this).is(':checked')) {
+                row.addClass('selected');
+            } else {
+                row.removeClass('selected');
+            }
+        });
+    }
+    
+    // Clear selection
+    $('.oj-clear-selection').on('click', function() {
+        $('.oj-order-checkbox, #cb-select-all').prop('checked', false);
+        updateBulkActionsBar();
+        updateRowHighlighting();
+    });
+    
+    // Apply bulk action
+    $('.oj-apply-bulk-action').on('click', function() {
+        const selectedAction = $('#oj-bulk-action-select').val();
+        const selectedOrders = $('.oj-order-checkbox:checked').map(function() {
+            return $(this).val();
+        }).get();
+        
+        if (!selectedAction) {
+            alert('<?php _e("Please select an action", "orders-jet"); ?>');
+            return;
+        }
+        
+        if (selectedOrders.length === 0) {
+            alert('<?php _e("Please select at least one order", "orders-jet"); ?>');
+            return;
+        }
+        
+        // Confirm action
+        const actionText = $('#oj-bulk-action-select option:selected').text();
+        if (!confirm('<?php _e("Are you sure you want to", "orders-jet"); ?> ' + actionText.toLowerCase() + ' <?php _e("for", "orders-jet"); ?> ' + selectedOrders.length + ' <?php _e("orders?", "orders-jet"); ?>')) {
+            return;
+        }
+        
+        // Execute bulk action
+        executeBulkAction(selectedAction, selectedOrders);
+    });
+    
+    // Execute bulk action via AJAX
+    function executeBulkAction(action, orderIds) {
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'oj_bulk_action',
+                bulk_action: action,
+                order_ids: orderIds,
+                nonce: '<?php echo wp_create_nonce('oj_bulk_action'); ?>'
+            },
+            beforeSend: function() {
+                $('.oj-apply-bulk-action').prop('disabled', true).text('<?php _e("Processing...", "orders-jet"); ?>');
+            },
+            success: function(response) {
+                if (response.success) {
+                    alert(response.data.message);
+                    location.reload(); // Refresh the page to show updated statuses
+                } else {
+                    alert('<?php _e("Error:", "orders-jet"); ?> ' + response.data.message);
+                }
+            },
+            error: function() {
+                alert('<?php _e("Network error. Please try again.", "orders-jet"); ?>');
+            },
+            complete: function() {
+                $('.oj-apply-bulk-action').prop('disabled', false).text('<?php _e("Apply", "orders-jet"); ?>');
+            }
+        });
+    }
+    
+    // Update bulk actions when filters change
+    $('.oj-filter-btn').on('click', function() {
+        // Clear selections when filter changes
+        $('.oj-order-checkbox, #cb-select-all').prop('checked', false);
+        updateBulkActionsBar();
+        updateRowHighlighting();
+    });
     
 });
 </script>

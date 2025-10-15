@@ -28,6 +28,7 @@ class Orders_Jet_AJAX_Handlers {
         add_action('wp_ajax_oj_generate_guest_pdf', array($this, 'generate_guest_pdf'));
         add_action('wp_ajax_oj_generate_admin_pdf', array($this, 'generate_admin_pdf'));
         add_action('wp_ajax_oj_generate_table_pdf', array($this, 'generate_table_pdf'));
+        add_action('wp_ajax_oj_bulk_action', array($this, 'bulk_action'));
         
         // AJAX handlers for non-logged in users (guests)
         add_action('wp_ajax_nopriv_oj_submit_table_order', array($this, 'submit_table_order'));
@@ -2605,6 +2606,136 @@ class Orders_Jet_AJAX_Handlers {
             </div>', $html);
         
         echo $print_html;
+    }
+    
+    /**
+     * Handle bulk actions on orders
+     */
+    public function bulk_action() {
+        check_ajax_referer('oj_bulk_action', 'nonce');
+        
+        if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Permission denied', 'orders-jet')));
+        }
+        
+        $bulk_action = sanitize_text_field($_POST['bulk_action']);
+        $order_ids = array_map('intval', $_POST['order_ids']);
+        
+        if (empty($order_ids)) {
+            wp_send_json_error(array('message' => __('No orders selected', 'orders-jet')));
+        }
+        
+        $success_count = 0;
+        $error_count = 0;
+        $processed_orders = array();
+        
+        foreach ($order_ids as $order_id) {
+            $order = wc_get_order($order_id);
+            if (!$order) {
+                $error_count++;
+                error_log('Orders Jet: Bulk Action - Order not found: ' . $order_id);
+                continue;
+            }
+            
+            $current_status = $order->get_status();
+            $order_number = $order->get_order_number();
+            
+            switch ($bulk_action) {
+                case 'mark_ready':
+                    if ($current_status === 'processing') {
+                        $order->set_status('pending');
+                        $order->add_order_note(__('Order marked as ready via bulk action', 'orders-jet'));
+                        $order->save();
+                        $success_count++;
+                        $processed_orders[] = $order_number;
+                        error_log('Orders Jet: Bulk Action - Marked order #' . $order_number . ' as ready');
+                    } else {
+                        $error_count++;
+                        error_log('Orders Jet: Bulk Action - Cannot mark order #' . $order_number . ' as ready. Current status: ' . $current_status);
+                    }
+                    break;
+                    
+                case 'complete_orders':
+                    if (in_array($current_status, ['processing', 'pending'])) {
+                        $order->set_status('completed');
+                        $order->add_order_note(__('Order completed via bulk action', 'orders-jet'));
+                        $order->save();
+                        $success_count++;
+                        $processed_orders[] = $order_number;
+                        error_log('Orders Jet: Bulk Action - Completed order #' . $order_number);
+                    } else {
+                        $error_count++;
+                        error_log('Orders Jet: Bulk Action - Cannot complete order #' . $order_number . '. Current status: ' . $current_status);
+                    }
+                    break;
+                    
+                case 'cancel_orders':
+                    if (in_array($current_status, ['processing', 'pending'])) {
+                        $order->set_status('cancelled');
+                        $order->add_order_note(__('Order cancelled via bulk action', 'orders-jet'));
+                        $order->save();
+                        $success_count++;
+                        $processed_orders[] = $order_number;
+                        error_log('Orders Jet: Bulk Action - Cancelled order #' . $order_number);
+                    } else {
+                        $error_count++;
+                        error_log('Orders Jet: Bulk Action - Cannot cancel order #' . $order_number . '. Current status: ' . $current_status);
+                    }
+                    break;
+                    
+                default:
+                    $error_count++;
+                    error_log('Orders Jet: Bulk Action - Unknown action: ' . $bulk_action);
+            }
+        }
+        
+        // Prepare response message
+        $action_names = array(
+            'mark_ready' => __('marked as ready', 'orders-jet'),
+            'complete_orders' => __('completed', 'orders-jet'),
+            'cancel_orders' => __('cancelled', 'orders-jet')
+        );
+        
+        $action_name = isset($action_names[$bulk_action]) ? $action_names[$bulk_action] : $bulk_action;
+        
+        if ($success_count > 0) {
+            $message = sprintf(
+                _n(
+                    '%d order %s successfully.',
+                    '%d orders %s successfully.',
+                    $success_count,
+                    'orders-jet'
+                ),
+                $success_count,
+                $action_name
+            );
+            
+            if ($error_count > 0) {
+                $message .= ' ' . sprintf(
+                    _n(
+                        '%d order failed to process.',
+                        '%d orders failed to process.',
+                        $error_count,
+                        'orders-jet'
+                    ),
+                    $error_count
+                );
+            }
+        } else {
+            $message = sprintf(
+                __('No orders could be %s. Please check order statuses.', 'orders-jet'),
+                $action_name
+            );
+        }
+        
+        error_log('Orders Jet: Bulk Action Summary - Action: ' . $bulk_action . ', Success: ' . $success_count . ', Errors: ' . $error_count);
+        
+        wp_send_json_success(array(
+            'message' => $message,
+            'success_count' => $success_count,
+            'error_count' => $error_count,
+            'processed_orders' => $processed_orders
+        ));
     }
     
 }
