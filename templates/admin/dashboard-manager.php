@@ -654,10 +654,16 @@ jQuery(document).ready(function($) {
     }
     
     function showTableInvoiceModal(tableNumber, responseData) {
+        // Debug: Log the response data to see what we're receiving
+        console.log('Table Invoice Modal - Response Data:', responseData);
+        
         // Extract order IDs from response data for table orders
         let orderIds = [];
         if (responseData && responseData.order_ids) {
             orderIds = responseData.order_ids;
+            console.log('Table Invoice Modal - Order IDs found:', orderIds);
+        } else {
+            console.log('Table Invoice Modal - No order_ids found in response data');
         }
         
         const modal = $(`

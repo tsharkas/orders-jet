@@ -1254,32 +1254,21 @@ class Orders_Jet_AJAX_Handlers {
         // Update table status to available
         update_post_meta($table_id, '_oj_table_status', 'available');
         
-        // Mark all pending/processing orders as completed
-        foreach ($orders as $order_post) {
-            $order = wc_get_order($order_post->ID);
-            if ($order && in_array($order->get_status(), array('processing', 'pending', 'pending'))) {
-                $order->set_status('completed');
-                $order->update_meta_data('_oj_payment_method', $payment_method);
-                $order->update_meta_data('_oj_table_closed', current_time('mysql'));
-                $order->save();
-                error_log('Orders Jet: Marked order #' . $order->get_id() . ' as completed');
-            }
-        }
-        
         // Generate a session ID for this table closure
         $session_id = 'session_' . $table_number . '_' . time();
         
-        // Update all orders with session ID, payment method, and table closed timestamp
-        // Also collect order IDs for PDF invoice generation
+        // Mark all pending/processing orders as completed and collect order IDs
         $completed_order_ids = array();
         foreach ($orders as $order_post) {
             $order = wc_get_order($order_post->ID);
             if ($order && in_array($order->get_status(), array('processing', 'pending', 'pending'))) {
+                $order->set_status('completed');
                 $order->update_meta_data('_oj_session_id', $session_id);
                 $order->update_meta_data('_oj_payment_method', $payment_method);
                 $order->update_meta_data('_oj_table_closed', current_time('mysql'));
                 $order->save();
                 $completed_order_ids[] = $order->get_id();
+                error_log('Orders Jet: Marked order #' . $order->get_id() . ' as completed and added to invoice list');
             }
         }
         
