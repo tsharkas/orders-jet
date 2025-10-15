@@ -695,13 +695,11 @@ jQuery(document).ready(function($) {
         // Handle view PDF invoice for table
         modal.find('.oj-view-table-invoice').on('click', function() {
             const orderIds = $(this).data('orders');
+            const tableNumber = $(this).data('table');
             if (orderIds) {
-                // For multiple orders, open each invoice in separate tabs using our secure endpoint
-                const orderIdArray = orderIds.split(',');
-                orderIdArray.forEach(function(orderId) {
-                    const invoiceUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_admin_pdf&order_id=' + orderId.trim() + '&document_type=invoice&output=html&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
-                    window.open(invoiceUrl, '_blank');
-                });
+                // Generate combined table invoice using our new endpoint
+                const invoiceUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_table_pdf&table_number=' + encodeURIComponent(tableNumber) + '&order_ids=' + encodeURIComponent(orderIds) + '&output=html&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
+                window.open(invoiceUrl, '_blank');
             } else {
                 alert('<?php _e('No orders found for this table.', 'orders-jet'); ?>');
             }
@@ -710,44 +708,40 @@ jQuery(document).ready(function($) {
         // Handle print PDF invoice for table
         modal.find('.oj-print-table-invoice').on('click', function() {
             const orderIds = $(this).data('orders');
+            const tableNumber = $(this).data('table');
             if (orderIds) {
-                // For multiple orders, print each invoice separately using our secure endpoint
-                const orderIdArray = orderIds.split(',');
-                orderIdArray.forEach(function(orderId, index) {
-                    setTimeout(function() {
-                        const pdfUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_admin_pdf&order_id=' + orderId.trim() + '&document_type=invoice&output=pdf&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
-                        
-                        // Create hidden iframe for printing
-                        const iframe = document.createElement('iframe');
-                        iframe.style.display = 'none';
-                        iframe.src = pdfUrl;
-                        document.body.appendChild(iframe);
-                        
-                        iframe.onload = function() {
-                            try {
-                                // Try to print the PDF directly
-                                iframe.contentWindow.print();
-                            } catch (e) {
-                                // Fallback: open in new window for manual printing
-                                window.open(pdfUrl, '_blank');
-                            }
-                            // Remove iframe after printing
-                            setTimeout(() => {
-                                if (document.body.contains(iframe)) {
-                                    document.body.removeChild(iframe);
-                                }
-                            }, 2000);
-                        };
-                        
-                        // Fallback if iframe fails to load
-                        iframe.onerror = function() {
-                            window.open(pdfUrl, '_blank');
-                            if (document.body.contains(iframe)) {
-                                document.body.removeChild(iframe);
-                            }
-                        };
-                    }, index * 1000); // Delay each print by 1 second to avoid conflicts
-                });
+                // Generate combined table invoice PDF for printing
+                const pdfUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_table_pdf&table_number=' + encodeURIComponent(tableNumber) + '&order_ids=' + encodeURIComponent(orderIds) + '&output=pdf&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
+                
+                // Create hidden iframe for printing
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.src = pdfUrl;
+                document.body.appendChild(iframe);
+                
+                iframe.onload = function() {
+                    try {
+                        // Try to print the PDF directly
+                        iframe.contentWindow.print();
+                    } catch (e) {
+                        // Fallback: open in new window for manual printing
+                        window.open(pdfUrl, '_blank');
+                    }
+                    // Remove iframe after printing
+                    setTimeout(() => {
+                        if (document.body.contains(iframe)) {
+                            document.body.removeChild(iframe);
+                        }
+                    }, 2000);
+                };
+                
+                // Fallback if iframe fails to load
+                iframe.onerror = function() {
+                    window.open(pdfUrl, '_blank');
+                    if (document.body.contains(iframe)) {
+                        document.body.removeChild(iframe);
+                    }
+                };
             } else {
                 alert('<?php _e('No orders found for this table.', 'orders-jet'); ?>');
             }
@@ -758,21 +752,16 @@ jQuery(document).ready(function($) {
             const tableNumber = $(this).data('table');
             const orderIds = $(this).data('orders');
             if (orderIds) {
-                // For multiple orders, download each invoice separately using our secure endpoint
-                const orderIdArray = orderIds.split(',');
-                orderIdArray.forEach(function(orderId, index) {
-                    setTimeout(function() {
-                        const downloadUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_admin_pdf&order_id=' + orderId.trim() + '&document_type=invoice&output=pdf&force_download=1&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
-                        
-                        // Create temporary link for download
-                        const link = document.createElement('a');
-                        link.href = downloadUrl;
-                        link.download = 'table-' + tableNumber + '-order-' + orderId.trim() + '-invoice.pdf';
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                    }, index * 500); // Delay each download by 500ms to avoid conflicts
-                });
+                // Generate combined table invoice PDF for download
+                const downloadUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_table_pdf&table_number=' + encodeURIComponent(tableNumber) + '&order_ids=' + encodeURIComponent(orderIds) + '&output=pdf&force_download=1&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
+                
+                // Create temporary link for download
+                const link = document.createElement('a');
+                link.href = downloadUrl;
+                link.download = 'table-' + tableNumber + '-combined-invoice.pdf';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
             } else {
                 alert('<?php _e('No orders found for this table.', 'orders-jet'); ?>');
             }

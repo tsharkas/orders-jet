@@ -27,6 +27,7 @@ class Orders_Jet_AJAX_Handlers {
         add_action('wp_ajax_oj_get_completed_orders_for_pdf', array($this, 'get_completed_orders_for_pdf'));
         add_action('wp_ajax_oj_generate_guest_pdf', array($this, 'generate_guest_pdf'));
         add_action('wp_ajax_oj_generate_admin_pdf', array($this, 'generate_admin_pdf'));
+        add_action('wp_ajax_oj_generate_table_pdf', array($this, 'generate_table_pdf'));
         
         // AJAX handlers for non-logged in users (guests)
         add_action('wp_ajax_nopriv_oj_submit_table_order', array($this, 'submit_table_order'));
@@ -1903,6 +1904,240 @@ class Orders_Jet_AJAX_Handlers {
         } catch (Exception $e) {
             error_log('Orders Jet: Admin PDF generation error: ' . $e->getMessage());
             wp_die(__('Error generating PDF: ', 'orders-jet') . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Generate combined PDF invoice for table orders (admin users)
+     */
+    public function generate_table_pdf() {
+        // Verify nonce for security
+        if (!wp_verify_nonce($_GET['nonce'] ?? '', 'oj_admin_pdf')) {
+            wp_die(__('Security check failed', 'orders-jet'));
+        }
+        
+        // Check if user has admin capabilities
+        if (!current_user_can('manage_woocommerce') && !current_user_can('access_oj_manager_dashboard')) {
+            wp_die(__('You do not have permission to access this resource', 'orders-jet'));
+        }
+        
+        $table_number = sanitize_text_field($_GET['table_number'] ?? '');
+        $order_ids = sanitize_text_field($_GET['order_ids'] ?? '');
+        $output = sanitize_text_field($_GET['output'] ?? 'pdf');
+        $force_download = isset($_GET['force_download']);
+        
+        if (!$table_number || !$order_ids) {
+            wp_die(__('Invalid table number or order IDs', 'orders-jet'));
+        }
+        
+        // Parse order IDs
+        $order_id_array = explode(',', $order_ids);
+        $order_id_array = array_map('intval', $order_id_array);
+        
+        if (empty($order_id_array)) {
+            wp_die(__('No valid order IDs provided', 'orders-jet'));
+        }
+        
+        try {
+            // Generate combined table invoice HTML
+            $invoice_html = $this->generate_table_invoice_html($table_number, $order_id_array);
+            
+            if ($output === 'html') {
+                header('Content-Type: text/html; charset=utf-8');
+                echo $invoice_html;
+            } else {
+                // Generate PDF from HTML
+                $this->generate_pdf_from_html($invoice_html, $table_number, $force_download);
+            }
+            
+            exit;
+            
+        } catch (Exception $e) {
+            error_log('Orders Jet: Table PDF generation error: ' . $e->getMessage());
+            wp_die(__('Error generating table PDF: ', 'orders-jet') . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Generate combined table invoice HTML
+     */
+    private function generate_table_invoice_html($table_number, $order_ids) {
+        // Get all completed orders for this table
+        $orders = array();
+        $total_amount = 0;
+        $order_data = array();
+        
+        foreach ($order_ids as $order_id) {
+            $order = wc_get_order($order_id);
+            if (!$order) continue;
+            
+            // Verify order belongs to this table
+            $order_table = $order->get_meta('_oj_table_number');
+            if ($order_table !== $table_number) continue;
+            
+            $order_items = array();
+            foreach ($order->get_items() as $item) {
+                $order_items[] = array(
+                    'name' => $item->get_name(),
+                    'quantity' => $item->get_quantity(),
+                    'total' => $item->get_total()
+                );
+            }
+            
+            $order_data[] = array(
+                'order_id' => $order->get_id(),
+                'order_number' => $order->get_order_number(),
+                'total' => $order->get_total(),
+                'items' => $order_items,
+                'date' => $order->get_date_created()->format('Y-m-d H:i:s'),
+                'payment_method' => $order->get_meta('_oj_payment_method') ?: 'cash'
+            );
+            
+            $total_amount += $order->get_total();
+        }
+        
+        // Get table information
+        $table_id = oj_get_table_id_by_number($table_number);
+        $table_capacity = $table_id ? get_post_meta($table_id, '_oj_table_capacity', true) : '';
+        $table_location = $table_id ? get_post_meta($table_id, '_oj_table_location', true) : '';
+        
+        // Generate HTML using our existing template logic
+        ob_start();
+        ?>
+        <!DOCTYPE html>
+        <html <?php language_attributes(); ?>>
+        <head>
+            <meta charset="<?php bloginfo('charset'); ?>">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title><?php printf(__('Table %s Invoice', 'orders-jet'), $table_number); ?></title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+                .invoice-container { max-width: 800px; margin: 0 auto; }
+                .invoice-header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+                .invoice-header h1 { color: #c41e3a; margin: 0; font-size: 28px; }
+                .invoice-info { margin-bottom: 30px; }
+                .info-row { display: flex; justify-content: space-between; margin: 8px 0; }
+                .info-label { font-weight: bold; }
+                .orders-section h2 { color: #333; border-bottom: 1px solid #ddd; padding-bottom: 10px; }
+                .order-block { margin-bottom: 25px; border: 1px solid #ddd; padding: 15px; }
+                .order-header { background: #f8f9fa; padding: 10px; margin: -15px -15px 15px -15px; }
+                .items-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                .items-table th, .items-table td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+                .items-table th { background: #f8f9fa; font-weight: bold; }
+                .order-total { text-align: right; font-weight: bold; margin-top: 10px; }
+                .invoice-total { background: #c41e3a; color: white; padding: 20px; text-align: center; margin-top: 30px; }
+                .invoice-total h2 { margin: 0; font-size: 24px; }
+            </style>
+        </head>
+        <body>
+            <div class="invoice-container">
+                <div class="invoice-header">
+                    <h1><?php _e('Restaurant Invoice', 'orders-jet'); ?></h1>
+                    <p><?php printf(__('Table %s', 'orders-jet'), $table_number); ?></p>
+                </div>
+                
+                <div class="invoice-info">
+                    <div class="info-row">
+                        <span class="info-label"><?php _e('Table Number:', 'orders-jet'); ?></span>
+                        <span><?php echo esc_html($table_number); ?></span>
+                    </div>
+                    <?php if ($table_capacity): ?>
+                    <div class="info-row">
+                        <span class="info-label"><?php _e('Capacity:', 'orders-jet'); ?></span>
+                        <span><?php echo esc_html($table_capacity); ?> <?php _e('people', 'orders-jet'); ?></span>
+                    </div>
+                    <?php endif; ?>
+                    <?php if ($table_location): ?>
+                    <div class="info-row">
+                        <span class="info-label"><?php _e('Location:', 'orders-jet'); ?></span>
+                        <span><?php echo esc_html($table_location); ?></span>
+                    </div>
+                    <?php endif; ?>
+                    <div class="info-row">
+                        <span class="info-label"><?php _e('Invoice Date:', 'orders-jet'); ?></span>
+                        <span><?php echo current_time('Y-m-d H:i:s'); ?></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label"><?php _e('Number of Orders:', 'orders-jet'); ?></span>
+                        <span><?php echo count($order_data); ?></span>
+                    </div>
+                </div>
+                
+                <div class="orders-section">
+                    <h2><?php _e('Order Details', 'orders-jet'); ?></h2>
+                    
+                    <?php foreach ($order_data as $order): ?>
+                    <div class="order-block">
+                        <div class="order-header">
+                            <strong><?php _e('Order #', 'orders-jet'); ?><?php echo $order['order_number']; ?></strong>
+                            <span style="float: right;"><?php echo $order['date']; ?></span>
+                        </div>
+                        
+                        <table class="items-table">
+                            <thead>
+                                <tr>
+                                    <th><?php _e('Item', 'orders-jet'); ?></th>
+                                    <th><?php _e('Quantity', 'orders-jet'); ?></th>
+                                    <th><?php _e('Price', 'orders-jet'); ?></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($order['items'] as $item): ?>
+                                <tr>
+                                    <td><?php echo esc_html($item['name']); ?></td>
+                                    <td><?php echo $item['quantity']; ?></td>
+                                    <td><?php echo wc_price($item['total']); ?></td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                        
+                        <div class="order-total">
+                            <?php _e('Order Total:', 'orders-jet'); ?> <?php echo wc_price($order['total']); ?>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+                
+                <div class="invoice-total">
+                    <h2><?php _e('Total Amount:', 'orders-jet'); ?> <?php echo wc_price($total_amount); ?></h2>
+                    <p><?php printf(__('Payment Method: %s', 'orders-jet'), ucfirst($order_data[0]['payment_method'] ?? 'Cash')); ?></p>
+                </div>
+            </div>
+        </body>
+        </html>
+        <?php
+        
+        return ob_get_clean();
+    }
+    
+    /**
+     * Generate PDF from HTML using available PDF library
+     */
+    private function generate_pdf_from_html($html, $table_number, $force_download = false) {
+        // Try to use WooCommerce PDF plugin if available
+        if (class_exists('TCPDF')) {
+            $pdf = new TCPDF();
+            $pdf->AddPage();
+            $pdf->writeHTML($html);
+            
+            $filename = 'table-' . $table_number . '-invoice.pdf';
+            $pdf_content = $pdf->Output('', 'S');
+            
+            header('Content-Type: application/pdf');
+            header('Content-Length: ' . strlen($pdf_content));
+            
+            if ($force_download) {
+                header('Content-Disposition: attachment; filename="' . $filename . '"');
+            } else {
+                header('Content-Disposition: inline; filename="' . $filename . '"');
+            }
+            
+            echo $pdf_content;
+        } else {
+            // Fallback: return HTML with print styles
+            header('Content-Type: text/html; charset=utf-8');
+            echo $html;
         }
     }
     
