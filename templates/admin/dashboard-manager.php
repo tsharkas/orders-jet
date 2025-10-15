@@ -94,8 +94,43 @@ if (function_exists('wc_get_orders')) {
     // Combine active orders only (exclude completed from main operations)
     $active_orders = array_merge($processing_orders, $ready_orders);
     
+    // Apply FIFO sorting logic (same as kitchen dashboard): Dine-in first, then pickup orders, sorted by time ascending
+    usort($active_orders, function($a, $b) {
+        // 1. Dine-in orders (table orders) come first
+        $a_is_dinein = !empty($a['table']);
+        $b_is_dinein = !empty($b['table']);
+        
+        if ($a_is_dinein && !$b_is_dinein) {
+            return -1; // Dine-in comes first
+        }
+        if ($b_is_dinein && !$a_is_dinein) {
+            return 1; // Dine-in comes first
+        }
+        
+        // 2. Within same type (both dine-in or both pickup), sort by date/time ascending (FIFO)
+        // Convert time back to comparable format (assuming 'date' field contains H:i format)
+        $today = date('Y-m-d');
+        $a_datetime = $today . ' ' . $a['date'] . ':00'; // Add seconds for strtotime
+        $b_datetime = $today . ' ' . $b['date'] . ':00';
+        
+        $a_time = strtotime($a_datetime);
+        $b_time = strtotime($b_datetime);
+        
+        return $a_time - $b_time; // Ascending order (earliest first - FIFO)
+    });
+    
     // All orders including completed (for display purposes)
-    $all_orders = array_merge($processing_orders, $ready_orders, $recent_completed_orders);
+    $all_orders = array_merge($active_orders, $recent_completed_orders);
+    
+    // Debug logging for sorting verification
+    error_log('Orders Jet Manager: Applied FIFO sorting - Active orders count: ' . count($active_orders));
+    if (!empty($active_orders)) {
+        $order_sequence = array();
+        foreach ($active_orders as $order) {
+            $order_sequence[] = '#' . $order['id'] . ' (' . $order['type'] . ', ' . $order['date'] . ')';
+        }
+        error_log('Orders Jet Manager: Order sequence after FIFO sorting: ' . implode(', ', $order_sequence));
+    }
 }
 
 // Calculate statistics
