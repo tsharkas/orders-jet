@@ -2261,9 +2261,8 @@ class Orders_Jet_AJAX_Handlers {
      * Create simple PDF content without external libraries
      */
     private function create_simple_pdf_content($html, $table_number) {
-        // Extract text content from HTML
-        $text_content = strip_tags($html);
-        $text_content = html_entity_decode($text_content, ENT_QUOTES, 'UTF-8');
+        // Extract and structure content from HTML properly
+        $structured_content = $this->extract_structured_content($html, $table_number);
         
         // Create a basic PDF structure
         $pdf_header = "%PDF-1.4\n";
@@ -2278,30 +2277,19 @@ class Orders_Jet_AJAX_Handlers {
         $objects[2] = "2 0 obj\n<<\n/Type /Pages\n/Kids [3 0 R]\n/Count 1\n>>\nendobj\n";
         
         // Object 3: Page
-        $objects[3] = "3 0 obj\n<<\n/Type /Page\n/Parent 2 0 R\n/MediaBox [0 0 612 792]\n/Contents 4 0 R\n/Resources <<\n/Font <<\n/F1 5 0 R\n>>\n>>\n>>\nendobj\n";
-        
-        // Prepare text content for PDF
-        $clean_text = $this->prepare_text_for_pdf($text_content);
+        $objects[3] = "3 0 obj\n<<\n/Type /Page\n/Parent 2 0 R\n/MediaBox [0 0 612 792]\n/Contents 4 0 R\n/Resources <<\n/Font <<\n/F1 5 0 R\n/F2 6 0 R\n>>\n>>\n>>\nendobj\n";
         
         // Object 4: Content stream
-        $stream_content = "BT\n/F1 12 Tf\n50 750 Td\n";
-        $lines = explode("\n", $clean_text);
-        $y_position = 750;
-        
-        foreach ($lines as $line) {
-            if ($y_position < 50) break; // Prevent overflow
-            $stream_content .= "(" . $this->escape_pdf_string($line) . ") Tj\n";
-            $stream_content .= "0 -15 Td\n";
-            $y_position -= 15;
-        }
-        
-        $stream_content .= "ET\n";
+        $stream_content = $this->build_pdf_content_stream($structured_content);
         $stream_length = strlen($stream_content);
         
         $objects[4] = "4 0 obj\n<<\n/Length $stream_length\n>>\nstream\n$stream_content\nendstream\nendobj\n";
         
-        // Object 5: Font
+        // Object 5: Regular Font
         $objects[5] = "5 0 obj\n<<\n/Type /Font\n/Subtype /Type1\n/BaseFont /Helvetica\n>>\nendobj\n";
+        
+        // Object 6: Bold Font
+        $objects[6] = "6 0 obj\n<<\n/Type /Font\n/Subtype /Type1\n/BaseFont /Helvetica-Bold\n>>\nendobj\n";
         
         // Build PDF content
         $pdf_content = $pdf_header;
@@ -2312,10 +2300,10 @@ class Orders_Jet_AJAX_Handlers {
         }
         
         // Cross-reference table
-        $xref_table = "xref\n0 6\n0000000000 65535 f \n";
+        $xref_table = "xref\n0 7\n0000000000 65535 f \n";
         $offset = strlen($pdf_header);
         
-        for ($i = 1; $i <= 5; $i++) {
+        for ($i = 1; $i <= 6; $i++) {
             $xref_table .= sprintf("%010d 00000 n \n", $offset);
             $offset += strlen($objects[$i]);
         }
@@ -2323,10 +2311,182 @@ class Orders_Jet_AJAX_Handlers {
         $pdf_content .= $xref_table;
         
         // Trailer
-        $trailer = "trailer\n<<\n/Size 6\n/Root 1 0 R\n>>\nstartxref\n$xref_offset\n%%EOF\n";
+        $trailer = "trailer\n<<\n/Size 7\n/Root 1 0 R\n>>\nstartxref\n$xref_offset\n%%EOF\n";
         $pdf_content .= $trailer;
         
         return $pdf_content;
+    }
+    
+    /**
+     * Extract structured content from HTML
+     */
+    private function extract_structured_content($html, $table_number) {
+        // Remove CSS styles first
+        $html = preg_replace('/<style[^>]*>.*?<\/style>/is', '', $html);
+        $html = preg_replace('/style="[^"]*"/i', '', $html);
+        
+        // Create structured content array
+        $content = array(
+            'title' => 'Restaurant Invoice',
+            'subtitle' => 'Table ' . $table_number,
+            'sections' => array()
+        );
+        
+        // Extract table information
+        if (preg_match('/Table Number:\s*([^<\n]+)/i', $html, $matches)) {
+            $content['sections'][] = array('type' => 'info', 'label' => 'Table Number', 'value' => trim($matches[1]));
+        }
+        
+        if (preg_match('/Capacity:\s*([^<\n]+)/i', $html, $matches)) {
+            $content['sections'][] = array('type' => 'info', 'label' => 'Capacity', 'value' => trim($matches[1]));
+        }
+        
+        if (preg_match('/Location:\s*([^<\n]+)/i', $html, $matches)) {
+            $content['sections'][] = array('type' => 'info', 'label' => 'Location', 'value' => trim($matches[1]));
+        }
+        
+        if (preg_match('/Invoice Date:\s*([^<\n]+)/i', $html, $matches)) {
+            $content['sections'][] = array('type' => 'info', 'label' => 'Invoice Date', 'value' => trim($matches[1]));
+        }
+        
+        if (preg_match('/Number of Orders:\s*([^<\n]+)/i', $html, $matches)) {
+            $content['sections'][] = array('type' => 'info', 'label' => 'Number of Orders', 'value' => trim($matches[1]));
+        }
+        
+        // Add section break
+        $content['sections'][] = array('type' => 'section_header', 'text' => 'Order Details');
+        
+        // Extract orders
+        preg_match_all('/Order #(\d+)\s+([0-9-:\s]+).*?Order Total:\s*([0-9.,]+\s*EGP)/is', $html, $order_matches, PREG_SET_ORDER);
+        
+        foreach ($order_matches as $order_match) {
+            $order_id = $order_match[1];
+            $order_date = trim($order_match[2]);
+            $order_total = $order_match[3];
+            
+            $content['sections'][] = array('type' => 'order_header', 'text' => "Order #$order_id - $order_date");
+            
+            // Extract items for this order
+            $order_section = $order_match[0];
+            preg_match_all('/([A-Za-z\s\-]+)\s+(\d+)\s+([0-9.,]+\s*EGP)/i', $order_section, $item_matches, PREG_SET_ORDER);
+            
+            foreach ($item_matches as $item_match) {
+                $item_name = trim($item_match[1]);
+                $quantity = $item_match[2];
+                $price = $item_match[3];
+                
+                if (!empty($item_name) && $item_name !== 'Order Total') {
+                    $content['sections'][] = array(
+                        'type' => 'item', 
+                        'name' => $item_name, 
+                        'quantity' => $quantity, 
+                        'price' => $price
+                    );
+                }
+            }
+            
+            $content['sections'][] = array('type' => 'order_total', 'text' => "Order Total: $order_total");
+            $content['sections'][] = array('type' => 'spacer', 'text' => '');
+        }
+        
+        // Extract final totals
+        if (preg_match('/Total Amount:\s*([0-9.,]+\s*EGP)/i', $html, $matches)) {
+            $content['sections'][] = array('type' => 'final_total', 'text' => 'Total Amount: ' . $matches[1]);
+        }
+        
+        if (preg_match('/Payment Method:\s*([^<\n]+)/i', $html, $matches)) {
+            $content['sections'][] = array('type' => 'payment_method', 'text' => 'Payment Method: ' . trim($matches[1]));
+        }
+        
+        return $content;
+    }
+    
+    /**
+     * Build PDF content stream from structured content
+     */
+    private function build_pdf_content_stream($content) {
+        $stream = "BT\n";
+        $current_y = 750;
+        $line_height = 15;
+        
+        // Title
+        $stream .= "/F2 18 Tf\n"; // Bold, larger font
+        $stream .= "50 $current_y Td\n";
+        $stream .= "(" . $this->escape_pdf_string($content['title']) . ") Tj\n";
+        $current_y -= 25;
+        
+        // Subtitle  
+        $stream .= "/F2 14 Tf\n"; // Bold, medium font
+        $stream .= "0 -25 Td\n"; // Move down relative to current position
+        $stream .= "(" . $this->escape_pdf_string($content['subtitle']) . ") Tj\n";
+        $current_y -= 30;
+        
+        // Content sections
+        foreach ($content['sections'] as $section) {
+            if ($current_y < 50) break; // Prevent overflow
+            
+            switch ($section['type']) {
+                case 'info':
+                    $stream .= "/F1 10 Tf\n"; // Regular font
+                    $stream .= "0 -" . $line_height . " Td\n";
+                    $stream .= "(" . $this->escape_pdf_string($section['label'] . ': ' . $section['value']) . ") Tj\n";
+                    $current_y -= $line_height;
+                    break;
+                    
+                case 'section_header':
+                    $stream .= "/F2 14 Tf\n"; // Bold font
+                    $stream .= "0 -25 Td\n"; // Extra space before section
+                    $stream .= "(" . $this->escape_pdf_string($section['text']) . ") Tj\n";
+                    $current_y -= 25;
+                    break;
+                    
+                case 'order_header':
+                    $stream .= "/F2 12 Tf\n"; // Bold font
+                    $stream .= "0 -20 Td\n";
+                    $stream .= "(" . $this->escape_pdf_string($section['text']) . ") Tj\n";
+                    $current_y -= 20;
+                    break;
+                    
+                case 'item':
+                    $stream .= "/F1 10 Tf\n"; // Regular font
+                    $stream .= "20 -" . $line_height . " Td\n"; // Indent items
+                    $item_line = $section['name'] . ' x' . $section['quantity'] . ' - ' . $section['price'];
+                    $stream .= "(" . $this->escape_pdf_string($item_line) . ") Tj\n";
+                    $stream .= "-20 0 Td\n"; // Reset indent
+                    $current_y -= $line_height;
+                    break;
+                    
+                case 'order_total':
+                    $stream .= "/F2 10 Tf\n"; // Bold font
+                    $stream .= "20 -" . $line_height . " Td\n"; // Indent
+                    $stream .= "(" . $this->escape_pdf_string($section['text']) . ") Tj\n";
+                    $stream .= "-20 0 Td\n"; // Reset indent
+                    $current_y -= $line_height;
+                    break;
+                    
+                case 'final_total':
+                    $stream .= "/F2 14 Tf\n"; // Bold, larger font
+                    $stream .= "0 -25 Td\n"; // Extra space before final total
+                    $stream .= "(" . $this->escape_pdf_string($section['text']) . ") Tj\n";
+                    $current_y -= 25;
+                    break;
+                    
+                case 'payment_method':
+                    $stream .= "/F1 12 Tf\n"; // Regular font
+                    $stream .= "0 -" . $line_height . " Td\n";
+                    $stream .= "(" . $this->escape_pdf_string($section['text']) . ") Tj\n";
+                    $current_y -= $line_height;
+                    break;
+                    
+                case 'spacer':
+                    $stream .= "0 -10 Td\n";
+                    $current_y -= 10;
+                    break;
+            }
+        }
+        
+        $stream .= "ET\n";
+        return $stream;
     }
     
     /**
