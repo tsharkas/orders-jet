@@ -2107,34 +2107,20 @@ class Orders_Jet_AJAX_Handlers {
             ob_end_clean();
         }
         
-        // Try to use TCPDF if available
-        if (class_exists('TCPDF')) {
+        // Try to use WooCommerce PDF plugin's TCPDF first
+        if (function_exists('wcpdf_get_document') && class_exists('WPO\WC\PDF_Invoices\TCPDF')) {
             try {
-                // Create new PDF document
-                $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
+                // Use WooCommerce PDF plugin's TCPDF
+                $pdf = new WPO\WC\PDF_Invoices\TCPDF();
                 
                 // Set document information
                 $pdf->SetCreator('Orders Jet');
                 $pdf->SetAuthor('Restaurant');
                 $pdf->SetTitle('Table ' . $table_number . ' Invoice');
                 
-                // Set default header data
-                $pdf->SetHeaderData('', 0, 'Restaurant Invoice', 'Table ' . $table_number);
-                
-                // Set header and footer fonts
-                $pdf->setHeaderFont(Array(PDF_FONT_NAME_MAIN, '', PDF_FONT_SIZE_MAIN));
-                $pdf->setFooterFont(Array(PDF_FONT_NAME_DATA, '', PDF_FONT_SIZE_DATA));
-                
-                // Set default monospaced font
-                $pdf->SetDefaultMonospacedFont(PDF_FONT_MONOSPACED);
-                
                 // Set margins
-                $pdf->SetMargins(PDF_MARGIN_LEFT, PDF_MARGIN_TOP, PDF_MARGIN_RIGHT);
-                $pdf->SetHeaderMargin(PDF_MARGIN_HEADER);
-                $pdf->SetFooterMargin(PDF_MARGIN_FOOTER);
-                
-                // Set auto page breaks
-                $pdf->SetAutoPageBreak(TRUE, PDF_MARGIN_BOTTOM);
+                $pdf->SetMargins(15, 15, 15);
+                $pdf->SetAutoPageBreak(TRUE, 15);
                 
                 // Add a page
                 $pdf->AddPage();
@@ -2155,16 +2141,66 @@ class Orders_Jet_AJAX_Handlers {
                     $pdf->Output($filename, 'I'); // Display in browser
                 }
                 
+                return; // Success, exit function
+                
             } catch (Exception $e) {
-                error_log('Orders Jet: TCPDF Error: ' . $e->getMessage());
-                // Fallback to HTML
-                $this->output_html_fallback($html, $table_number, $force_download);
+                error_log('Orders Jet: WooCommerce TCPDF Error: ' . $e->getMessage());
             }
-        } else {
-            error_log('Orders Jet: TCPDF not available, using HTML fallback');
-            // Fallback to HTML
-            $this->output_html_fallback($html, $table_number, $force_download);
         }
+        
+        // Try standard TCPDF if available
+        if (class_exists('TCPDF')) {
+            try {
+                // Create new PDF document
+                $pdf = new TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
+                
+                // Set document information
+                $pdf->SetCreator('Orders Jet');
+                $pdf->SetAuthor('Restaurant');
+                $pdf->SetTitle('Table ' . $table_number . ' Invoice');
+                
+                // Set margins
+                $pdf->SetMargins(15, 15, 15);
+                $pdf->SetAutoPageBreak(TRUE, 15);
+                
+                // Add a page
+                $pdf->AddPage();
+                
+                // Clean HTML for PDF compatibility
+                $clean_html = $this->clean_html_for_pdf($html);
+                
+                // Write HTML content
+                $pdf->writeHTML($clean_html, true, false, true, false, '');
+                
+                // Generate filename
+                $filename = 'table-' . $table_number . '-combined-invoice.pdf';
+                
+                // Output PDF
+                if ($force_download) {
+                    $pdf->Output($filename, 'D'); // Force download
+                } else {
+                    $pdf->Output($filename, 'I'); // Display in browser
+                }
+                
+                return; // Success, exit function
+                
+            } catch (Exception $e) {
+                error_log('Orders Jet: Standard TCPDF Error: ' . $e->getMessage());
+            }
+        }
+        
+        // Try using a simple PDF generation approach
+        try {
+            // Use a basic PDF generation method
+            $this->generate_simple_pdf($html, $table_number, $force_download);
+            return;
+        } catch (Exception $e) {
+            error_log('Orders Jet: Simple PDF Error: ' . $e->getMessage());
+        }
+        
+        // Final fallback to HTML
+        error_log('Orders Jet: No PDF libraries available, using HTML fallback');
+        $this->output_html_fallback($html, $table_number, $force_download);
     }
     
     /**
@@ -2192,6 +2228,202 @@ class Orders_Jet_AJAX_Handlers {
         $html = str_replace('<head>', '<head>' . $pdf_styles, $html);
         
         return $html;
+    }
+    
+    /**
+     * Generate PDF using simple method with proper headers
+     */
+    private function generate_simple_pdf($html, $table_number, $force_download = false) {
+        // Create a simple text-based PDF content
+        $pdf_content = $this->create_simple_pdf_content($html, $table_number);
+        
+        $filename = 'table-' . $table_number . '-combined-invoice.pdf';
+        
+        // Set proper PDF headers
+        header('Content-Type: application/pdf');
+        header('Content-Length: ' . strlen($pdf_content));
+        
+        if ($force_download) {
+            header('Content-Disposition: attachment; filename="' . $filename . '"');
+        } else {
+            header('Content-Disposition: inline; filename="' . $filename . '"');
+        }
+        
+        // Disable caching
+        header('Cache-Control: private, no-transform, no-store, must-revalidate');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        
+        echo $pdf_content;
+    }
+    
+    /**
+     * Create simple PDF content without external libraries
+     */
+    private function create_simple_pdf_content($html, $table_number) {
+        // Extract text content from HTML
+        $text_content = strip_tags($html);
+        $text_content = html_entity_decode($text_content, ENT_QUOTES, 'UTF-8');
+        
+        // Create a basic PDF structure
+        $pdf_header = "%PDF-1.4\n";
+        
+        // PDF objects
+        $objects = array();
+        
+        // Object 1: Catalog
+        $objects[1] = "1 0 obj\n<<\n/Type /Catalog\n/Pages 2 0 R\n>>\nendobj\n";
+        
+        // Object 2: Pages
+        $objects[2] = "2 0 obj\n<<\n/Type /Pages\n/Kids [3 0 R]\n/Count 1\n>>\nendobj\n";
+        
+        // Object 3: Page
+        $objects[3] = "3 0 obj\n<<\n/Type /Page\n/Parent 2 0 R\n/MediaBox [0 0 612 792]\n/Contents 4 0 R\n/Resources <<\n/Font <<\n/F1 5 0 R\n>>\n>>\n>>\nendobj\n";
+        
+        // Prepare text content for PDF
+        $clean_text = $this->prepare_text_for_pdf($text_content);
+        
+        // Object 4: Content stream
+        $stream_content = "BT\n/F1 12 Tf\n50 750 Td\n";
+        $lines = explode("\n", $clean_text);
+        $y_position = 750;
+        
+        foreach ($lines as $line) {
+            if ($y_position < 50) break; // Prevent overflow
+            $stream_content .= "(" . $this->escape_pdf_string($line) . ") Tj\n";
+            $stream_content .= "0 -15 Td\n";
+            $y_position -= 15;
+        }
+        
+        $stream_content .= "ET\n";
+        $stream_length = strlen($stream_content);
+        
+        $objects[4] = "4 0 obj\n<<\n/Length $stream_length\n>>\nstream\n$stream_content\nendstream\nendobj\n";
+        
+        // Object 5: Font
+        $objects[5] = "5 0 obj\n<<\n/Type /Font\n/Subtype /Type1\n/BaseFont /Helvetica\n>>\nendobj\n";
+        
+        // Build PDF content
+        $pdf_content = $pdf_header;
+        $xref_offset = strlen($pdf_content);
+        
+        foreach ($objects as $obj) {
+            $pdf_content .= $obj;
+        }
+        
+        // Cross-reference table
+        $xref_table = "xref\n0 6\n0000000000 65535 f \n";
+        $offset = strlen($pdf_header);
+        
+        for ($i = 1; $i <= 5; $i++) {
+            $xref_table .= sprintf("%010d 00000 n \n", $offset);
+            $offset += strlen($objects[$i]);
+        }
+        
+        $pdf_content .= $xref_table;
+        
+        // Trailer
+        $trailer = "trailer\n<<\n/Size 6\n/Root 1 0 R\n>>\nstartxref\n$xref_offset\n%%EOF\n";
+        $pdf_content .= $trailer;
+        
+        return $pdf_content;
+    }
+    
+    /**
+     * Prepare text content for PDF
+     */
+    private function prepare_text_for_pdf($text) {
+        // Clean up the text
+        $text = preg_replace('/\s+/', ' ', $text); // Normalize whitespace
+        $text = trim($text);
+        
+        // Add line breaks for better formatting
+        $text = str_replace('Restaurant Invoice', "Restaurant Invoice\n\n", $text);
+        $text = str_replace('Order Details', "\n\nOrder Details\n", $text);
+        $text = str_replace('Total Amount:', "\n\nTotal Amount:", $text);
+        $text = str_replace('Payment Method:', "\nPayment Method:", $text);
+        
+        // Wrap long lines
+        $lines = explode("\n", $text);
+        $wrapped_lines = array();
+        
+        foreach ($lines as $line) {
+            if (strlen($line) > 80) {
+                $wrapped_lines = array_merge($wrapped_lines, str_split($line, 80));
+            } else {
+                $wrapped_lines[] = $line;
+            }
+        }
+        
+        return implode("\n", $wrapped_lines);
+    }
+    
+    /**
+     * Escape string for PDF
+     */
+    private function escape_pdf_string($string) {
+        $string = str_replace('\\', '\\\\', $string);
+        $string = str_replace('(', '\\(', $string);
+        $string = str_replace(')', '\\)', $string);
+        return $string;
+    }
+    
+    /**
+     * Generate PDF using alternative method (browser-based conversion)
+     */
+    private function generate_pdf_via_alternative($html, $table_number, $force_download = false) {
+        // Use a simple approach: create a temporary HTML file that auto-prints
+        $filename = 'table-' . $table_number . '-combined-invoice.pdf';
+        
+        // For now, let's try a different approach - use the browser's print-to-PDF capability
+        // by creating a special HTML page that triggers print dialog
+        
+        $print_html = '
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Table ' . $table_number . ' Invoice</title>
+            <style>
+                @media print {
+                    body { margin: 0; }
+                    .no-print { display: none; }
+                }
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                .print-instructions { 
+                    background: #f0f8ff; 
+                    border: 2px solid #4CAF50; 
+                    padding: 15px; 
+                    margin: 20px 0; 
+                    border-radius: 5px;
+                    text-align: center;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="print-instructions no-print">
+                <h3>📄 Save as PDF Instructions</h3>
+                <p><strong>To save this invoice as PDF:</strong></p>
+                <ol style="text-align: left; display: inline-block;">
+                    <li>Press <kbd>Ctrl+P</kbd> (Windows) or <kbd>Cmd+P</kbd> (Mac)</li>
+                    <li>Select "Save as PDF" as the destination</li>
+                    <li>Click "Save" and choose your download location</li>
+                </ol>
+                <button onclick="window.print()" style="background: #c41e3a; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 10px;">
+                    🖨️ Print / Save as PDF
+                </button>
+            </div>
+            ' . $html . '
+        </body>
+        </html>';
+        
+        // Set headers for HTML with PDF instructions
+        header('Content-Type: text/html; charset=utf-8');
+        if ($force_download) {
+            header('Content-Disposition: attachment; filename="table-' . $table_number . '-invoice-print-to-pdf.html"');
+        }
+        
+        echo $print_html;
     }
     
     /**
