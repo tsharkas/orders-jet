@@ -29,6 +29,7 @@ class Orders_Jet_AJAX_Handlers {
         add_action('wp_ajax_oj_generate_admin_pdf', array($this, 'generate_admin_pdf'));
         add_action('wp_ajax_oj_generate_table_pdf', array($this, 'generate_table_pdf'));
         add_action('wp_ajax_oj_bulk_action', array($this, 'bulk_action'));
+        add_action('wp_ajax_oj_search_order_invoice', array($this, 'search_order_invoice'));
         
         // AJAX handlers for non-logged in users (guests)
         add_action('wp_ajax_nopriv_oj_submit_table_order', array($this, 'submit_table_order'));
@@ -2825,6 +2826,62 @@ class Orders_Jet_AJAX_Handlers {
             error_log('Orders Jet: Close Table Error - ' . $e->getMessage());
             return false;
         }
+    }
+    
+    /**
+     * Search order for invoice (minimal AJAX handler)
+     */
+    public function search_order_invoice() {
+        check_ajax_referer('oj_search_invoice', 'nonce');
+        
+        if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Permission denied', 'orders-jet')));
+        }
+        
+        $order_number = sanitize_text_field($_POST['order_number']);
+        
+        if (empty($order_number)) {
+            wp_send_json_error(array('message' => __('Please enter an order number', 'orders-jet')));
+        }
+        
+        // Try to find order by ID or order number
+        $order = wc_get_order($order_number);
+        
+        // If not found by ID, try searching by order number
+        if (!$order) {
+            $orders = wc_get_orders(array(
+                'meta_query' => array(
+                    array(
+                        'key' => '_order_number',
+                        'value' => $order_number,
+                        'compare' => '='
+                    )
+                ),
+                'limit' => 1
+            ));
+            
+            if (!empty($orders)) {
+                $order = $orders[0];
+            }
+        }
+        
+        if (!$order) {
+            wp_send_json_error(array('message' => __('Order not found', 'orders-jet')));
+        }
+        
+        if ($order->get_status() !== 'completed') {
+            wp_send_json_error(array('message' => __('Order is not completed yet', 'orders-jet')));
+        }
+        
+        $table_number = $order->get_meta('_oj_table_number');
+        
+        wp_send_json_success(array(
+            'id' => $order->get_id(),
+            'type' => !empty($table_number) ? 'table' : 'pickup',
+            'table' => $table_number ?: '',
+            'status' => $order->get_status(),
+            'total' => $order->get_total()
+        ));
     }
     
 }

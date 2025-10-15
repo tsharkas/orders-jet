@@ -42,6 +42,14 @@ if (function_exists('wc_get_orders')) {
         'order' => 'DESC'
     ));
     
+    // Get recent completed orders (minimal load - only latest 15)
+    $recent_completed_wc_orders = wc_get_orders(array(
+        'status' => 'completed',
+        'limit' => 15, // Only latest 15 for performance
+        'orderby' => 'date_modified',
+        'order' => 'DESC'
+    ));
+    
     // Process processing orders
     foreach ($processing_wc_orders as $order) {
         $processing_orders[] = array(
@@ -68,14 +76,30 @@ if (function_exists('wc_get_orders')) {
         );
     }
     
+    // Process recent completed orders
+    $recent_completed_orders = array();
+    foreach ($recent_completed_wc_orders as $order) {
+        $recent_completed_orders[] = array(
+            'id' => $order->get_id(),
+            'status' => $order->get_status(),
+            'total' => $order->get_total(),
+            'customer' => $order->get_billing_first_name() ?: 'Guest',
+            'table' => $order->get_meta('_oj_table_number') ?: '',
+            'date' => $order->get_date_modified()->format('H:i'),
+            'payment_method' => $order->get_meta('_oj_payment_method') ?: '',
+            'type' => !empty($order->get_meta('_oj_table_number')) ? 'table' : 'pickup'
+        );
+    }
+    
     // Combine all orders
-    $all_orders = array_merge($processing_orders, $ready_orders);
+    $all_orders = array_merge($processing_orders, $ready_orders, $recent_completed_orders);
 }
 
 // Calculate statistics
 $total_orders = count($all_orders);
 $processing_count = count($processing_orders);
 $ready_count = count($ready_orders);
+$recent_completed_count = count($recent_completed_orders);
 $table_orders = array_filter($all_orders, function($order) { return $order['type'] === 'table'; });
 $pickup_orders = array_filter($all_orders, function($order) { return $order['type'] === 'pickup'; });
 
@@ -90,10 +114,18 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
                 <?php _e('Orders Management', 'orders-jet'); ?>
         </h1>
         <p><?php echo sprintf(__('Manage all restaurant orders - %s', 'orders-jet'), $today_formatted); ?></p>
-        <button onclick="location.reload()" class="button">
-                <span class="dashicons dashicons-update"></span>
-            <?php _e('Refresh', 'orders-jet'); ?>
-    </button>
+        <div class="oj-header-actions">
+            <div class="oj-quick-search">
+                <input type="text" id="oj-order-search" placeholder="<?php _e('Order # for invoice...', 'orders-jet'); ?>" />
+                <button type="button" class="button" id="oj-search-invoice">
+                    <span class="dashicons dashicons-search"></span>
+                </button>
+            </div>
+            <button onclick="location.reload()" class="button">
+                    <span class="dashicons dashicons-update"></span>
+                <?php _e('Refresh', 'orders-jet'); ?>
+        </button>
+        </div>
     </div>
     
     
@@ -137,6 +169,9 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
         </button>
         <button class="oj-filter-btn" data-filter="pickup">
             <?php _e('Pickup Orders', 'orders-jet'); ?> (<?php echo count($pickup_orders); ?>)
+        </button>
+        <button class="oj-filter-btn" data-filter="completed">
+            ✅ <?php _e('Recent', 'orders-jet'); ?> (<?php echo $recent_completed_count; ?>)
         </button>
     </div>
     
@@ -205,6 +240,9 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
                                     <span class="oj-status cooking">🍳 <?php _e('Cooking', 'orders-jet'); ?></span>
                                 <?php elseif ($order['status'] === 'pending') : ?>
                                     <span class="oj-status ready">✅ <?php _e('Ready', 'orders-jet'); ?></span>
+                                <?php elseif ($order['status'] === 'completed') : ?>
+                                    <span class="oj-status completed">✅ <?php _e('Completed', 'orders-jet'); ?></span>
+                                    <small class="oj-completion-time"><?php echo $order['date']; ?></small>
                                 <?php endif; ?>
                             </td>
                             
@@ -226,9 +264,16 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
                                             <?php _e('Complete Order', 'orders-jet'); ?>
                                         </button>
                                     <?php endif; ?>
+                                <?php elseif ($order['status'] === 'completed') : ?>
+                                    <button class="button-link oj-quick-invoice" 
+                                            data-order-id="<?php echo $order['id']; ?>" 
+                                            data-type="<?php echo $order['type']; ?>"
+                                            data-table="<?php echo esc_attr($order['table']); ?>">
+                                        📄 <?php _e('Invoice', 'orders-jet'); ?>
+                                    </button>
                                 <?php else : ?>
                                     <span class="oj-status-note"><?php _e('In Kitchen', 'orders-jet'); ?></span>
-                                    <?php endif; ?>
+                                <?php endif; ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -264,6 +309,32 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
     display: flex;
     align-items: center;
     gap: 10px;
+}
+
+.oj-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.oj-quick-search {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+#oj-order-search {
+    width: 180px;
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 13px;
+}
+
+#oj-search-invoice {
+    padding: 4px 8px;
+    height: 28px;
+    min-height: 28px;
 }
 
 .oj-stats {
@@ -342,6 +413,18 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
 .oj-status.ready {
     background: #d1edff;
     color: #0c5460;
+}
+
+.oj-status.completed {
+    background: #d1f2eb;
+    color: #0f5132;
+}
+
+.oj-completion-time {
+    display: block;
+    color: #666;
+    font-size: 11px;
+    margin-top: 2px;
 }
 
 .oj-status-note {
@@ -520,6 +603,9 @@ jQuery(document).ready(function($) {
                     break;
                 case 'pickup':
                     show = type === 'pickup';
+                    break;
+                case 'completed':
+                    show = status === 'completed';
                     break;
             }
             
@@ -1116,6 +1202,80 @@ jQuery(document).ready(function($) {
         updateBulkActionsBar();
         updateRowHighlighting();
     });
+    
+    // ===== SEARCH AND INVOICE FUNCTIONALITY =====
+    
+    // Quick order search for invoice
+    $('#oj-search-invoice').on('click', function() {
+        const orderNumber = $('#oj-order-search').val().trim();
+        if (!orderNumber) {
+            alert('<?php _e("Please enter an order number", "orders-jet"); ?>');
+            return;
+        }
+        
+        // Search and show invoice directly
+        searchOrderInvoice(orderNumber);
+    });
+    
+    // Enter key support for search
+    $('#oj-order-search').on('keypress', function(e) {
+        if (e.which === 13) {
+            $('#oj-search-invoice').click();
+        }
+    });
+    
+    // Quick invoice for recent completed orders
+    $(document).on('click', '.oj-quick-invoice', function() {
+        const orderId = $(this).data('order-id');
+        const orderType = $(this).data('type');
+        const table = $(this).data('table');
+        
+        openOrderInvoice(orderId, orderType, table);
+    });
+    
+    // Search order and open invoice
+    function searchOrderInvoice(orderNumber) {
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'oj_search_order_invoice',
+                order_number: orderNumber,
+                nonce: '<?php echo wp_create_nonce('oj_search_invoice'); ?>'
+            },
+            beforeSend: function() {
+                $('#oj-search-invoice').prop('disabled', true).find('.dashicons').removeClass('dashicons-search').addClass('dashicons-update');
+            },
+            success: function(response) {
+                if (response.success) {
+                    const order = response.data;
+                    openOrderInvoice(order.id, order.type, order.table);
+                    $('#oj-order-search').val(''); // Clear search box
+                } else {
+                    alert('<?php _e("Order not found or not completed", "orders-jet"); ?>');
+                }
+            },
+            error: function() {
+                alert('<?php _e("Search failed. Please try again.", "orders-jet"); ?>');
+            },
+            complete: function() {
+                $('#oj-search-invoice').prop('disabled', false).find('.dashicons').removeClass('dashicons-update').addClass('dashicons-search');
+            }
+        });
+    }
+    
+    // Open invoice (unified function)
+    function openOrderInvoice(orderId, orderType, table) {
+        let invoiceUrl;
+        
+        if (orderType === 'table' && table) {
+            invoiceUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_table_pdf&table_number=' + encodeURIComponent(table) + '&order_ids=' + orderId + '&output=html&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
+        } else {
+            invoiceUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_admin_pdf&order_id=' + orderId + '&document_type=invoice&output=html&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
+        }
+        
+        window.open(invoiceUrl, '_blank');
+    }
     
 });
 </script>
