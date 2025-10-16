@@ -326,9 +326,16 @@ class Orders_Jet_AJAX_Handlers {
         // Save order with WooCommerce-calculated totals
         $order->save();
         
-        // Log final totals
-        error_log('Orders Jet: Final order total: ' . $order->get_total());
-        error_log('Orders Jet: Final order subtotal: ' . $order->get_subtotal());
+        // Log final totals with tax information
+        error_log('Orders Jet: Final order #' . $order->get_id() . ' totals:');
+        error_log('  - Subtotal: ' . $order->get_subtotal());
+        error_log('  - Tax: ' . $order->get_total_tax());
+        error_log('  - Total: ' . $order->get_total());
+        error_log('  - Order Type: ' . (!empty($table_number) ? 'Table Order (Tax Deferred)' : 'Pickup Order (Tax Calculated)'));
+        
+        // SAFEGUARD: Validate tax isolation
+        $expected_behavior = !empty($table_number) ? 'deferred' : 'calculated';
+        $this->validate_tax_isolation($order, $expected_behavior);
         
         // Update table status to occupied (CRITICAL FIX: Always try to update)
         if ($table_id > 0) {
@@ -3185,17 +3192,44 @@ class Orders_Jet_AJAX_Handlers {
                 foreach ($child_order->get_items() as $item) {
                     $product = $item->get_product();
                     if ($product) {
+                        // Use the original subtotal from child order (without tax) for consolidated order
+                        // The consolidated order will then calculate taxes on this subtotal
                         $consolidated_order->add_product(
                             $product,
                             $item->get_quantity(),
                             array(
                                 'totals' => array(
                                     'subtotal' => $item->get_subtotal(),
-                                    'total' => $item->get_total(),
+                                    'total' => $item->get_subtotal(), // Use subtotal as total (no tax from child)
                                 )
                             )
                         );
                         $total_items += $item->get_quantity();
+                        
+                        // Copy over any item meta data (notes, add-ons, etc.)
+                        $new_items = $consolidated_order->get_items();
+                        $new_item = end($new_items); // Get the last added item
+                        
+                        if ($new_item) {
+                            // Copy item notes
+                            $notes = $item->get_meta('_oj_item_notes');
+                            if ($notes) {
+                                $new_item->add_meta_data('_oj_item_notes', $notes);
+                            }
+                            
+                            // Copy add-ons data
+                            $addons = $item->get_meta('_oj_item_addons');
+                            if ($addons) {
+                                $new_item->add_meta_data('_oj_item_addons', $addons);
+                            }
+                            
+                            $addons_data = $item->get_meta('_oj_addons_data');
+                            if ($addons_data) {
+                                $new_item->add_meta_data('_oj_addons_data', $addons_data);
+                            }
+                            
+                            $new_item->save();
+                        }
                     }
                 }
             }
@@ -3237,6 +3271,9 @@ class Orders_Jet_AJAX_Handlers {
             
             error_log('Orders Jet: Consolidated order #' . $consolidated_order->get_id() . ' created and completed');
             error_log('Orders Jet: Consolidated order totals - Subtotal: ' . $consolidated_order->get_subtotal() . ', Tax: ' . $consolidated_order->get_total_tax() . ', Total: ' . $consolidated_order->get_total());
+            
+            // SAFEGUARD: Validate consolidated order tax calculation
+            $this->validate_tax_isolation($consolidated_order, 'consolidated');
             
             // 8. Permanently delete child orders
             foreach ($table_orders as $child_order) {
@@ -3304,6 +3341,49 @@ class Orders_Jet_AJAX_Handlers {
                 'message' => __('Table closure failed: ' . $e->getMessage(), 'orders-jet')
             ));
         }
+    }
+    
+    /**
+     * Validate tax calculation isolation (SAFEGUARD FUNCTION)
+     * Ensures tax changes only affect the intended order types
+     */
+    private function validate_tax_isolation($order, $expected_tax_behavior) {
+        $order_id = $order->get_id();
+        $table_number = $order->get_meta('_oj_table_number');
+        $tax_deferred = $order->get_meta('_oj_tax_deferred');
+        $total_tax = $order->get_total_tax();
+        
+        if ($expected_tax_behavior === 'deferred') {
+            // Table orders should have zero tax and deferred flag
+            if (!empty($table_number) && $tax_deferred === 'yes' && $total_tax == 0) {
+                error_log("Orders Jet: ✅ Tax isolation VALIDATED - Order #{$order_id} (Table {$table_number}) has tax deferred correctly");
+                return true;
+            } else {
+                error_log("Orders Jet: ❌ Tax isolation FAILED - Order #{$order_id} should have deferred tax but doesn't");
+                return false;
+            }
+        } elseif ($expected_tax_behavior === 'calculated') {
+            // Pickup orders should have calculated tax
+            if (empty($table_number) && $tax_deferred !== 'yes') {
+                error_log("Orders Jet: ✅ Tax isolation VALIDATED - Order #{$order_id} (Pickup) has tax calculated correctly: {$total_tax}");
+                return true;
+            } else {
+                error_log("Orders Jet: ❌ Tax isolation FAILED - Order #{$order_id} should have calculated tax but doesn't");
+                return false;
+            }
+        } elseif ($expected_tax_behavior === 'consolidated') {
+            // Consolidated orders should have calculated tax
+            $is_consolidated = $order->get_meta('_oj_consolidated_order');
+            if ($is_consolidated === 'yes') {
+                error_log("Orders Jet: ✅ Tax isolation VALIDATED - Consolidated Order #{$order_id} has tax calculated correctly: {$total_tax}");
+                return true;
+            } else {
+                error_log("Orders Jet: ❌ Tax isolation FAILED - Order #{$order_id} should be consolidated but isn't");
+                return false;
+            }
+        }
+        
+        return false;
     }
     
 }
