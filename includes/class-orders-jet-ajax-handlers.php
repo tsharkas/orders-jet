@@ -1439,11 +1439,8 @@ class Orders_Jet_AJAX_Handlers {
             wp_send_json_error(array('message' => __('Order not found.', 'orders-jet')));
         }
         
-        // Check if this is a table order
+        // Get table number (if any) - this works for both table and pickup orders
         $table_number = $order->get_meta('_oj_table_number');
-        if (!$table_number) {
-            wp_send_json_error(array('message' => __('This is not a table order.', 'orders-jet')));
-        }
         
         // Check current status
         $current_status = $order->get_status();
@@ -1455,24 +1452,31 @@ class Orders_Jet_AJAX_Handlers {
             // Mark order as ready (pending status means ready for pickup/payment)
             $order->set_status('pending');
             
-            // Add order note
+            // Add order note with order type context
+            $order_type = !empty($table_number) ? 'table' : 'pickup';
             $order->add_order_note(sprintf(
-                __('Order marked as ready by kitchen staff (%s)', 'orders-jet'), 
-                wp_get_current_user()->display_name
+                __('Order marked as ready by kitchen staff (%s) - %s order', 'orders-jet'), 
+                wp_get_current_user()->display_name,
+                ucfirst($order_type)
             ));
             
             // Save the order
             $order->save();
             
-            error_log('Orders Jet Kitchen: Order #' . $order_id . ' marked as ready (pending) by user #' . get_current_user_id());
+            error_log('Orders Jet Kitchen: Order #' . $order_id . ' (' . $order_type . ') marked as ready (pending) by user #' . get_current_user_id());
             
             // Send notifications to manager and waiter dashboards
             $this->send_ready_notifications($order, $table_number);
             
+            $success_message = !empty($table_number) 
+                ? sprintf(__('Table order #%d marked as ready!', 'orders-jet'), $order_id)
+                : sprintf(__('Pickup order #%d marked as ready!', 'orders-jet'), $order_id);
+            
             wp_send_json_success(array(
-                'message' => sprintf(__('Order #%d marked as ready for pickup!', 'orders-jet'), $order_id),
+                'message' => $success_message,
                 'order_id' => $order_id,
                 'table_number' => $table_number,
+                'order_type' => $order_type,
                 'new_status' => 'pending'
             ));
             
@@ -3276,24 +3280,51 @@ class Orders_Jet_AJAX_Handlers {
             $this->validate_tax_isolation($consolidated_order, 'consolidated');
             
             // 8. Permanently delete child orders
+            error_log('Orders Jet: Starting deletion of ' . count($table_orders) . ' child orders');
+            
             foreach ($table_orders as $child_order) {
                 $child_order_id = $child_order->get_id();
-                error_log('Orders Jet: Permanently deleting child order #' . $child_order_id);
+                error_log('Orders Jet: Attempting to delete child order #' . $child_order_id);
                 
-                // Delete all order items first
-                foreach ($child_order->get_items() as $item_id => $item) {
-                    wc_delete_order_item($item_id);
+                try {
+                    // Check if order exists before deletion
+                    $order_exists = wc_get_order($child_order_id);
+                    if (!$order_exists) {
+                        error_log('Orders Jet: Child order #' . $child_order_id . ' does not exist, skipping deletion');
+                        continue;
+                    }
+                    
+                    // Use WooCommerce's native delete method (handles items, meta, and post deletion)
+                    $deletion_result = $child_order->delete(true); // Force delete permanently
+                    
+                    if ($deletion_result) {
+                        error_log('Orders Jet: ✅ Child order #' . $child_order_id . ' deleted successfully using WC native method');
+                    } else {
+                        error_log('Orders Jet: ❌ WC delete method failed for order #' . $child_order_id . ', trying wp_delete_post');
+                        
+                        // Fallback to WordPress method
+                        $wp_result = wp_delete_post($child_order_id, true);
+                        if ($wp_result) {
+                            error_log('Orders Jet: ✅ Child order #' . $child_order_id . ' deleted using wp_delete_post fallback');
+                        } else {
+                            error_log('Orders Jet: ❌ Both deletion methods failed for order #' . $child_order_id);
+                        }
+                    }
+                    
+                    // Verify deletion
+                    $verification = wc_get_order($child_order_id);
+                    if (!$verification) {
+                        error_log('Orders Jet: ✅ Deletion verified - Order #' . $child_order_id . ' no longer exists');
+                    } else {
+                        error_log('Orders Jet: ❌ Deletion verification failed - Order #' . $child_order_id . ' still exists');
+                    }
+                    
+                } catch (Exception $e) {
+                    error_log('Orders Jet: ❌ Error deleting child order #' . $child_order_id . ': ' . $e->getMessage());
                 }
-                
-                // Delete all order meta
-                global $wpdb;
-                $wpdb->delete($wpdb->postmeta, array('post_id' => $child_order_id));
-                
-                // Permanently delete the order post
-                wp_delete_post($child_order_id, true);
-                
-                error_log('Orders Jet: Child order #' . $child_order_id . ' permanently deleted');
             }
+            
+            error_log('Orders Jet: Child order deletion process completed');
             
             // 9. Update table status to available
             $table_id = oj_get_table_id_by_number($table_number);
