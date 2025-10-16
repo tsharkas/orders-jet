@@ -46,28 +46,12 @@ class Orders_Jet_AJAX_Handlers {
      * Submit table order (contactless)
      */
     public function submit_table_order() {
-        // Check if parent-child system is enabled
-        $parent_child_manager = new Orders_Jet_Parent_Child_Manager();
-        if ($parent_child_manager->is_parent_child_enabled()) {
-            error_log('Orders Jet: Using parent-child order system');
-            return $this->submit_table_order_parent_child();
-        }
-        
-        // Legacy system (existing functionality)
-        error_log('Orders Jet: Using legacy order system');
-        return $this->submit_table_order_legacy();
-    }
-    
-    /**
-     * Submit table order using legacy system (existing functionality)
-     */
-    public function submit_table_order_legacy() {
         // Enable error reporting for debugging
         error_reporting(E_ALL);
         ini_set('display_errors', 0); // Don't display errors, log them instead
         
         // Log the incoming request
-        error_log('Orders Jet: ========== ORDER SUBMISSION START (LEGACY) ==========');
+        error_log('Orders Jet: ========== ORDER SUBMISSION START ==========');
         error_log('Orders Jet: Order submission request received');
         error_log('Orders Jet: POST data: ' . print_r($_POST, true));
         error_log('Orders Jet: REQUEST data: ' . print_r($_REQUEST, true));
@@ -382,221 +366,6 @@ class Orders_Jet_AJAX_Handlers {
         
         } catch (Exception $e) {
             error_log('Orders Jet: Order submission error: ' . $e->getMessage());
-            error_log('Orders Jet: Stack trace: ' . $e->getTraceAsString());
-            
-            wp_send_json_error(array(
-                'message' => __('Order submission failed: ' . $e->getMessage(), 'orders-jet')
-            ));
-        }
-    }
-    
-    /**
-     * Submit table order using parent-child system
-     */
-    public function submit_table_order_parent_child() {
-        error_log('Orders Jet: ========== ORDER SUBMISSION START (PARENT-CHILD) ==========');
-        
-        try {
-            check_ajax_referer('oj_table_order', 'nonce');
-            
-            // Handle both old and new data formats (same as legacy)
-            $table_id = 0;
-            
-            if (isset($_POST['order_data'])) {
-                // New format - JSON data
-                $order_data = json_decode(stripslashes($_POST['order_data']), true);
-                $table_number = sanitize_text_field($order_data['table_number']);
-                $items = $order_data['items'];
-                $total = floatval($order_data['total']);
-                $table_id = intval($order_data['table_id'] ?? 0);
-            } else {
-                // Old format - direct POST data
-                $table_number = sanitize_text_field($_POST['table_number']);
-                $items = $_POST['items'] ?? array();
-                $total = floatval($_POST['total']);
-                $table_id = intval($_POST['table_id'] ?? 0);
-            }
-            
-            // Convert items to consistent format (same as legacy)
-            if (!empty($items)) {
-                foreach ($items as &$item) {
-                    $converted_item = array(
-                        'product_id' => intval($item['product_id'] ?? $item['id'] ?? 0),
-                        'variation_id' => intval($item['variation_id'] ?? 0),
-                        'quantity' => intval($item['quantity'] ?? 1),
-                        'notes' => sanitize_text_field($item['notes'] ?? ''),
-                        'add_ons' => array()
-                    );
-                    
-                    // Handle add-ons
-                    if (!empty($item['add_ons'])) {
-                        foreach ($item['add_ons'] as $addon) {
-                            $converted_item['add_ons'][] = array(
-                                'id' => $addon['id'] ?? uniqid(),
-                                'name' => $addon['name'] ?? 'Add-on',
-                                'price' => floatval($addon['price'] ?? 0),
-                                'quantity' => intval($addon['quantity'] ?? 1)
-                            );
-                        }
-                    }
-                    
-                    $item = $converted_item;
-                }
-            }
-            
-            // Get table ID if not provided
-            if (empty($table_id) || $table_id == 0) {
-                $table_id = oj_get_table_id_by_number($table_number);
-                error_log('Orders Jet: Retrieved table ID from table number: ' . $table_id);
-            }
-            
-            // Validate required fields
-            if (empty($table_number) || empty($items)) {
-                wp_send_json_error(array('message' => __('Table number and cart items are required', 'orders-jet')));
-            }
-            
-            // PARENT-CHILD SYSTEM: Get or create parent order
-            $parent_child_manager = new Orders_Jet_Parent_Child_Manager();
-            $parent_order = $parent_child_manager->get_or_create_parent_order($table_number);
-            
-            if (!$parent_order) {
-                wp_send_json_error(array('message' => __('Failed to create parent order', 'orders-jet')));
-            }
-            
-            // Create child order (for kitchen workflow)
-            $child_order = wc_create_order();
-            
-            if (is_wp_error($child_order)) {
-                error_log('Orders Jet: Failed to create child order: ' . $child_order->get_error_message());
-                wp_send_json_error(array('message' => __('Failed to create child order: ' . $child_order->get_error_message(), 'orders-jet')));
-            }
-            
-            // Add items to child order (same logic as legacy)
-            foreach ($items as $item) {
-                $product_id = intval($item['product_id']);
-                $variation_id = intval($item['variation_id'] ?? 0);
-                $quantity = intval($item['quantity']);
-                $notes = sanitize_text_field($item['notes'] ?? '');
-                $add_ons = $item['add_ons'] ?? array();
-                
-                // Get product
-                if ($variation_id > 0) {
-                    $product = wc_get_product($variation_id);
-                } else {
-                    $product = wc_get_product($product_id);
-                }
-                
-                if (!$product) {
-                    error_log('Orders Jet: Product not found for ID: ' . $product_id);
-                    continue;
-                }
-                
-                // Calculate price using WooCommerce native methods
-                $base_price = $product->get_price();
-                $addon_total = 0;
-                
-                // Calculate add-ons total
-                if (!empty($add_ons)) {
-                    foreach ($add_ons as $addon) {
-                        $addon_price = floatval($addon['price'] ?? 0);
-                        $addon_quantity = intval($addon['quantity'] ?? 1);
-                        $addon_total += $addon_price * $addon_quantity;
-                    }
-                }
-                
-                $total_price = $base_price + $addon_total;
-                
-                // Add product to child order
-                $item_id = $child_order->add_product($product, $quantity, array(
-                    'variation' => ($variation_id > 0) ? $product->get_variation_attributes() : array(),
-                    'totals' => array(
-                        'subtotal' => $total_price * $quantity,
-                        'total' => $total_price * $quantity,
-                    )
-                ));
-                
-                if ($item_id) {
-                    // Get the order item that was just added
-                    $order_item = $child_order->get_item($item_id);
-                    
-                    // Add item notes if any
-                    if (!empty($notes)) {
-                        $order_item->add_meta_data('_oj_item_notes', $notes);
-                    }
-                    
-                    // Store add-ons in WooCommerce-compatible format
-                    if (!empty($add_ons)) {
-                        $addon_names = array();
-                        foreach ($add_ons as $addon) {
-                            $addon_name = sanitize_text_field($addon['name'] ?? 'Add-on');
-                            $addon_price = floatval($addon['price'] ?? 0);
-                            $addon_quantity = intval($addon['quantity'] ?? 1);
-                            $addon_value = sanitize_text_field($addon['value'] ?? '');
-                            
-                            if ($addon_quantity > 1) {
-                                $addon_names[] = $addon_name . ' × ' . $addon_quantity . ' (+' . wc_price($addon_price * $addon_quantity) . ')';
-                            } elseif (!empty($addon_value)) {
-                                $addon_names[] = $addon_name . ': ' . $addon_value;
-                            } else {
-                                $addon_names[] = $addon_name . ' (+' . wc_price($addon_price) . ')';
-                            }
-                        }
-                        
-                        $order_item->add_meta_data('_oj_item_addons', implode(', ', $addon_names));
-                        $order_item->add_meta_data('_oj_addons_data', $add_ons);
-                    }
-                    
-                    // Store base price for order history display
-                    $order_item->add_meta_data('_oj_base_price', $base_price);
-                    
-                    // Save item meta data
-                    $order_item->save();
-                }
-            }
-            
-            // Set child order meta data
-            $child_order->set_billing_first_name('Table ' . $table_number);
-            $child_order->set_billing_last_name('Guest');
-            $child_order->set_billing_phone('N/A');
-            $child_order->set_billing_email('table' . $table_number . '@restaurant.local');
-            
-            // Set child order metadata
-            $child_order->update_meta_data('_oj_table_number', $table_number);
-            $child_order->update_meta_data('_oj_table_id', $table_id ?? 0);
-            $child_order->update_meta_data('_oj_order_method', 'dinein');
-            $child_order->update_meta_data('_oj_contactless_order', 'yes');
-            $child_order->update_meta_data('_oj_order_timestamp', current_time('mysql'));
-            
-            // Set child order status to processing (for kitchen)
-            $child_order->set_status('processing');
-            
-            // Let WooCommerce calculate totals
-            $child_order->calculate_totals();
-            $child_order->save();
-            
-            // Add child order to parent order
-            $parent_child_manager->add_child_to_parent($parent_order, $child_order);
-            
-            // Update table status to occupied
-            if ($table_id > 0) {
-                update_post_meta($table_id, '_oj_table_status', 'occupied');
-                error_log('Orders Jet: Table ' . $table_number . ' (ID: ' . $table_id . ') status updated to occupied');
-            }
-            
-            error_log('Orders Jet: ========== ORDER SUBMISSION COMPLETE (PARENT-CHILD) ==========');
-            error_log('Orders Jet: Created child order #' . $child_order->get_id() . ' linked to parent order #' . $parent_order->get_id());
-            
-            wp_send_json_success(array(
-                'message' => __('Order placed successfully', 'orders-jet'),
-                'order_id' => $child_order->get_id(),
-                'parent_order_id' => $parent_order->get_id(),
-                'order_number' => $child_order->get_order_number(),
-                'total' => $child_order->get_total(),
-                'system' => 'parent_child'
-            ));
-            
-        } catch (Exception $e) {
-            error_log('Orders Jet: Parent-Child order submission error: ' . $e->getMessage());
             error_log('Orders Jet: Stack trace: ' . $e->getTraceAsString());
             
             wp_send_json_error(array(
@@ -1369,22 +1138,6 @@ class Orders_Jet_AJAX_Handlers {
      * Close table and generate invoice
      */
     public function close_table() {
-        // Check if parent-child system is enabled
-        $parent_child_manager = new Orders_Jet_Parent_Child_Manager();
-        if ($parent_child_manager->is_parent_child_enabled()) {
-            error_log('Orders Jet: Using parent-child table closure system');
-            return $this->close_table_parent_child();
-        }
-        
-        // Legacy system (existing functionality)
-        error_log('Orders Jet: Using legacy table closure system');
-        return $this->close_table_legacy();
-    }
-    
-    /**
-     * Close table using legacy system (existing functionality)
-     */
-    public function close_table_legacy() {
         check_ajax_referer('oj_table_order', 'nonce');
         
         $table_number = sanitize_text_field($_POST['table_number']);
@@ -1561,59 +1314,6 @@ class Orders_Jet_AJAX_Handlers {
             'invoice_url' => $invoice_url,
             'order_ids' => $completed_order_ids,
             'tax_method' => 'combined_invoice'
-        ));
-    }
-    
-    /**
-     * Close table using parent-child system
-     */
-    public function close_table_parent_child() {
-        check_ajax_referer('oj_table_order', 'nonce');
-        
-        $table_number = sanitize_text_field($_POST['table_number']);
-        $payment_method = sanitize_text_field($_POST['payment_method']);
-        
-        if (empty($table_number)) {
-            wp_send_json_error(array('message' => __('Table number is required', 'orders-jet')));
-        }
-        
-        // Get table ID
-        $table_id = oj_get_table_id_by_number($table_number);
-        if (!$table_id) {
-            wp_send_json_error(array('message' => __('Table not found', 'orders-jet')));
-        }
-        
-        // Use parent-child manager to close table
-        $parent_child_manager = new Orders_Jet_Parent_Child_Manager();
-        $parent_order = $parent_child_manager->close_table_parent_child($table_number, $payment_method);
-        
-        if (!$parent_order) {
-            wp_send_json_error(array('message' => __('No active orders found for this table', 'orders-jet')));
-        }
-        
-        // Update table status to available
-        update_post_meta($table_id, '_oj_table_status', 'available');
-        
-        // Generate invoice URL using parent order
-        $invoice_url = add_query_arg(array(
-            'table' => $table_number,
-            'parent_order_id' => $parent_order->get_id(),
-            'payment_method' => $payment_method
-        ), ORDERS_JET_PLUGIN_URL . 'table-invoice.php');
-        
-        error_log('Orders Jet: Parent-Child table closure complete - Parent Order #' . $parent_order->get_id() . ' - Total: ' . $parent_order->get_total());
-        
-        wp_send_json_success(array(
-            'message' => __('Table closed successfully', 'orders-jet'),
-            'parent_order_id' => $parent_order->get_id(),
-            'subtotal' => $parent_order->get_subtotal(),
-            'total_tax' => $parent_order->get_total_tax(),
-            'grand_total' => $parent_order->get_total(),
-            'payment_method' => $payment_method,
-            'invoice_url' => $invoice_url,
-            'order_ids' => array($parent_order->get_id()),
-            'tax_method' => 'combined_invoice',
-            'system' => 'parent_child'
         ));
     }
     
