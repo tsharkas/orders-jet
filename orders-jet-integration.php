@@ -122,6 +122,7 @@ class Orders_Jet_Integration {
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-woofood-integration.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-menu-analyzer.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-menu-integration.php';
+        include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-parent-child-manager.php';
         
         // Temporary debug page for WooFood orders
         if (is_admin()) {
@@ -150,6 +151,9 @@ class Orders_Jet_Integration {
         
         // Initialize assets manager
         new Orders_Jet_Assets();
+        
+        // Initialize parent-child order manager
+        new Orders_Jet_Parent_Child_Manager();
     }
     
     /**
