@@ -288,30 +288,21 @@ class Orders_Jet_AJAX_Handlers {
         // Use the calculated total if it's correct, otherwise use the frontend total
         $final_total = ($calculated_total > 0) ? $calculated_total : $total;
         
-        // Set order totals using WooCommerce meta data
-        $order->update_meta_data('_order_total', $final_total);
-        $order->update_meta_data('_order_subtotal', $final_total);
-        $order->update_meta_data('_order_tax', 0);
+        // Set order subtotal and let WooCommerce calculate taxes naturally
+        // Store the original total for reference
+        $order->update_meta_data('_oj_original_total', $final_total);
+        
+        // Set basic order data without forcing tax to zero
         $order->update_meta_data('_order_shipping', 0);
         $order->update_meta_data('_order_shipping_tax', 0);
         $order->update_meta_data('_order_discount', 0);
         $order->update_meta_data('_order_discount_tax', 0);
         
-        // Also set the totals using WooCommerce methods
-        $order->set_total($final_total);
+        // Let WooCommerce calculate totals and taxes naturally
+        // This will enable tax calculations when orders are completed
+        $order->calculate_totals();
         
-        // Force WooCommerce to recognize the total by updating the database directly
-        global $wpdb;
-        $wpdb->update(
-            $wpdb->postmeta,
-            array('meta_value' => $final_total),
-            array(
-                'post_id' => $order->get_id(),
-                'meta_key' => '_order_total'
-            )
-        );
-        
-        // Save order with manual totals
+        // Save order with WooCommerce-calculated totals
         $order->save();
         
         // Log final totals
@@ -1249,18 +1240,60 @@ class Orders_Jet_AJAX_Handlers {
         
         // Mark all pending/processing orders as completed and collect order IDs
         $completed_order_ids = array();
+        $table_subtotal = 0;
+        
+        // First pass: Complete orders WITHOUT calculating individual taxes and accumulate subtotals
         foreach ($orders as $order_post) {
             $order = wc_get_order($order_post->ID);
             if ($order && in_array($order->get_status(), array('processing', 'pending', 'pending'))) {
+                
+                // For table orders: Do NOT calculate individual taxes
+                // Just accumulate the subtotals (without tax)
+                $order_subtotal = $order->get_subtotal();
+                if ($order_subtotal <= 0) {
+                    // Fallback: calculate subtotal from line items if not set
+                    $order_subtotal = 0;
+                    foreach ($order->get_items() as $item) {
+                        $order_subtotal += $item->get_subtotal();
+                    }
+                }
+                $table_subtotal += $order_subtotal;
+                
                 $order->set_status('completed');
                 $order->update_meta_data('_oj_session_id', $session_id);
                 $order->update_meta_data('_oj_payment_method', $payment_method);
                 $order->update_meta_data('_oj_table_closed', current_time('mysql'));
+                
+                // Mark this as a table order for tax calculation reference
+                $order->update_meta_data('_oj_tax_method', 'combined_invoice');
+                
                 $order->save();
                 $completed_order_ids[] = $order->get_id();
-                error_log('Orders Jet: Marked order #' . $order->get_id() . ' as completed and added to invoice list');
+                error_log('Orders Jet: Marked table order #' . $order->get_id() . ' as completed - Subtotal: ' . $order_subtotal);
             }
         }
+        
+        // TABLE ORDERS: Calculate tax on the combined invoice total
+        $table_tax_data = $this->calculate_table_invoice_taxes($table_subtotal, $completed_order_ids);
+        
+        // Store table-level tax information for invoice generation
+        $table_invoice_data = array(
+            'subtotal' => $table_subtotal,
+            'service_tax' => $table_tax_data['service_tax'],
+            'vat_tax' => $table_tax_data['vat_tax'],
+            'total_tax' => $table_tax_data['total_tax'],
+            'grand_total' => $table_tax_data['grand_total'],
+            'order_ids' => $completed_order_ids,
+            'payment_method' => $payment_method,
+            'table_number' => $table_number,
+            'session_id' => $session_id,
+            'closed_at' => current_time('mysql')
+        );
+        
+        // Store the combined tax data for the table session
+        update_option('oj_table_tax_' . $session_id, $table_invoice_data);
+        
+        error_log('Orders Jet: Table #' . $table_number . ' - Combined invoice tax calculation complete - Subtotal: ' . $table_subtotal . ', Total Tax: ' . $table_tax_data['total_tax'] . ', Grand Total: ' . $table_tax_data['grand_total']);
         
         // Generate invoice URL using direct file access with session ID
         $invoice_url = add_query_arg(array(
@@ -1272,9 +1305,15 @@ class Orders_Jet_AJAX_Handlers {
         wp_send_json_success(array(
             'message' => __('Table closed successfully', 'orders-jet'),
             'total' => $total_amount,
+            'subtotal' => $table_tax_data['subtotal'] ?? $table_subtotal,
+            'service_tax' => $table_tax_data['service_tax'] ?? 0,
+            'vat_tax' => $table_tax_data['vat_tax'] ?? 0,
+            'total_tax' => $table_tax_data['total_tax'] ?? 0,
+            'grand_total' => $table_tax_data['grand_total'] ?? $table_subtotal,
             'payment_method' => $payment_method,
             'invoice_url' => $invoice_url,
-            'order_ids' => $completed_order_ids
+            'order_ids' => $completed_order_ids,
+            'tax_method' => 'combined_invoice'
         ));
     }
     
@@ -1681,6 +1720,7 @@ class Orders_Jet_AJAX_Handlers {
         check_ajax_referer('oj_dashboard_nonce', 'nonce');
         
         $order_id = intval($_POST['order_id']);
+        $payment_method = sanitize_text_field($_POST['payment_method'] ?? 'cash');
         
         if (empty($order_id)) {
             wp_send_json_error(array('message' => __('Order ID is required', 'orders-jet')));
@@ -1698,16 +1738,38 @@ class Orders_Jet_AJAX_Handlers {
             wp_send_json_error(array('message' => __('This is a table order. Use Close Table instead.', 'orders-jet')));
         }
         
+        // Store original totals for logging
+        $original_subtotal = $order->get_subtotal();
+        $original_total = $order->get_total();
+        
+        // INDIVIDUAL ORDER: Calculate tax per order
+        $this->calculate_individual_order_taxes($order);
+        
+        // Store payment method and tax calculation method
+        $order->update_meta_data('_oj_payment_method', $payment_method);
+        $order->update_meta_data('_oj_tax_method', 'individual_order');
+        
         // Mark order as completed
         $order->set_status('completed');
         $order->add_order_note(sprintf(
-            __('Individual order completed by manager (%s)', 'orders-jet'),
-            wp_get_current_user()->display_name
+            __('Individual order completed by manager (%s) - Payment: %s - Tax calculated per order (Subtotal: %s, Tax: %s, Total: %s)', 'orders-jet'),
+            wp_get_current_user()->display_name,
+            $payment_method,
+            wc_price($order->get_subtotal()),
+            wc_price($order->get_total_tax()),
+            wc_price($order->get_total())
         ));
         $order->save();
         
+        error_log('Orders Jet: Individual order #' . $order_id . ' completed - Original Total: ' . $original_total . ', New Total with Tax: ' . $order->get_total());
+        
         wp_send_json_success(array(
-            'message' => sprintf(__('Order #%d completed successfully!', 'orders-jet'), $order_id)
+            'message' => sprintf(__('Order #%d completed successfully!', 'orders-jet'), $order_id),
+            'subtotal' => $order->get_subtotal(),
+            'tax_total' => $order->get_total_tax(),
+            'total' => $order->get_total(),
+            'payment_method' => $payment_method,
+            'tax_method' => 'individual_order'
         ));
     }
     
@@ -2882,6 +2944,152 @@ class Orders_Jet_AJAX_Handlers {
             'status' => $order->get_status(),
             'total' => $order->get_total()
         ));
+    }
+    
+    /**
+     * Calculate taxes for individual orders (per order basis)
+     */
+    private function calculate_individual_order_taxes($order) {
+        if (!$order) return;
+        
+        $tax_enabled = wc_tax_enabled();
+        if (!$tax_enabled) {
+            error_log('Orders Jet: Taxes not enabled in WooCommerce');
+            return;
+        }
+        
+        // Set customer location for tax calculation (use store location)
+        $store_country = WC()->countries->get_base_country();
+        $store_state = WC()->countries->get_base_state();
+        
+        // Set order addresses for tax calculation
+        $order->set_billing_country($store_country);
+        $order->set_billing_state($store_state);
+        $order->set_shipping_country($store_country);
+        $order->set_shipping_state($store_state);
+        
+        // Calculate taxes for each item in this individual order
+        foreach ($order->get_items() as $item_id => $item) {
+            $product = $item->get_product();
+            if (!$product) continue;
+            
+            // Get tax class for the product
+            $tax_class = $product->get_tax_class();
+            
+            // Get tax rates for this product
+            $tax_rates = WC_Tax::find_rates(array(
+                'country' => $store_country,
+                'state' => $store_state,
+                'city' => '',
+                'postcode' => '',
+                'tax_class' => $tax_class
+            ));
+            
+            if (!empty($tax_rates)) {
+                $line_subtotal = $item->get_subtotal();
+                $line_total = $item->get_total();
+                
+                // Calculate taxes
+                $line_subtotal_taxes = WC_Tax::calc_tax($line_subtotal, $tax_rates, false);
+                $line_taxes = WC_Tax::calc_tax($line_total, $tax_rates, false);
+                
+                // Set item taxes
+                $item->set_taxes(array(
+                    'subtotal' => $line_subtotal_taxes,
+                    'total' => $line_taxes
+                ));
+                
+                $item->save();
+                
+                error_log('Orders Jet: Applied individual order taxes to item ' . $item->get_name() . ' - Tax: ' . array_sum($line_taxes));
+            }
+        }
+        
+        // Recalculate order totals (this will sum up all item taxes)
+        $order->calculate_totals();
+        
+        // Log tax calculation results
+        error_log('Orders Jet: Individual Order #' . $order->get_id() . ' - Tax calculated per order - Subtotal: ' . $order->get_subtotal() . ', Tax: ' . $order->get_total_tax() . ', Total: ' . $order->get_total());
+    }
+    
+    /**
+     * Calculate taxes for table orders (per combined invoice total)
+     */
+    private function calculate_table_invoice_taxes($subtotal, $order_ids) {
+        if (!wc_tax_enabled()) {
+            error_log('Orders Jet: Taxes not enabled - returning zero tax amounts');
+            return array(
+                'service_tax' => 0,
+                'vat_tax' => 0,
+                'total_tax' => 0,
+                'grand_total' => $subtotal
+            );
+        }
+        
+        // Get tax rates for standard tax class
+        $store_country = WC()->countries->get_base_country();
+        $store_state = WC()->countries->get_base_state();
+        
+        $tax_rates = WC_Tax::find_rates(array(
+            'country' => $store_country,
+            'state' => $store_state,
+            'city' => '',
+            'postcode' => '',
+            'tax_class' => '' // Standard tax class
+        ));
+        
+        // Initialize tax amounts
+        $service_tax = 0;
+        $vat_tax = 0;
+        $running_total = $subtotal;
+        
+        // Sort tax rates by priority to ensure correct compound calculation
+        uasort($tax_rates, function($a, $b) {
+            return intval($a['priority']) - intval($b['priority']);
+        });
+        
+        foreach ($tax_rates as $rate_id => $rate) {
+            $rate_percent = floatval($rate['rate']);
+            $is_compound = $rate['compound'] === 'yes';
+            $priority = intval($rate['priority']);
+            
+            error_log('Orders Jet: Processing tax rate - Rate: ' . $rate_percent . '%, Compound: ' . ($is_compound ? 'Yes' : 'No') . ', Priority: ' . $priority);
+            
+            if ($rate_percent == 12.0) {
+                // Service tax (12%, Priority 1)
+                $service_tax = ($running_total * $rate_percent) / 100;
+                error_log('Orders Jet: Service Tax (12%) calculated: ' . $service_tax . ' on base: ' . $running_total);
+                
+                if ($is_compound) {
+                    $running_total += $service_tax;
+                    error_log('Orders Jet: Service tax is compound - new running total: ' . $running_total);
+                }
+            } elseif ($rate_percent == 14.0) {
+                // VAT tax (14%, Priority 2, should be compound)
+                if ($is_compound) {
+                    // Compound: calculate on subtotal + previous taxes
+                    $vat_tax = ($running_total * $rate_percent) / 100;
+                    error_log('Orders Jet: VAT (14% compound) calculated: ' . $vat_tax . ' on base: ' . $running_total);
+                } else {
+                    // Non-compound: calculate on original subtotal only
+                    $vat_tax = ($subtotal * $rate_percent) / 100;
+                    error_log('Orders Jet: VAT (14% non-compound) calculated: ' . $vat_tax . ' on base: ' . $subtotal);
+                }
+            }
+        }
+        
+        $total_tax = $service_tax + $vat_tax;
+        $grand_total = $subtotal + $total_tax;
+        
+        error_log('Orders Jet: Table Invoice Tax Calculation Complete - Subtotal: ' . $subtotal . ', Service Tax (12%): ' . $service_tax . ', VAT (14% compound): ' . $vat_tax . ', Total Tax: ' . $total_tax . ', Grand Total: ' . $grand_total);
+        
+        return array(
+            'service_tax' => $service_tax,
+            'vat_tax' => $vat_tax,
+            'total_tax' => $total_tax,
+            'grand_total' => $grand_total,
+            'order_ids' => $order_ids
+        );
     }
     
 }
