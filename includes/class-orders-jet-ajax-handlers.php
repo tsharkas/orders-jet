@@ -185,12 +185,21 @@ class Orders_Jet_AJAX_Handlers {
             $total_price = $base_price + $addon_total;
             
             // Add product to order using WooCommerce native method
+            // For table orders, set tax to zero (will be calculated on consolidated order)
+            $totals_array = array(
+                'subtotal' => $total_price * $quantity,
+                'total' => $total_price * $quantity,
+            );
+            
+            // If this is a table order, ensure no tax is calculated on line items
+            if (!empty($table_number)) {
+                $totals_array['subtotal_tax'] = 0;
+                $totals_array['total_tax'] = 0;
+            }
+            
             $item_id = $order->add_product($product, $quantity, array(
                 'variation' => ($variation_id > 0) ? $product->get_variation_attributes() : array(),
-                'totals' => array(
-                    'subtotal' => $total_price * $quantity,
-                    'total' => $total_price * $quantity,
-                )
+                'totals' => $totals_array
             ));
             
             if ($item_id) {
@@ -299,9 +308,20 @@ class Orders_Jet_AJAX_Handlers {
         $order->update_meta_data('_order_discount', 0);
         $order->update_meta_data('_order_discount_tax', 0);
         
-        // Let WooCommerce calculate totals and taxes naturally
-        // This will enable tax calculations when orders are completed
-        $order->calculate_totals();
+        // For table orders, don't calculate taxes (they will be calculated on consolidated order)
+        // For pickup orders, calculate taxes normally
+        if (!empty($table_number)) {
+            // Table order - set totals manually without tax calculation
+            $order->set_total($final_total);
+            $order->update_meta_data('_order_tax', 0);
+            $order->update_meta_data('_order_total_tax', 0);
+            $order->update_meta_data('_oj_tax_deferred', 'yes'); // Mark that tax will be calculated later
+            error_log('Orders Jet: Table order #' . $order->get_id() . ' - Tax calculation skipped (will be calculated on consolidated order)');
+        } else {
+            // Pickup order - calculate taxes normally
+            $order->calculate_totals();
+            error_log('Orders Jet: Pickup order #' . $order->get_id() . ' - Tax calculated normally');
+        }
         
         // Save order with WooCommerce-calculated totals
         $order->save();
@@ -3218,10 +3238,24 @@ class Orders_Jet_AJAX_Handlers {
             error_log('Orders Jet: Consolidated order #' . $consolidated_order->get_id() . ' created and completed');
             error_log('Orders Jet: Consolidated order totals - Subtotal: ' . $consolidated_order->get_subtotal() . ', Tax: ' . $consolidated_order->get_total_tax() . ', Total: ' . $consolidated_order->get_total());
             
-            // 8. Delete child orders
+            // 8. Permanently delete child orders
             foreach ($table_orders as $child_order) {
-                error_log('Orders Jet: Deleting child order #' . $child_order->get_id());
-                wp_delete_post($child_order->get_id(), true);
+                $child_order_id = $child_order->get_id();
+                error_log('Orders Jet: Permanently deleting child order #' . $child_order_id);
+                
+                // Delete all order items first
+                foreach ($child_order->get_items() as $item_id => $item) {
+                    wc_delete_order_item($item_id);
+                }
+                
+                // Delete all order meta
+                global $wpdb;
+                $wpdb->delete($wpdb->postmeta, array('post_id' => $child_order_id));
+                
+                // Permanently delete the order post
+                wp_delete_post($child_order_id, true);
+                
+                error_log('Orders Jet: Child order #' . $child_order_id . ' permanently deleted');
             }
             
             // 9. Update table status to available

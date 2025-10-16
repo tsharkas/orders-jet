@@ -1071,7 +1071,7 @@ jQuery(document).ready(function($) {
                 data: {
                     action: 'oj_mark_order_ready',
                     order_id: orderId,
-                    nonce: '<?php echo wp_create_nonce('oj_mark_ready_' . get_current_user_id()); ?>'
+                    nonce: '<?php echo wp_create_nonce('oj_dashboard_nonce'); ?>'
                 },
                 success: function(response) {
                     if (response.success) {
@@ -1238,12 +1238,7 @@ jQuery(document).ready(function($) {
                         showInvoiceModal(orderId, response.data);
                     }
                     
-                    // Reload page after successful table group closure
-                    if (orderType === 'table_group') {
-                        setTimeout(function() {
-                            location.reload();
-                        }, 2000);
-                    }
+                    // Don't auto-refresh - let user interact with invoice modal first
                 } else {
                     alert(response.data.message || '<?php _e('Error completing order', 'orders-jet'); ?>');
                 }
@@ -1359,30 +1354,40 @@ jQuery(document).ready(function($) {
         // Debug: Log the response data to see what we're receiving
         console.log('Table Invoice Modal - Response Data:', responseData);
         
-        // Extract order IDs from response data for table orders
-        let orderIds = [];
-        if (responseData && responseData.order_ids) {
-            orderIds = responseData.order_ids;
-            console.log('Table Invoice Modal - Order IDs found:', orderIds);
-        } else {
-            console.log('Table Invoice Modal - No order_ids found in response data');
+        // For consolidated orders, use the consolidated_order_id
+        let consolidatedOrderId = null;
+        let childOrderIds = [];
+        
+        if (responseData && responseData.consolidated_order_id) {
+            consolidatedOrderId = responseData.consolidated_order_id;
+            childOrderIds = responseData.child_order_ids || [];
+            console.log('Table Invoice Modal - Consolidated Order ID:', consolidatedOrderId);
+            console.log('Table Invoice Modal - Child Order IDs:', childOrderIds);
+        } else if (responseData && responseData.order_ids) {
+            // Fallback for legacy system
+            childOrderIds = responseData.order_ids;
+            console.log('Table Invoice Modal - Legacy Order IDs:', childOrderIds);
         }
         
         const modal = $(`
             <div class="oj-invoice-modal-overlay">
                 <div class="oj-invoice-modal">
                     <h3>✅ <?php _e('Table Closed Successfully!', 'orders-jet'); ?></h3>
-                    <p><?php _e('Table', 'orders-jet'); ?> #${tableNumber} <?php _e('has been closed and invoice generated.', 'orders-jet'); ?></p>
-                    ${orderIds.length > 0 ? `<p><small><?php _e('Orders:', 'orders-jet'); ?> ${orderIds.join(', ')}</small></p>` : ''}
+                    <p><?php _e('Table', 'orders-jet'); ?> #${tableNumber} <?php _e('has been closed and consolidated invoice generated.', 'orders-jet'); ?></p>
+                    ${consolidatedOrderId ? `<p><small><?php _e('Consolidated Order ID:', 'orders-jet'); ?> #${consolidatedOrderId}</small></p>` : ''}
+                    ${childOrderIds.length > 0 ? `<p><small><?php _e('Child Orders:', 'orders-jet'); ?> ${childOrderIds.map(id => '#' + id).join(', ')}</small></p>` : ''}
                     <div class="oj-invoice-actions">
-                        <button class="button button-primary oj-view-table-invoice" data-table="${tableNumber}" data-orders="${orderIds.join(',')}">
-                            📄 <?php _e('View PDF Invoice', 'orders-jet'); ?>
+                        <button class="button button-primary oj-view-consolidated-invoice" data-order-id="${consolidatedOrderId}" data-table="${tableNumber}">
+                            📄 <?php _e('View Invoice', 'orders-jet'); ?>
                         </button>
-                        <button class="button button-secondary oj-print-table-invoice" data-table="${tableNumber}" data-orders="${orderIds.join(',')}">
-                            🖨️ <?php _e('Print PDF Invoice', 'orders-jet'); ?>
+                        <button class="button button-secondary oj-print-consolidated-invoice" data-order-id="${consolidatedOrderId}" data-table="${tableNumber}">
+                            🖨️ <?php _e('Print Invoice', 'orders-jet'); ?>
                         </button>
-                        <button class="button button-secondary oj-download-table-invoice" data-table="${tableNumber}" data-orders="${orderIds.join(',')}">
+                        <button class="button button-secondary oj-download-consolidated-invoice" data-order-id="${consolidatedOrderId}" data-table="${tableNumber}">
                             💾 <?php _e('Download PDF', 'orders-jet'); ?>
+                        </button>
+                        <button class="button oj-refresh-page">
+                            🔄 <?php _e('Refresh Dashboard', 'orders-jet'); ?>
                         </button>
                         <button class="button oj-close-success">
                             <?php _e('Close', 'orders-jet'); ?>
@@ -1394,26 +1399,25 @@ jQuery(document).ready(function($) {
         
         $('body').append(modal);
         
-        // Handle view PDF invoice for table
-        modal.find('.oj-view-table-invoice').on('click', function() {
-            const orderIds = $(this).data('orders');
+        // Handle view consolidated invoice
+        modal.find('.oj-view-consolidated-invoice').on('click', function() {
+            const orderId = $(this).data('order-id');
             const tableNumber = $(this).data('table');
-            if (orderIds) {
-                // Generate combined table invoice using our new endpoint
-                const invoiceUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_table_pdf&table_number=' + encodeURIComponent(tableNumber) + '&order_ids=' + encodeURIComponent(orderIds) + '&output=html&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
+            if (orderId) {
+                // Use standard WooCommerce order view or custom invoice template
+                const invoiceUrl = '<?php echo admin_url('post.php'); ?>?post=' + orderId + '&action=edit';
                 window.open(invoiceUrl, '_blank');
             } else {
-                alert('<?php _e('No orders found for this table.', 'orders-jet'); ?>');
+                alert('<?php _e('No consolidated order found.', 'orders-jet'); ?>');
             }
         });
         
-        // Handle print PDF invoice for table
-        modal.find('.oj-print-table-invoice').on('click', function() {
-            const orderIds = $(this).data('orders');
-            const tableNumber = $(this).data('table');
-            if (orderIds) {
-                // Generate combined table invoice PDF for printing
-                const pdfUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_table_pdf&table_number=' + encodeURIComponent(tableNumber) + '&order_ids=' + encodeURIComponent(orderIds) + '&output=pdf&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
+        // Handle print consolidated invoice
+        modal.find('.oj-print-consolidated-invoice').on('click', function() {
+            const orderId = $(this).data('order-id');
+            if (orderId) {
+                // Generate PDF for consolidated order
+                const pdfUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_admin_pdf&order_id=' + orderId + '&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
                 
                 // Create hidden iframe for printing
                 const iframe = document.createElement('iframe');
@@ -1449,18 +1453,18 @@ jQuery(document).ready(function($) {
             }
         });
         
-        // Handle download PDF invoice for table
-        modal.find('.oj-download-table-invoice').on('click', function() {
+        // Handle download consolidated invoice
+        modal.find('.oj-download-consolidated-invoice').on('click', function() {
+            const orderId = $(this).data('order-id');
             const tableNumber = $(this).data('table');
-            const orderIds = $(this).data('orders');
-            if (orderIds) {
-                // Generate combined table invoice PDF for download
-                const downloadUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_table_pdf&table_number=' + encodeURIComponent(tableNumber) + '&order_ids=' + encodeURIComponent(orderIds) + '&output=pdf&force_download=1&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
+            if (orderId) {
+                // Generate PDF for consolidated order download
+                const downloadUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_admin_pdf&order_id=' + orderId + '&force_download=1&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
                 
                 // Create temporary link for download
                 const link = document.createElement('a');
                 link.href = downloadUrl;
-                link.download = 'table-' + tableNumber + '-combined-invoice.pdf';
+                link.download = 'consolidated-order-' + orderId + '-table-' + tableNumber + '.pdf';
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
@@ -1469,17 +1473,21 @@ jQuery(document).ready(function($) {
             }
         });
         
-        // Handle close
-        modal.find('.oj-close-success').on('click', function() {
+        // Handle refresh dashboard
+        modal.find('.oj-refresh-page').on('click', function() {
             modal.remove();
             location.reload();
         });
         
-        // Close on overlay click
+        // Handle close (without refresh)
+        modal.find('.oj-close-success').on('click', function() {
+            modal.remove();
+        });
+        
+        // Close on overlay click (without refresh)
         modal.on('click', function(e) {
             if (e.target === this) {
                 modal.remove();
-                location.reload();
             }
         });
     }
