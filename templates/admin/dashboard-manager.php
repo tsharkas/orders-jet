@@ -94,33 +94,87 @@ if (function_exists('wc_get_orders')) {
     // Combine active orders only (exclude completed from main operations)
     $active_orders = array_merge($processing_orders, $ready_orders);
     
-    // Apply FIFO sorting logic (same as kitchen dashboard): Dine-in first, then pickup orders, sorted by time ascending
-    usort($active_orders, function($a, $b) {
-        // 1. Dine-in orders (table orders) come first
-        $a_is_dinein = !empty($a['table']);
-        $b_is_dinein = !empty($b['table']);
-        
-        if ($a_is_dinein && !$b_is_dinein) {
-            return -1; // Dine-in comes first
+    // NEW APPROACH: Group table orders by table number for collapsed view
+    $table_groups = array();
+    $pickup_orders = array();
+    
+    foreach ($active_orders as $order) {
+        if ($order['type'] === 'table' && !empty($order['table'])) {
+            $table_number = $order['table'];
+            
+            // Initialize table group if not exists
+            if (!isset($table_groups[$table_number])) {
+                $table_groups[$table_number] = array(
+                    'table_number' => $table_number,
+                    'orders' => array(),
+                    'total_amount' => 0,
+                    'order_count' => 0,
+                    'earliest_time' => null,
+                    'all_ready' => true,
+                    'has_cooking' => false,
+                    'has_ready' => false
+                );
+            }
+            
+            // Add order to table group
+            $table_groups[$table_number]['orders'][] = $order;
+            $table_groups[$table_number]['total_amount'] += floatval($order['total']);
+            $table_groups[$table_number]['order_count']++;
+            
+            // Track earliest time (table opened time)
+            if (!$table_groups[$table_number]['earliest_time'] || 
+                $order['date'] < $table_groups[$table_number]['earliest_time']) {
+                $table_groups[$table_number]['earliest_time'] = $order['date'];
+            }
+            
+            // Track order statuses
+            if ($order['status'] === 'processing') {
+                $table_groups[$table_number]['has_cooking'] = true;
+                $table_groups[$table_number]['all_ready'] = false;
+            } elseif ($order['status'] === 'pending') {
+                $table_groups[$table_number]['has_ready'] = true;
+            }
+        } else {
+            // Pickup orders remain individual
+            $pickup_orders[] = $order;
         }
-        if ($b_is_dinein && !$a_is_dinein) {
-            return 1; // Dine-in comes first
-        }
-        
-        // 2. Within same type (both dine-in or both pickup), sort by date/time ascending (FIFO)
-        // Convert time back to comparable format (assuming 'date' field contains H:i format)
-        $today = date('Y-m-d');
-        $a_datetime = $today . ' ' . $a['date'] . ':00'; // Add seconds for strtotime
-        $b_datetime = $today . ' ' . $b['date'] . ':00';
-        
-        $a_time = strtotime($a_datetime);
-        $b_time = strtotime($b_datetime);
-        
-        return $a_time - $b_time; // Ascending order (earliest first - FIFO)
+    }
+    
+    // Sort table groups by earliest time (FIFO)
+    uasort($table_groups, function($a, $b) {
+        return strcmp($a['earliest_time'], $b['earliest_time']);
     });
     
+    // Sort pickup orders by time (FIFO)
+    usort($pickup_orders, function($a, $b) {
+        return strcmp($a['date'], $b['date']);
+    });
+    
+    // For display purposes, we'll create a mixed array of table groups and pickup orders
+    $display_orders = array();
+    
+    // Add table groups first (they have priority)
+    foreach ($table_groups as $table_group) {
+        $display_orders[] = array(
+            'type' => 'table_group',
+            'table_number' => $table_group['table_number'],
+            'order_count' => $table_group['order_count'],
+            'total_amount' => $table_group['total_amount'],
+            'earliest_time' => $table_group['earliest_time'],
+            'all_ready' => $table_group['all_ready'],
+            'has_cooking' => $table_group['has_cooking'],
+            'has_ready' => $table_group['has_ready'],
+            'orders' => $table_group['orders']
+        );
+    }
+    
+    // Add pickup orders
+    foreach ($pickup_orders as $pickup_order) {
+        $display_orders[] = $pickup_order;
+    }
+    
     // All orders including completed (for display purposes)
-    $all_orders = array_merge($active_orders, $recent_completed_orders);
+    $all_orders = array_merge($display_orders, $recent_completed_orders);
     
     // Debug logging for sorting verification
     error_log('Orders Jet Manager: Applied FIFO sorting - Active orders count: ' . count($active_orders));
@@ -133,20 +187,31 @@ if (function_exists('wc_get_orders')) {
     }
 }
 
-// Calculate statistics
-$active_orders_count = count($active_orders);
-$total_orders = count($all_orders);
+// Calculate statistics for new grouped structure
+$active_orders_count = count($active_orders); // Total individual orders
+$total_display_items = count($display_orders); // Table groups + pickup orders
 $processing_count = count($processing_orders);
 $ready_count = count($ready_orders);
 $recent_completed_count = count($recent_completed_orders);
 
-// Active orders only (exclude completed)
-$active_table_orders = array_filter($active_orders, function($order) { return $order['type'] === 'table'; });
-$active_pickup_orders = array_filter($active_orders, function($order) { return $order['type'] === 'pickup'; });
+// Count table groups and pickup orders separately
+$table_groups_count = count($table_groups);
+$pickup_orders_count = count($pickup_orders);
+
+// For backward compatibility with existing template code
+$active_table_orders = array();
+foreach ($table_groups as $group) {
+    $active_table_orders = array_merge($active_table_orders, $group['orders']);
+}
+$active_pickup_orders = $pickup_orders;
 
 // All orders including completed (for backward compatibility)
-$table_orders = array_filter($all_orders, function($order) { return $order['type'] === 'table'; });
-$pickup_orders = array_filter($all_orders, function($order) { return $order['type'] === 'pickup'; });
+$table_orders = $active_table_orders;
+$pickup_orders_all = array_merge($pickup_orders, 
+    array_filter($recent_completed_orders, function($order) { 
+        return isset($order['type']) && $order['type'] === 'pickup'; 
+    })
+);
 
 ?>
 
@@ -177,15 +242,15 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
     <!-- Statistics -->
     <div class="oj-stats">
         <div class="oj-stat-card">
-            <div class="stat-number"><?php echo $total_orders; ?></div>
+            <div class="stat-number"><?php echo $active_orders_count; ?></div>
             <div class="stat-label"><?php _e('Active Orders', 'orders-jet'); ?></div>
             </div>
         <div class="oj-stat-card">
-            <div class="stat-number"><?php echo count($table_orders); ?></div>
-            <div class="stat-label"><?php _e('Table Orders', 'orders-jet'); ?></div>
+            <div class="stat-number"><?php echo $table_groups_count; ?></div>
+            <div class="stat-label"><?php _e('Active Tables', 'orders-jet'); ?></div>
             </div>
         <div class="oj-stat-card">
-            <div class="stat-number"><?php echo count($pickup_orders); ?></div>
+            <div class="stat-number"><?php echo $pickup_orders_count; ?></div>
             <div class="stat-label"><?php _e('Pickup Orders', 'orders-jet'); ?></div>
             </div>
         <div class="oj-stat-card">
@@ -210,10 +275,10 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
             <?php _e('Ready Orders', 'orders-jet'); ?> (<?php echo $ready_count; ?>)
         </button>
         <button class="oj-filter-btn" data-filter="table">
-            <?php _e('Table Orders', 'orders-jet'); ?> (<?php echo count($active_table_orders); ?>)
+            <?php _e('Table Groups', 'orders-jet'); ?> (<?php echo $table_groups_count; ?>)
         </button>
         <button class="oj-filter-btn" data-filter="pickup">
-            <?php _e('Pickup Orders', 'orders-jet'); ?> (<?php echo count($active_pickup_orders); ?>)
+            <?php _e('Pickup Orders', 'orders-jet'); ?> (<?php echo $pickup_orders_count; ?>)
         </button>
         <button class="oj-filter-btn" data-filter="completed">
             ✅ <?php _e('Recent', 'orders-jet'); ?> (<?php echo $recent_completed_count; ?>)
@@ -257,78 +322,167 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
             </thead>
             <tbody>
                 <?php if (!empty($all_orders)) : ?>
-                    <?php foreach ($all_orders as $order) : ?>
-                        <tr class="oj-order-row" 
-                            data-status="<?php echo esc_attr($order['status']); ?>"
-                            data-type="<?php echo esc_attr($order['type']); ?>"
-                            data-order-id="<?php echo esc_attr($order['id']); ?>">
-                            
-                            <!-- Checkbox column -->
-                            <td class="check-column">
-                                <input type="checkbox" class="oj-order-checkbox" value="<?php echo esc_attr($order['id']); ?>" />
-                            </td>
-                            
-                            <td><strong>#<?php echo $order['id']; ?></strong></td>
-                            
-                            <td><?php echo esc_html($order['customer']); ?></td>
-                            
-                            <td>
-                                <?php if ($order['type'] === 'table') : ?>
-                                    🍽️ <?php echo sprintf(__('Table %s', 'orders-jet'), $order['table']); ?>
-                                    <?php else : ?>
-                                    🥡 <?php _e('Pickup', 'orders-jet'); ?>
-                                    <?php endif; ?>
-                            </td>
-                            
-                            <td>
-                                <?php if ($order['status'] === 'processing') : ?>
-                                    <span class="oj-status cooking">🍳 <?php _e('Cooking', 'orders-jet'); ?></span>
-                                <?php elseif ($order['status'] === 'pending') : ?>
-                                    <span class="oj-status ready">✅ <?php _e('Ready', 'orders-jet'); ?></span>
-                                <?php elseif ($order['status'] === 'completed') : ?>
-                                    <span class="oj-status completed">✅ <?php _e('Completed', 'orders-jet'); ?></span>
-                                    <small class="oj-completion-time"><?php echo $order['date']; ?></small>
-                                <?php endif; ?>
-                            </td>
-                            
-                            <td><?php echo wc_price($order['total']); ?></td>
-                            
-                            <td><?php echo $order['date']; ?></td>
-                            
-                            <td>
-                                <?php if ($order['status'] === 'pending') : ?>
-                                    <?php if ($order['type'] === 'table') : ?>
-                                        <button class="button button-primary oj-close-table" 
-                                                data-order-id="<?php echo $order['id']; ?>"
-                                                data-table="<?php echo esc_attr($order['table']); ?>">
-                                            <?php _e('Close Table', 'orders-jet'); ?>
+                    <?php foreach ($all_orders as $item) : ?>
+                        
+                        <?php if ($item['type'] === 'table_group') : ?>
+                            <!-- TABLE GROUP ROW (Collapsed by default) -->
+                            <tr class="oj-table-group-row collapsed" 
+                                data-table="<?php echo esc_attr($item['table_number']); ?>"
+                                data-type="table_group">
+                                
+                                <td class="check-column">
+                                    <input type="checkbox" class="oj-table-checkbox" 
+                                           value="<?php echo esc_attr($item['table_number']); ?>" />
+                                </td>
+                                
+                                <td><strong><?php echo esc_html($item['table_number']); ?></strong></td>
+                                
+                                <td colspan="3" class="oj-table-summary">
+                                    <div class="oj-table-info">
+                                        <span class="oj-order-count"><?php echo $item['order_count']; ?> <?php _e('Orders', 'orders-jet'); ?></span>
+                                        <span class="oj-separator">|</span>
+                                        <span class="oj-total-amount"><?php echo wc_price($item['total_amount']); ?></span>
+                                        <span class="oj-separator">|</span>
+                                        <span class="oj-opened-time"><?php _e('Opened', 'orders-jet'); ?> <?php echo esc_html($item['earliest_time']); ?></span>
+                                        
+                                        <?php if ($item['has_cooking']) : ?>
+                                            <span class="oj-status-indicator cooking">🍳</span>
+                                        <?php endif; ?>
+                                        
+                                        <?php if ($item['has_ready']) : ?>
+                                            <span class="oj-status-indicator ready">✅</span>
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
+                                
+                                <td></td>
+                                <td></td>
+                                
+                                <td class="oj-table-actions">
+                                    <button class="oj-expand-table" data-table="<?php echo esc_attr($item['table_number']); ?>">
+                                        <span class="dashicons dashicons-arrow-down-alt2"></span>
                                     </button>
-                                <?php else : ?>
-                                        <button class="button button-primary oj-complete-order" 
-                                                data-order-id="<?php echo $order['id']; ?>">
-                                            <?php _e('Complete Order', 'orders-jet'); ?>
+                                    
+                                    <?php if ($item['all_ready']) : ?>
+                                        <button class="button button-primary oj-close-table-group" 
+                                                data-table="<?php echo esc_attr($item['table_number']); ?>">
+                                            <?php _e('Close Table', 'orders-jet'); ?>
+                                        </button>
+                                    <?php else : ?>
+                                        <button class="button button-secondary oj-close-table-group" 
+                                                data-table="<?php echo esc_attr($item['table_number']); ?>"
+                                                disabled title="<?php _e('All orders must be ready first', 'orders-jet'); ?>">
+                                            <?php _e('Close Table', 'orders-jet'); ?>
                                         </button>
                                     <?php endif; ?>
-                                <?php elseif ($order['status'] === 'completed') : ?>
-                                    <button class="button-link oj-quick-invoice" 
-                                            data-order-id="<?php echo $order['id']; ?>" 
-                                            data-type="<?php echo $order['type']; ?>"
-                                            data-table="<?php echo esc_attr($order['table']); ?>">
-                                        📄 <?php _e('Invoice', 'orders-jet'); ?>
-                                    </button>
-                                <?php else : ?>
-                                    <span class="oj-status-note"><?php _e('In Kitchen', 'orders-jet'); ?></span>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
+                                </td>
+                            </tr>
+                            
+                            <!-- CHILD ORDERS (Hidden by default) -->
+                            <?php foreach ($item['orders'] as $child_order) : ?>
+                                <tr class="oj-child-order-row" 
+                                    data-table="<?php echo esc_attr($item['table_number']); ?>"
+                                    data-order-id="<?php echo esc_attr($child_order['id']); ?>"
+                                    data-status="<?php echo esc_attr($child_order['status']); ?>"
+                                    style="display: none;">
+                                    
+                                    <td></td>
+                                    
+                                    <td class="oj-child-order">
+                                        <span class="oj-child-indicator">└─</span>
+                                        <strong>#<?php echo $child_order['id']; ?></strong>
+                                    </td>
+                                    
+                                    <td><?php echo esc_html($child_order['customer']); ?></td>
+                                    
+                                    <td>🍽️ <?php echo sprintf(__('Table %s', 'orders-jet'), $item['table_number']); ?></td>
+                                    
+                                    <td>
+                                        <?php if ($child_order['status'] === 'processing') : ?>
+                                            <span class="oj-status cooking">🍳 <?php _e('Cooking', 'orders-jet'); ?></span>
+                                        <?php elseif ($child_order['status'] === 'pending') : ?>
+                                            <span class="oj-status ready">✅ <?php _e('Ready', 'orders-jet'); ?></span>
+                                        <?php endif; ?>
+                                    </td>
+                                    
+                                    <td><?php echo wc_price($child_order['total']); ?></td>
+                                    
+                                    <td><?php echo $child_order['date']; ?></td>
+                                    
+                                    <td>
+                                        <?php if ($child_order['status'] === 'processing') : ?>
+                                            <button class="button oj-mark-ready" 
+                                                    data-order-id="<?php echo $child_order['id']; ?>">
+                                                <?php _e('Mark Ready', 'orders-jet'); ?>
+                                            </button>
+                                        <?php elseif ($child_order['status'] === 'pending') : ?>
+                                            <span class="oj-status-note ready">✅ <?php _e('Ready', 'orders-jet'); ?></span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                            
+                        <?php else : ?>
+                            <!-- PICKUP ORDER ROW (Individual) -->
+                            <tr class="oj-order-row pickup-order" 
+                                data-status="<?php echo esc_attr($item['status']); ?>"
+                                data-type="pickup"
+                                data-order-id="<?php echo esc_attr($item['id']); ?>">
+                                
+                                <td class="check-column">
+                                    <input type="checkbox" class="oj-order-checkbox" value="<?php echo esc_attr($item['id']); ?>" />
+                                </td>
+                                
+                                <td><strong>#<?php echo $item['id']; ?></strong></td>
+                                
+                                <td><?php echo esc_html($item['customer']); ?></td>
+                                
+                                <td>🥡 <?php _e('Pickup', 'orders-jet'); ?></td>
+                                
+                                <td>
+                                    <?php if ($item['status'] === 'processing') : ?>
+                                        <span class="oj-status cooking">🍳 <?php _e('Cooking', 'orders-jet'); ?></span>
+                                    <?php elseif ($item['status'] === 'pending') : ?>
+                                        <span class="oj-status ready">✅ <?php _e('Ready', 'orders-jet'); ?></span>
+                                    <?php elseif ($item['status'] === 'completed') : ?>
+                                        <span class="oj-status completed">✅ <?php _e('Completed', 'orders-jet'); ?></span>
+                                    <?php endif; ?>
+                                </td>
+                                
+                                <td><?php echo wc_price($item['total']); ?></td>
+                                
+                                <td><?php echo $item['date']; ?></td>
+                                
+                                <td>
+                                    <?php if ($item['status'] === 'processing') : ?>
+                                        <button class="button oj-mark-ready" 
+                                                data-order-id="<?php echo $item['id']; ?>">
+                                            <?php _e('Mark Ready', 'orders-jet'); ?>
+                                        </button>
+                                    <?php elseif ($item['status'] === 'pending') : ?>
+                                        <button class="button button-primary oj-complete-order" 
+                                                data-order-id="<?php echo $item['id']; ?>">
+                                            <?php _e('Complete Order', 'orders-jet'); ?>
+                                        </button>
+                                    <?php elseif ($item['status'] === 'completed') : ?>
+                                        <button class="button-link oj-quick-invoice" 
+                                                data-order-id="<?php echo $item['id']; ?>" 
+                                                data-type="pickup">
+                                            📄 <?php _e('Invoice', 'orders-jet'); ?>
+                                        </button>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endif; ?>
+                        
                     <?php endforeach; ?>
-        <?php else : ?>
+                <?php else : ?>
                     <tr>
                         <td colspan="8" class="oj-no-orders">
                             <?php _e('No active orders found.', 'orders-jet'); ?>
                         </td>
                     </tr>
-        <?php endif; ?>
+                <?php endif; ?>
             </tbody>
         </table>
     </div>
@@ -483,6 +637,154 @@ $pickup_orders = array_filter($all_orders, function($order) { return $order['typ
     color: #666;
 }
 
+/* NEW: Table Group Styles */
+.oj-table-group-row {
+    background: #f8f9fa;
+    border-left: 4px solid #007cba;
+    font-weight: 500;
+}
+
+.oj-table-group-row.collapsed {
+    border-left-color: #007cba;
+}
+
+.oj-table-group-row.expanded {
+    border-left-color: #00a32a;
+    background: #f0f6ff;
+}
+
+.oj-table-summary {
+    padding: 8px 12px;
+}
+
+.oj-table-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+}
+
+.oj-order-count {
+    font-weight: 600;
+    color: #2271b1;
+}
+
+.oj-total-amount {
+    font-weight: 600;
+    color: #135e96;
+}
+
+.oj-opened-time {
+    color: #646970;
+}
+
+.oj-separator {
+    color: #c3c4c7;
+}
+
+.oj-status-indicator {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+}
+
+.oj-status-indicator.cooking {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.oj-status-indicator.ready {
+    background: #d1f2eb;
+    color: #0f5132;
+}
+
+.oj-table-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.oj-expand-table {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 3px;
+    transition: background 0.2s;
+}
+
+.oj-expand-table:hover {
+    background: #f0f0f1;
+}
+
+.oj-expand-table .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+.oj-table-group-row.expanded .oj-expand-table .dashicons {
+    transform: rotate(180deg);
+}
+
+/* Child Order Styles */
+.oj-child-order-row {
+    background: #fafafa;
+    border-left: 2px solid #c3c4c7;
+}
+
+.oj-child-order {
+    padding-left: 20px;
+}
+
+.oj-child-indicator {
+    color: #8c8f94;
+    margin-right: 8px;
+    font-family: monospace;
+}
+
+.oj-child-order-row td {
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+.oj-child-order-row .oj-status-note.ready {
+    color: #0f5132;
+    font-weight: 500;
+}
+
+/* Pickup Order Styles */
+.pickup-order {
+    border-left: 2px solid #dba617;
+}
+
+/* Enhanced Button Styles */
+.oj-close-table-group {
+    font-size: 12px;
+    padding: 4px 12px;
+    height: auto;
+    line-height: 1.4;
+}
+
+.oj-close-table-group:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.oj-mark-ready {
+    font-size: 12px;
+    padding: 4px 10px;
+    background: #2271b1;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.oj-mark-ready:hover {
+    background: #135e96;
+}
+
 /* Bulk Actions Styles */
 .oj-bulk-actions-bar {
     background: #f8f9fa;
@@ -632,9 +934,61 @@ jQuery(document).ready(function($) {
         applyFilter(filter);
     });
     
-    // Reusable filter function
+    // Reusable filter function (Updated for table groups)
     function applyFilter(filter) {
-        $('.oj-order-row').each(function() {
+        // Handle table groups
+        $('.oj-table-group-row').each(function() {
+            const $groupRow = $(this);
+            const tableNumber = $groupRow.data('table');
+            const $childRows = $(`.oj-child-order-row[data-table="${tableNumber}"]`);
+            
+            let showGroup = false;
+            
+            switch(filter) {
+                case 'all':
+                    showGroup = true; // Show all table groups
+                    break;
+                case 'table':
+                    showGroup = true; // Show table groups when filtering by table
+                    break;
+                case 'processing':
+                    // Show if any child order is processing
+                    $childRows.each(function() {
+                        if ($(this).data('status') === 'processing') {
+                            showGroup = true;
+                            return false;
+                        }
+                    });
+                    break;
+                case 'ready':
+                    // Show if any child order is ready (pending)
+                    $childRows.each(function() {
+                        if ($(this).data('status') === 'pending') {
+                            showGroup = true;
+                            return false;
+                        }
+                    });
+                    break;
+                case 'pickup':
+                case 'completed':
+                    showGroup = false; // Don't show table groups for pickup/completed filters
+                    break;
+            }
+            
+            if (showGroup) {
+                $groupRow.removeClass('hidden');
+                // Also show child rows if expanded
+                if ($groupRow.hasClass('expanded')) {
+                    $childRows.show();
+                }
+            } else {
+                $groupRow.addClass('hidden');
+                $childRows.hide();
+            }
+        });
+        
+        // Handle pickup orders
+        $('.pickup-order').each(function() {
             const $row = $(this);
             const status = $row.data('status');
             const type = $row.data('type');
@@ -643,7 +997,7 @@ jQuery(document).ready(function($) {
             
             switch(filter) {
                 case 'all':
-                    // Show only active orders (exclude completed)
+                    // Show only active pickup orders (exclude completed)
                     show = status !== 'completed';
                     break;
                 case 'processing':
@@ -652,16 +1006,15 @@ jQuery(document).ready(function($) {
                 case 'ready':
                     show = status === 'pending';
                     break;
-                case 'table':
-                    // Show only active table orders (exclude completed)
-                    show = type === 'table' && status !== 'completed';
-                    break;
                 case 'pickup':
                     // Show only active pickup orders (exclude completed)
-                    show = type === 'pickup' && status !== 'completed';
+                    show = status !== 'completed';
                     break;
                 case 'completed':
                     show = status === 'completed';
+                    break;
+                case 'table':
+                    show = false; // Don't show pickup orders when filtering by table
                     break;
             }
             
@@ -671,7 +1024,114 @@ jQuery(document).ready(function($) {
                 $row.addClass('hidden');
             }
         });
+        
+        // Handle completed orders (if any)
+        $('.oj-order-row:not(.pickup-order)').each(function() {
+            const $row = $(this);
+            const status = $row.data('status');
+            
+            if (status === 'completed') {
+                if (filter === 'completed' || filter === 'all') {
+                    $row.removeClass('hidden');
+                } else {
+                    $row.addClass('hidden');
+                }
+            }
+        });
     }
+    
+    // NEW: Table Group Expand/Collapse Functionality
+    $('.oj-expand-table').on('click', function() {
+        const tableNumber = $(this).data('table');
+        const $groupRow = $(this).closest('.oj-table-group-row');
+        const $childRows = $(`.oj-child-order-row[data-table="${tableNumber}"]`);
+        
+        if ($groupRow.hasClass('collapsed')) {
+            // Expand
+            $groupRow.removeClass('collapsed').addClass('expanded');
+            $childRows.show();
+        } else {
+            // Collapse
+            $groupRow.removeClass('expanded').addClass('collapsed');
+            $childRows.hide();
+        }
+    });
+    
+    // NEW: Mark Ready functionality for individual orders
+    $('.oj-mark-ready').on('click', function() {
+        const orderId = $(this).data('order-id');
+        const $button = $(this);
+        
+        if (confirm('<?php _e('Mark this order as ready?', 'orders-jet'); ?>')) {
+            $button.prop('disabled', true).text('<?php _e('Processing...', 'orders-jet'); ?>');
+            
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'oj_mark_order_ready',
+                    order_id: orderId,
+                    nonce: '<?php echo wp_create_nonce('oj_mark_ready_' . get_current_user_id()); ?>'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Update the row to show ready status
+                        const $row = $button.closest('tr');
+                        $row.find('.oj-status').removeClass('cooking').addClass('ready')
+                            .html('✅ <?php _e('Ready', 'orders-jet'); ?>');
+                        $button.replaceWith('<span class="oj-status-note ready">✅ <?php _e('Ready', 'orders-jet'); ?></span>');
+                        
+                        // Check if all orders in this table are now ready
+                        const tableNumber = $row.data('table');
+                        const $tableGroupRow = $(`.oj-table-group-row[data-table="${tableNumber}"]`);
+                        const $allChildRows = $(`.oj-child-order-row[data-table="${tableNumber}"]`);
+                        
+                        let allReady = true;
+                        $allChildRows.each(function() {
+                            if ($(this).data('status') === 'processing') {
+                                allReady = false;
+                                return false;
+                            }
+                        });
+                        
+                        if (allReady) {
+                            // Enable the Close Table button
+                            $tableGroupRow.find('.oj-close-table-group')
+                                .removeClass('button-secondary')
+                                .addClass('button-primary')
+                                .prop('disabled', false)
+                                .removeAttr('title');
+                        }
+                        
+                        alert('<?php _e('Order marked as ready!', 'orders-jet'); ?>');
+                    } else {
+                        alert('<?php _e('Error: ', 'orders-jet'); ?>' + response.data.message);
+                        $button.prop('disabled', false).text('<?php _e('Mark Ready', 'orders-jet'); ?>');
+                    }
+                },
+                error: function() {
+                    alert('<?php _e('Error marking order as ready', 'orders-jet'); ?>');
+                    $button.prop('disabled', false).text('<?php _e('Mark Ready', 'orders-jet'); ?>');
+                }
+            });
+        }
+    });
+    
+    // NEW: Close Table Group functionality
+    $('.oj-close-table-group').on('click', function() {
+        const tableNumber = $(this).data('table');
+        const $button = $(this);
+        
+        if ($button.prop('disabled')) {
+            alert('<?php _e('All orders must be ready before closing the table', 'orders-jet'); ?>');
+            return;
+        }
+        
+        if (confirm('<?php _e('Close this table and create consolidated invoice?', 'orders-jet'); ?>')) {
+            // Show payment method modal for table group
+            showPaymentMethodModal(null, 'table_group', tableNumber);
+        }
+    });
     
     // Close table action with payment method selection
     $('.oj-close-table').on('click', function() {
@@ -740,7 +1200,16 @@ jQuery(document).ready(function($) {
     }
     
     function completeOrderWithPayment(orderId, paymentMethod, orderType, tableNumber = null) {
-        const actionName = orderType === 'table' ? 'oj_close_table' : 'oj_complete_individual_order';
+        let actionName;
+        
+        // Determine the correct action based on order type
+        if (orderType === 'table_group') {
+            actionName = 'oj_close_table_group';
+        } else if (orderType === 'table') {
+            actionName = 'oj_close_table';
+        } else {
+            actionName = 'oj_complete_individual_order';
+        }
         
         let requestData = {
             action: actionName,
@@ -748,7 +1217,7 @@ jQuery(document).ready(function($) {
         };
         
         // Add appropriate ID parameter and nonce
-        if (orderType === 'table') {
+        if (orderType === 'table_group' || orderType === 'table') {
             requestData.table_number = tableNumber;
             requestData.nonce = '<?php echo wp_create_nonce('oj_table_order'); ?>';
         } else {
@@ -763,10 +1232,17 @@ jQuery(document).ready(function($) {
             success: function(response) {
                 if (response.success) {
                     // Show success message and invoice option
-                    if (orderType === 'table') {
+                    if (orderType === 'table_group' || orderType === 'table') {
                         showTableInvoiceModal(tableNumber, response.data);
                     } else {
                         showInvoiceModal(orderId, response.data);
+                    }
+                    
+                    // Reload page after successful table group closure
+                    if (orderType === 'table_group') {
+                        setTimeout(function() {
+                            location.reload();
+                        }, 2000);
                     }
                 } else {
                     alert(response.data.message || '<?php _e('Error completing order', 'orders-jet'); ?>');

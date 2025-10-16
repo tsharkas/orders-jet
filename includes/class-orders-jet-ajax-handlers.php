@@ -30,6 +30,7 @@ class Orders_Jet_AJAX_Handlers {
         add_action('wp_ajax_oj_generate_table_pdf', array($this, 'generate_table_pdf'));
         add_action('wp_ajax_oj_bulk_action', array($this, 'bulk_action'));
         add_action('wp_ajax_oj_search_order_invoice', array($this, 'search_order_invoice'));
+        add_action('wp_ajax_oj_close_table_group', array($this, 'close_table_group'));
         
         // AJAX handlers for non-logged in users (guests)
         add_action('wp_ajax_nopriv_oj_submit_table_order', array($this, 'submit_table_order'));
@@ -3090,6 +3091,185 @@ class Orders_Jet_AJAX_Handlers {
             'grand_total' => $grand_total,
             'order_ids' => $order_ids
         );
+    }
+    
+    /**
+     * Close table group and create consolidated order (NEW APPROACH)
+     */
+    public function close_table_group() {
+        check_ajax_referer('oj_table_order', 'nonce');
+        
+        $table_number = sanitize_text_field($_POST['table_number']);
+        $payment_method = sanitize_text_field($_POST['payment_method']);
+        
+        if (empty($table_number)) {
+            wp_send_json_error(array('message' => __('Table number is required', 'orders-jet')));
+        }
+        
+        error_log('Orders Jet: ========== TABLE GROUP CLOSURE START ==========');
+        error_log('Orders Jet: Closing table group: ' . $table_number . ' with payment method: ' . $payment_method);
+        
+        try {
+            // 1. Get all table orders for this table
+            $table_orders = wc_get_orders(array(
+                'status' => array('processing', 'pending'),
+                'meta_key' => '_oj_table_number',
+                'meta_value' => $table_number,
+                'limit' => -1,
+                'orderby' => 'date',
+                'order' => 'ASC'
+            ));
+            
+            if (empty($table_orders)) {
+                wp_send_json_error(array('message' => __('No active orders found for this table', 'orders-jet')));
+            }
+            
+            error_log('Orders Jet: Found ' . count($table_orders) . ' orders for table ' . $table_number);
+            
+            // 2. Check if all orders are ready (pending status)
+            $all_ready = true;
+            $not_ready_orders = array();
+            
+            foreach ($table_orders as $order) {
+                if ($order->get_status() !== 'pending') {
+                    $all_ready = false;
+                    $not_ready_orders[] = '#' . $order->get_id();
+                }
+            }
+            
+            if (!$all_ready) {
+                wp_send_json_error(array(
+                    'message' => sprintf(__('All orders must be ready before closing table. Orders not ready: %s', 'orders-jet'), 
+                        implode(', ', $not_ready_orders)),
+                    'action_required' => 'make_all_ready'
+                ));
+            }
+            
+            error_log('Orders Jet: All orders are ready, proceeding with consolidation');
+            
+            // 3. Create consolidated order
+            $consolidated_order = wc_create_order();
+            
+            if (is_wp_error($consolidated_order)) {
+                error_log('Orders Jet: Failed to create consolidated order: ' . $consolidated_order->get_error_message());
+                wp_send_json_error(array('message' => __('Failed to create consolidated order', 'orders-jet')));
+            }
+            
+            // 4. Extract and add all items from child orders
+            $total_items = 0;
+            $child_order_ids = array();
+            
+            foreach ($table_orders as $child_order) {
+                $child_order_ids[] = $child_order->get_id();
+                
+                foreach ($child_order->get_items() as $item) {
+                    $product = $item->get_product();
+                    if ($product) {
+                        $consolidated_order->add_product(
+                            $product,
+                            $item->get_quantity(),
+                            array(
+                                'totals' => array(
+                                    'subtotal' => $item->get_subtotal(),
+                                    'total' => $item->get_total(),
+                                )
+                            )
+                        );
+                        $total_items += $item->get_quantity();
+                    }
+                }
+            }
+            
+            error_log('Orders Jet: Added ' . $total_items . ' items to consolidated order');
+            
+            // 5. Set consolidated order properties
+            $consolidated_order->set_billing_first_name('Table ' . $table_number);
+            $consolidated_order->set_billing_last_name('Combined Invoice');
+            $consolidated_order->set_billing_phone('N/A');
+            $consolidated_order->set_billing_email('table' . $table_number . '@restaurant.local');
+            
+            // Set consolidated order meta
+            $consolidated_order->update_meta_data('_oj_table_number', $table_number);
+            $consolidated_order->update_meta_data('_oj_consolidated_order', 'yes');
+            $consolidated_order->update_meta_data('_oj_child_order_ids', $child_order_ids);
+            $consolidated_order->update_meta_data('_oj_payment_method', $payment_method);
+            $consolidated_order->update_meta_data('_oj_order_method', 'dinein');
+            $consolidated_order->update_meta_data('_oj_table_closed', current_time('mysql'));
+            
+            // 6. Calculate totals (this will calculate taxes using WooCommerce native system)
+            $consolidated_order->calculate_totals();
+            
+            // 7. Complete consolidated order
+            $consolidated_order->set_status('completed');
+            
+            // Add completion note
+            $consolidated_order->add_order_note(sprintf(
+                __('Table %s closed - Consolidated order from %d child orders - Payment: %s (Subtotal: %s, Tax: %s, Total: %s)', 'orders-jet'),
+                $table_number,
+                count($child_order_ids),
+                $payment_method,
+                wc_price($consolidated_order->get_subtotal()),
+                wc_price($consolidated_order->get_total_tax()),
+                wc_price($consolidated_order->get_total())
+            ));
+            
+            $consolidated_order->save();
+            
+            error_log('Orders Jet: Consolidated order #' . $consolidated_order->get_id() . ' created and completed');
+            error_log('Orders Jet: Consolidated order totals - Subtotal: ' . $consolidated_order->get_subtotal() . ', Tax: ' . $consolidated_order->get_total_tax() . ', Total: ' . $consolidated_order->get_total());
+            
+            // 8. Delete child orders
+            foreach ($table_orders as $child_order) {
+                error_log('Orders Jet: Deleting child order #' . $child_order->get_id());
+                wp_delete_post($child_order->get_id(), true);
+            }
+            
+            // 9. Update table status to available
+            $table_id = oj_get_table_id_by_number($table_number);
+            if ($table_id) {
+                update_post_meta($table_id, '_oj_table_status', 'available');
+                error_log('Orders Jet: Table ' . $table_number . ' (ID: ' . $table_id . ') status updated to available');
+            }
+            
+            // 10. Log table closure
+            update_option('oj_table_closed_' . $table_number . '_' . time(), array(
+                'table_number' => $table_number,
+                'consolidated_order_id' => $consolidated_order->get_id(),
+                'child_order_ids' => $child_order_ids,
+                'closed_at' => current_time('mysql'),
+                'payment_method' => $payment_method,
+                'total_amount' => $consolidated_order->get_total()
+            ));
+            
+            // Generate invoice URL
+            $invoice_url = add_query_arg(array(
+                'order_id' => $consolidated_order->get_id(),
+                'table' => $table_number,
+                'payment_method' => $payment_method
+            ), admin_url('admin.php?page=manager-invoice'));
+            
+            error_log('Orders Jet: ========== TABLE GROUP CLOSURE COMPLETE ==========');
+            
+            wp_send_json_success(array(
+                'message' => __('Table closed successfully', 'orders-jet'),
+                'consolidated_order_id' => $consolidated_order->get_id(),
+                'subtotal' => $consolidated_order->get_subtotal(),
+                'total_tax' => $consolidated_order->get_total_tax(),
+                'grand_total' => $consolidated_order->get_total(),
+                'payment_method' => $payment_method,
+                'invoice_url' => $invoice_url,
+                'child_order_ids' => $child_order_ids,
+                'tax_method' => 'consolidated_woocommerce'
+            ));
+            
+        } catch (Exception $e) {
+            error_log('Orders Jet: Table group closure error: ' . $e->getMessage());
+            error_log('Orders Jet: Stack trace: ' . $e->getTraceAsString());
+            
+            wp_send_json_error(array(
+                'message' => __('Table closure failed: ' . $e->getMessage(), 'orders-jet')
+            ));
+        }
     }
     
 }
