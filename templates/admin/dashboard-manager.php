@@ -419,12 +419,6 @@ $pickup_orders_all = array_merge($pickup_orders,
                                     <td><?php echo $child_order['date']; ?></td>
                                     
                                     <td>
-                                        <button class="button-link oj-view-order" 
-                                                data-order-id="<?php echo $child_order['id']; ?>"
-                                                title="<?php _e('View Order Details', 'orders-jet'); ?>">
-                                            👁️ <?php _e('View', 'orders-jet'); ?>
-                                        </button>
-                                        
                                         <?php if ($child_order['status'] === 'processing') : ?>
                                             <button class="button oj-mark-ready" 
                                                     data-order-id="<?php echo $child_order['id']; ?>">
@@ -433,6 +427,13 @@ $pickup_orders_all = array_merge($pickup_orders,
                                         <?php elseif ($child_order['status'] === 'pending') : ?>
                                             <span class="oj-status-note ready">✅ <?php _e('Ready', 'orders-jet'); ?></span>
                                         <?php endif; ?>
+                                    </td>
+                                    <td class="oj-view-action">
+                                        <button class="button-link oj-view-order" 
+                                                data-order-id="<?php echo $child_order['id']; ?>"
+                                                title="<?php _e('View Order Details', 'orders-jet'); ?>">
+                                            👁️
+                                        </button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -469,14 +470,6 @@ $pickup_orders_all = array_merge($pickup_orders,
                                 <td><?php echo $item['date']; ?></td>
                                 
                                 <td>
-                                    <?php if (in_array($item['status'], ['processing', 'pending'])) : ?>
-                                        <button class="button-link oj-view-order" 
-                                                data-order-id="<?php echo $item['id']; ?>"
-                                                title="<?php _e('View Order Details', 'orders-jet'); ?>">
-                                            👁️ <?php _e('View', 'orders-jet'); ?>
-                                        </button>
-                                    <?php endif; ?>
-                                    
                                     <?php if ($item['status'] === 'processing') : ?>
                                         <button class="button oj-mark-ready" 
                                                 data-order-id="<?php echo $item['id']; ?>">
@@ -492,6 +485,15 @@ $pickup_orders_all = array_merge($pickup_orders,
                                                 data-order-id="<?php echo $item['id']; ?>" 
                                                 data-type="pickup">
                                             📄 <?php _e('Invoice', 'orders-jet'); ?>
+                                        </button>
+                                    <?php endif; ?>
+                                </td>
+                                <td class="oj-view-action">
+                                    <?php if (in_array($item['status'], ['processing', 'pending'])) : ?>
+                                        <button class="button-link oj-view-order" 
+                                                data-order-id="<?php echo $item['id']; ?>"
+                                                title="<?php _e('View Order Details', 'orders-jet'); ?>">
+                                            👁️
                                         </button>
                                     <?php endif; ?>
                                 </td>
@@ -829,20 +831,29 @@ $pickup_orders_all = array_merge($pickup_orders,
 }
 
 /* View Order Button */
+.oj-view-action {
+    text-align: center;
+    vertical-align: middle;
+    width: 60px;
+    padding: 8px 12px;
+}
+
 .oj-view-order {
     color: #2271b1;
     text-decoration: none;
-    font-size: 12px;
-    margin-right: 8px;
-    padding: 4px 8px;
-    border-radius: 3px;
+    font-size: 18px;
+    padding: 8px 12px;
+    border-radius: 4px;
     transition: all 0.2s;
+    display: inline-block;
+    line-height: 1;
 }
 
 .oj-view-order:hover {
     background: #f0f6fc;
     color: #135e96;
     text-decoration: none;
+    transform: scale(1.1);
 }
 
 /* Bulk Actions Styles */
