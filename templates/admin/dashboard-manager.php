@@ -325,8 +325,8 @@ $pickup_orders_all = array_merge($pickup_orders,
                     <?php foreach ($all_orders as $item) : ?>
                         
                         <?php if ($item['type'] === 'table_group') : ?>
-                            <!-- TABLE GROUP ROW (Collapsed by default) - Formatted to match table headers -->
-                            <tr class="oj-table-group-row collapsed" 
+                            <!-- TABLE GROUP ROW (Expanded by default) - Formatted to match table headers -->
+                            <tr class="oj-table-group-row expanded" 
                                 data-table="<?php echo esc_attr($item['table_number']); ?>"
                                 data-type="table_group">
                                 
@@ -387,13 +387,13 @@ $pickup_orders_all = array_merge($pickup_orders,
                                 </td>
                             </tr>
                             
-                            <!-- CHILD ORDERS (Hidden by default) -->
+                            <!-- CHILD ORDERS (Visible by default) -->
                             <?php foreach ($item['orders'] as $child_order) : ?>
                                 <tr class="oj-child-order-row" 
                                     data-table="<?php echo esc_attr($item['table_number']); ?>"
                                     data-order-id="<?php echo esc_attr($child_order['id']); ?>"
                                     data-status="<?php echo esc_attr($child_order['status']); ?>"
-                                    style="display: none;">
+                                    style="display: table-row;">
                                     
                                     <td></td>
                                     
