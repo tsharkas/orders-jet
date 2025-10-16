@@ -382,7 +382,7 @@ $pickup_orders_all = array_merge($pickup_orders,
                                     <?php endif; ?>
                                     
                                     <button class="oj-expand-table" data-table="<?php echo esc_attr($item['table_number']); ?>">
-                                        <span class="dashicons dashicons-arrow-down-alt2"></span>
+                                        <span class="oj-expand-arrow">▼</span>
                                     </button>
                                 </td>
                             </tr>
@@ -732,9 +732,12 @@ $pickup_orders_all = array_merge($pickup_orders,
     transition: all 0.2s;
     order: 2; /* Place expand button after close table button */
     flex-shrink: 0; /* Prevent button from shrinking */
-    display: flex;
+    display: flex !important;
     align-items: center;
     justify-content: center;
+    visibility: visible !important;
+    opacity: 1 !important;
+    margin-left: 8px;
 }
 
 .oj-expand-table:hover {
@@ -742,15 +745,17 @@ $pickup_orders_all = array_merge($pickup_orders,
     border-color: #999;
 }
 
-.oj-expand-table .dashicons {
-    font-size: 18px;
-    width: 18px;
-    height: 18px;
-    color: #646970;
-    display: block;
+.oj-expand-arrow {
+    font-size: 14px;
+    color: #646970 !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    transition: transform 0.2s;
+    line-height: 1;
 }
 
-.oj-table-group-row.expanded .oj-expand-table .dashicons {
+.oj-table-group-row.expanded .oj-expand-arrow {
     transform: rotate(180deg);
 }
 
