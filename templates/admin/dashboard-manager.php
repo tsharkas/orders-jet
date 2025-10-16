@@ -727,14 +727,15 @@ $pickup_orders_all = array_merge($pickup_orders,
     background: #f6f7f7;
     border: 1px solid #ddd;
     cursor: pointer;
-    padding: 8px 10px;
+    padding: 6px 8px;
     border-radius: 4px;
     transition: all 0.2s;
     order: 2; /* Place expand button after close table button */
     flex-shrink: 0; /* Prevent button from shrinking */
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
+    margin-left: 8px;
 }
 
 .oj-expand-table:hover {
@@ -743,11 +744,12 @@ $pickup_orders_all = array_merge($pickup_orders,
 }
 
 .oj-expand-table .dashicons {
-    font-size: 18px;
-    width: 18px;
-    height: 18px;
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
     color: #646970;
     display: block;
+    line-height: 1;
 }
 
 .oj-table-group-row.expanded .oj-expand-table .dashicons {
