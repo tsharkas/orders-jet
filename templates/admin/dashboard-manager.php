@@ -715,11 +715,7 @@ $pickup_orders_all = array_merge($pickup_orders,
 }
 
 .oj-table-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    justify-content: flex-end;
-    min-width: 200px;
+    text-align: right;
     white-space: nowrap;
 }
 
@@ -730,12 +726,8 @@ $pickup_orders_all = array_merge($pickup_orders,
     padding: 6px 8px;
     border-radius: 4px;
     transition: all 0.2s;
-    order: 2; /* Place expand button after close table button */
-    flex-shrink: 0; /* Prevent button from shrinking */
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
     margin-left: 8px;
+    vertical-align: middle;
 }
 
 .oj-expand-table:hover {
@@ -757,12 +749,11 @@ $pickup_orders_all = array_merge($pickup_orders,
 }
 
 .oj-close-table-group {
-    order: 1; /* Place close table button first */
-    flex-shrink: 0; /* Prevent button from shrinking */
     font-size: 12px;
     padding: 6px 12px;
     height: auto;
     line-height: 1.4;
+    vertical-align: middle;
 }
 
 /* Child Order Styles */
