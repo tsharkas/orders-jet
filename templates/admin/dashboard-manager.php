@@ -318,6 +318,7 @@ $pickup_orders_all = array_merge($pickup_orders,
                     <th><?php _e('Total', 'orders-jet'); ?></th>
                     <th><?php _e('Time', 'orders-jet'); ?></th>
                     <th><?php _e('Actions', 'orders-jet'); ?></th>
+                    <th class="oj-view-header"><?php _e('View', 'orders-jet'); ?></th>
                 </tr>
             </thead>
             <tbody>
@@ -384,6 +385,9 @@ $pickup_orders_all = array_merge($pickup_orders,
                                     <button class="oj-expand-table" data-table="<?php echo esc_attr($item['table_number']); ?>">
                                         <span class="dashicons dashicons-arrow-down-alt2"></span>
                                     </button>
+                                </td>
+                                <td class="oj-view-action">
+                                    <!-- Empty for table group rows -->
                                 </td>
                             </tr>
                             
@@ -831,6 +835,13 @@ $pickup_orders_all = array_merge($pickup_orders,
 }
 
 /* View Order Button */
+.oj-view-header {
+    text-align: center;
+    width: 60px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
 .oj-view-action {
     text-align: center;
     vertical-align: middle;
