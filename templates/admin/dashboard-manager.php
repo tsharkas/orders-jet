@@ -419,6 +419,12 @@ $pickup_orders_all = array_merge($pickup_orders,
                                     <td><?php echo $child_order['date']; ?></td>
                                     
                                     <td>
+                                        <button class="button-link oj-view-order" 
+                                                data-order-id="<?php echo $child_order['id']; ?>"
+                                                title="<?php _e('View Order Details', 'orders-jet'); ?>">
+                                            👁️ <?php _e('View', 'orders-jet'); ?>
+                                        </button>
+                                        
                                         <?php if ($child_order['status'] === 'processing') : ?>
                                             <button class="button oj-mark-ready" 
                                                     data-order-id="<?php echo $child_order['id']; ?>">
@@ -463,6 +469,14 @@ $pickup_orders_all = array_merge($pickup_orders,
                                 <td><?php echo $item['date']; ?></td>
                                 
                                 <td>
+                                    <?php if (in_array($item['status'], ['processing', 'pending'])) : ?>
+                                        <button class="button-link oj-view-order" 
+                                                data-order-id="<?php echo $item['id']; ?>"
+                                                title="<?php _e('View Order Details', 'orders-jet'); ?>">
+                                            👁️ <?php _e('View', 'orders-jet'); ?>
+                                        </button>
+                                    <?php endif; ?>
+                                    
                                     <?php if ($item['status'] === 'processing') : ?>
                                         <button class="button oj-mark-ready" 
                                                 data-order-id="<?php echo $item['id']; ?>">
@@ -814,6 +828,23 @@ $pickup_orders_all = array_merge($pickup_orders,
     background: #135e96;
 }
 
+/* View Order Button */
+.oj-view-order {
+    color: #2271b1;
+    text-decoration: none;
+    font-size: 12px;
+    margin-right: 8px;
+    padding: 4px 8px;
+    border-radius: 3px;
+    transition: all 0.2s;
+}
+
+.oj-view-order:hover {
+    background: #f0f6fc;
+    color: #135e96;
+    text-decoration: none;
+}
+
 /* Bulk Actions Styles */
 .oj-bulk-actions-bar {
     background: #f8f9fa;
@@ -942,6 +973,201 @@ $pickup_orders_all = array_merge($pickup_orders,
 
 .oj-invoice-actions .button {
     margin: 5px;
+}
+
+/* Order Details Modal Styles */
+.oj-order-details-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10001;
+}
+
+.oj-order-details-modal {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.oj-modal-header {
+    background: #f8f9fa;
+    padding: 20px;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 8px 8px 0 0;
+}
+
+.oj-modal-header h3 {
+    margin: 0;
+    color: #333;
+}
+
+.oj-modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s;
+}
+
+.oj-modal-close:hover {
+    background: #e9ecef;
+    color: #333;
+}
+
+.oj-modal-content {
+    padding: 20px;
+}
+
+.oj-loading {
+    text-align: center;
+    padding: 40px;
+}
+
+.oj-spinner {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #2271b1;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 15px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.oj-order-info {
+    margin-bottom: 25px;
+}
+
+.oj-order-meta {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 6px;
+    border-left: 4px solid #2271b1;
+}
+
+.oj-order-meta p {
+    margin: 5px 0;
+    color: #555;
+}
+
+.oj-order-items {
+    margin-bottom: 25px;
+}
+
+.oj-order-items h4 {
+    margin-bottom: 15px;
+    color: #333;
+    border-bottom: 2px solid #2271b1;
+    padding-bottom: 8px;
+}
+
+.oj-order-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 15px;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    background: #fafbfc;
+}
+
+.oj-item-info {
+    flex: 1;
+}
+
+.oj-item-info h4 {
+    margin: 0 0 8px 0;
+    color: #333;
+    font-size: 16px;
+    border: none;
+    padding: 0;
+}
+
+.oj-item-details {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: #666;
+}
+
+.oj-quantity {
+    font-weight: 600;
+    color: #2271b1;
+}
+
+.oj-item-notes,
+.oj-item-addons {
+    font-size: 13px;
+    color: #666;
+    margin-top: 5px;
+    padding: 8px;
+    background: #fff;
+    border-radius: 4px;
+    border-left: 3px solid #ffc107;
+}
+
+.oj-item-addons {
+    border-left-color: #28a745;
+}
+
+.oj-item-total {
+    font-weight: 600;
+    color: #2271b1;
+    font-size: 16px;
+    margin-left: 15px;
+}
+
+.oj-order-totals {
+    border-top: 2px solid #dee2e6;
+    padding-top: 15px;
+}
+
+.oj-total-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    font-size: 14px;
+}
+
+.oj-grand-total {
+    border-top: 1px solid #dee2e6;
+    margin-top: 10px;
+    padding-top: 15px;
+    font-size: 18px;
+    color: #2271b1;
+}
+
+.oj-error {
+    text-align: center;
+    padding: 40px;
+    color: #d63638;
 }
 </style>
 
@@ -1144,6 +1370,12 @@ jQuery(document).ready(function($) {
                 }
             });
         }
+    });
+    
+    // NEW: View Order Details functionality
+    $('.oj-view-order').on('click', function() {
+        const orderId = $(this).data('order-id');
+        showOrderDetailsModal(orderId);
     });
     
     // NEW: Close Table Group functionality
@@ -1844,6 +2076,159 @@ jQuery(document).ready(function($) {
         }
         
         window.open(invoiceUrl, '_blank');
+    }
+    
+    // Show Order Details Modal
+    function showOrderDetailsModal(orderId) {
+        // Show loading modal first
+        const loadingModal = $(`
+            <div class="oj-order-details-overlay">
+                <div class="oj-order-details-modal">
+                    <div class="oj-modal-header">
+                        <h3>Loading Order Details...</h3>
+                        <button class="oj-modal-close">&times;</button>
+                    </div>
+                    <div class="oj-modal-content">
+                        <div class="oj-loading">
+                            <div class="oj-spinner"></div>
+                            <p>Please wait...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `);
+        
+        $('body').append(loadingModal);
+        
+        // Close modal functionality
+        loadingModal.find('.oj-modal-close').on('click', function() {
+            loadingModal.remove();
+        });
+        
+        loadingModal.on('click', function(e) {
+            if (e.target === this) {
+                loadingModal.remove();
+            }
+        });
+        
+        // Fetch order details via AJAX
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'oj_get_order_details',
+                order_id: orderId,
+                nonce: '<?php echo wp_create_nonce('oj_order_details'); ?>'
+            },
+            success: function(response) {
+                if (response.success) {
+                    showOrderDetailsContent(loadingModal, response.data);
+                } else {
+                    showOrderDetailsError(loadingModal, response.data.message || 'Failed to load order details');
+                }
+            },
+            error: function() {
+                showOrderDetailsError(loadingModal, 'Network error. Please try again.');
+            }
+        });
+    }
+    
+    // Show Order Details Content
+    function showOrderDetailsContent(modal, orderData) {
+        const order = orderData.order;
+        const items = orderData.items;
+        
+        let itemsHtml = '';
+        let subtotal = 0;
+        
+        items.forEach(function(item) {
+            const itemTotal = parseFloat(item.total);
+            subtotal += itemTotal;
+            
+            itemsHtml += `
+                <div class="oj-order-item">
+                    <div class="oj-item-info">
+                        <h4>${item.name}</h4>
+                        <div class="oj-item-details">
+                            <span class="oj-quantity">Qty: ${item.quantity}</span>
+                            <span class="oj-price">${item.price} × ${item.quantity}</span>
+                        </div>
+                        ${item.notes ? `<div class="oj-item-notes"><strong>Notes:</strong> ${item.notes}</div>` : ''}
+                        ${item.addons ? `<div class="oj-item-addons"><strong>Add-ons:</strong> ${item.addons}</div>` : ''}
+                    </div>
+                    <div class="oj-item-total">${item.formatted_total}</div>
+                </div>
+            `;
+        });
+        
+        const modalContent = `
+            <div class="oj-modal-header">
+                <h3>Order #${order.id} Details</h3>
+                <button class="oj-modal-close">&times;</button>
+            </div>
+            <div class="oj-modal-content">
+                <div class="oj-order-info">
+                    <div class="oj-order-meta">
+                        <p><strong>Customer:</strong> ${order.customer}</p>
+                        <p><strong>Type:</strong> ${order.type}</p>
+                        <p><strong>Status:</strong> ${order.status}</p>
+                        <p><strong>Date:</strong> ${order.date}</p>
+                        ${order.table ? `<p><strong>Table:</strong> ${order.table}</p>` : ''}
+                    </div>
+                </div>
+                
+                <div class="oj-order-items">
+                    <h4>Order Items</h4>
+                    ${itemsHtml}
+                </div>
+                
+                <div class="oj-order-totals">
+                    <div class="oj-total-row">
+                        <span>Subtotal:</span>
+                        <span>${order.formatted_subtotal}</span>
+                    </div>
+                    ${order.tax > 0 ? `
+                    <div class="oj-total-row">
+                        <span>Tax:</span>
+                        <span>${order.formatted_tax}</span>
+                    </div>
+                    ` : ''}
+                    <div class="oj-total-row oj-grand-total">
+                        <span><strong>Total:</strong></span>
+                        <span><strong>${order.formatted_total}</strong></span>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        modal.find('.oj-order-details-modal').html(modalContent);
+        
+        // Re-attach close functionality
+        modal.find('.oj-modal-close').on('click', function() {
+            modal.remove();
+        });
+    }
+    
+    // Show Order Details Error
+    function showOrderDetailsError(modal, message) {
+        const errorContent = `
+            <div class="oj-modal-header">
+                <h3>Error</h3>
+                <button class="oj-modal-close">&times;</button>
+            </div>
+            <div class="oj-modal-content">
+                <div class="oj-error">
+                    <p>${message}</p>
+                </div>
+            </div>
+        `;
+        
+        modal.find('.oj-order-details-modal').html(errorContent);
+        
+        // Re-attach close functionality
+        modal.find('.oj-modal-close').on('click', function() {
+            modal.remove();
+        });
     }
     
 });

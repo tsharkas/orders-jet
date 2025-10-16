@@ -31,6 +31,7 @@ class Orders_Jet_AJAX_Handlers {
         add_action('wp_ajax_oj_bulk_action', array($this, 'bulk_action'));
         add_action('wp_ajax_oj_search_order_invoice', array($this, 'search_order_invoice'));
         add_action('wp_ajax_oj_close_table_group', array($this, 'close_table_group'));
+        add_action('wp_ajax_oj_get_order_details', array($this, 'get_order_details'));
         
         // AJAX handlers for non-logged in users (guests)
         add_action('wp_ajax_nopriv_oj_submit_table_order', array($this, 'submit_table_order'));
@@ -3415,6 +3416,88 @@ class Orders_Jet_AJAX_Handlers {
         }
         
         return false;
+    }
+    
+    /**
+     * Get order details for modal display
+     */
+    public function get_order_details() {
+        check_ajax_referer('oj_order_details', 'nonce');
+        
+        $order_id = intval($_POST['order_id']);
+        
+        if (empty($order_id)) {
+            wp_send_json_error(array('message' => __('Order ID is required', 'orders-jet')));
+        }
+        
+        $order = wc_get_order($order_id);
+        
+        if (!$order) {
+            wp_send_json_error(array('message' => __('Order not found', 'orders-jet')));
+        }
+        
+        try {
+            // Get order basic info
+            $table_number = $order->get_meta('_oj_table_number');
+            $order_type = !empty($table_number) ? 'Table ' . $table_number : 'Pickup';
+            
+            $order_data = array(
+                'id' => $order->get_id(),
+                'customer' => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
+                'type' => $order_type,
+                'status' => ucfirst($order->get_status()),
+                'date' => $order->get_date_created()->format('Y-m-d H:i'),
+                'table' => $table_number,
+                'subtotal' => $order->get_subtotal(),
+                'tax' => $order->get_total_tax(),
+                'total' => $order->get_total(),
+                'formatted_subtotal' => wc_price($order->get_subtotal()),
+                'formatted_tax' => wc_price($order->get_total_tax()),
+                'formatted_total' => wc_price($order->get_total())
+            );
+            
+            // Get order items
+            $items = array();
+            foreach ($order->get_items() as $item_id => $item) {
+                $product = $item->get_product();
+                if (!$product) continue;
+                
+                // Get item notes
+                $notes = $item->get_meta('_oj_item_notes');
+                
+                // Get add-ons
+                $addons_data = $item->get_meta('_oj_addons_data');
+                $addons_text = '';
+                if (!empty($addons_data) && is_array($addons_data)) {
+                    $addon_names = array();
+                    foreach ($addons_data as $addon) {
+                        if (isset($addon['name']) && isset($addon['price'])) {
+                            $addon_names[] = $addon['name'] . ' (+' . wc_price($addon['price']) . ')';
+                        }
+                    }
+                    $addons_text = implode(', ', $addon_names);
+                }
+                
+                $items[] = array(
+                    'name' => $item->get_name(),
+                    'quantity' => $item->get_quantity(),
+                    'price' => wc_price($product->get_price()),
+                    'total' => $item->get_total(),
+                    'formatted_total' => wc_price($item->get_total()),
+                    'notes' => $notes,
+                    'addons' => $addons_text
+                );
+            }
+            
+            wp_send_json_success(array(
+                'order' => $order_data,
+                'items' => $items
+            ));
+            
+        } catch (Exception $e) {
+            error_log('Orders Jet: Error getting order details: ' . $e->getMessage());
+            wp_send_json_error(array('message' => __('Failed to load order details', 'orders-jet')));
+        }
     }
     
 }
