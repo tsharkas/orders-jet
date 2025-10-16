@@ -325,44 +325,50 @@ $pickup_orders_all = array_merge($pickup_orders,
                     <?php foreach ($all_orders as $item) : ?>
                         
                         <?php if ($item['type'] === 'table_group') : ?>
-                            <!-- TABLE GROUP ROW (Collapsed by default) -->
+                            <!-- TABLE GROUP ROW (Collapsed by default) - Formatted to match table headers -->
                             <tr class="oj-table-group-row collapsed" 
                                 data-table="<?php echo esc_attr($item['table_number']); ?>"
                                 data-type="table_group">
                                 
+                                <!-- Checkbox Column -->
                                 <td class="check-column">
                                     <input type="checkbox" class="oj-table-checkbox" 
                                            value="<?php echo esc_attr($item['table_number']); ?>" />
                                 </td>
                                 
+                                <!-- Order # Column: Table Number -->
                                 <td><strong><?php echo esc_html($item['table_number']); ?></strong></td>
                                 
-                                <td colspan="3" class="oj-table-summary">
-                                    <div class="oj-table-info">
-                                        <span class="oj-order-count"><?php echo $item['order_count']; ?> <?php _e('Orders', 'orders-jet'); ?></span>
-                                        <span class="oj-separator">|</span>
-                                        <span class="oj-total-amount"><?php echo wc_price($item['total_amount']); ?></span>
-                                        <span class="oj-separator">|</span>
-                                        <span class="oj-opened-time"><?php _e('Opened', 'orders-jet'); ?> <?php echo esc_html($item['earliest_time']); ?></span>
-                                        
-                                        <?php if ($item['has_cooking']) : ?>
-                                            <span class="oj-status-indicator cooking">🍳</span>
-                                        <?php endif; ?>
-                                        
-                                        <?php if ($item['has_ready']) : ?>
-                                            <span class="oj-status-indicator ready">✅</span>
-                                        <?php endif; ?>
-                                    </div>
+                                <!-- Customer Column: Table Guest -->
+                                <td><?php _e('Table Guest', 'orders-jet'); ?></td>
+                                
+                                <!-- Type Column: Dine In -->
+                                <td>🍽️ <?php _e('Dine In', 'orders-jet'); ?></td>
+                                
+                                <!-- Status Column: Opened with indicators -->
+                                <td>
+                                    <span class="oj-table-status"><?php _e('Opened', 'orders-jet'); ?></span>
+                                    <?php if ($item['has_cooking']) : ?>
+                                        <span class="oj-status-indicator cooking">🍳</span>
+                                    <?php endif; ?>
+                                    <?php if ($item['has_ready']) : ?>
+                                        <span class="oj-status-indicator ready">✅</span>
+                                    <?php endif; ?>
                                 </td>
                                 
-                                <td></td>
-                                <td></td>
+                                <!-- Total Column: Order count highlighted + Total amount -->
+                                <td class="oj-table-total">
+                                    <span class="oj-order-count-highlight"><?php echo $item['order_count']; ?></span>
+                                    <span class="oj-orders-text"><?php _e('Orders', 'orders-jet'); ?></span>
+                                    <span class="oj-separator">|</span>
+                                    <span class="oj-total-amount"><?php echo number_format($item['total_amount'], 2); ?></span>
+                                </td>
                                 
+                                <!-- Time Column: Opened time -->
+                                <td><?php echo esc_html($item['earliest_time']); ?></td>
+                                
+                                <!-- Actions Column: Close Table + Collapse icon -->
                                 <td class="oj-table-actions">
-                                    <button class="oj-expand-table" data-table="<?php echo esc_attr($item['table_number']); ?>">
-                                        <span class="dashicons dashicons-arrow-down-alt2"></span>
-                                    </button>
-                                    
                                     <?php if ($item['all_ready']) : ?>
                                         <button class="button button-primary oj-close-table-group" 
                                                 data-table="<?php echo esc_attr($item['table_number']); ?>">
@@ -375,6 +381,10 @@ $pickup_orders_all = array_merge($pickup_orders,
                                             <?php _e('Close Table', 'orders-jet'); ?>
                                         </button>
                                     <?php endif; ?>
+                                    
+                                    <button class="oj-expand-table" data-table="<?php echo esc_attr($item['table_number']); ?>">
+                                        <span class="dashicons dashicons-arrow-down-alt2"></span>
+                                    </button>
                                 </td>
                             </tr>
                             
@@ -653,29 +663,40 @@ $pickup_orders_all = array_merge($pickup_orders,
     background: #f0f6ff;
 }
 
-.oj-table-summary {
-    padding: 8px 12px;
+/* Table Status Styling */
+.oj-table-status {
+    color: #646970;
+    font-weight: 500;
 }
 
-.oj-table-info {
+/* Table Total Column Styling */
+.oj-table-total {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 6px;
     font-size: 14px;
 }
 
-.oj-order-count {
+.oj-order-count-highlight {
+    background: #2271b1;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
     font-weight: 600;
-    color: #2271b1;
+    font-size: 13px;
+    min-width: 20px;
+    text-align: center;
+}
+
+.oj-orders-text {
+    color: #646970;
+    font-size: 13px;
 }
 
 .oj-total-amount {
     font-weight: 600;
     color: #135e96;
-}
-
-.oj-opened-time {
-    color: #646970;
+    font-size: 14px;
 }
 
 .oj-separator {
@@ -702,29 +723,38 @@ $pickup_orders_all = array_merge($pickup_orders,
     display: flex;
     align-items: center;
     gap: 8px;
+    justify-content: flex-end;
+    min-width: 180px;
 }
 
 .oj-expand-table {
-    background: none;
-    border: none;
+    background: #f6f7f7;
+    border: 1px solid #ddd;
     cursor: pointer;
-    padding: 4px;
-    border-radius: 3px;
-    transition: background 0.2s;
+    padding: 6px 8px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    order: 2; /* Place expand button after close table button */
 }
 
 .oj-expand-table:hover {
-    background: #f0f0f1;
+    background: #e8e9ea;
+    border-color: #999;
 }
 
 .oj-expand-table .dashicons {
     font-size: 16px;
     width: 16px;
     height: 16px;
+    color: #646970;
 }
 
 .oj-table-group-row.expanded .oj-expand-table .dashicons {
     transform: rotate(180deg);
+}
+
+.oj-close-table-group {
+    order: 1; /* Place close table button first */
 }
 
 /* Child Order Styles */
