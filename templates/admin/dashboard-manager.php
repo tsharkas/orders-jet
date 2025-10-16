@@ -381,8 +381,8 @@ $pickup_orders_all = array_merge($pickup_orders,
                                         </button>
                                     <?php endif; ?>
                                     
-                                    <button class="oj-expand-table" data-table="<?php echo esc_attr($item['table_number']); ?>" title="Expand/Collapse Table Orders">
-                                        <span class="oj-expand-arrow">⬇</span>
+                                    <button class="oj-expand-table" data-table="<?php echo esc_attr($item['table_number']); ?>">
+                                        <span class="dashicons dashicons-arrow-down-alt2"></span>
                                     </button>
                                 </td>
                             </tr>
@@ -723,54 +723,35 @@ $pickup_orders_all = array_merge($pickup_orders,
     white-space: nowrap;
 }
 
-.oj-orders-table .oj-expand-table {
-    background: #f6f7f7 !important;
-    border: 1px solid #ddd !important;
-    cursor: pointer !important;
-    padding: 8px 10px !important;
-    border-radius: 4px !important;
-    transition: all 0.2s !important;
-    order: 2 !important; /* Place expand button after close table button */
-    flex-shrink: 0 !important; /* Prevent button from shrinking */
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    margin-left: 8px !important;
-    width: auto !important;
-    height: auto !important;
-    min-width: 32px !important;
-    min-height: 32px !important;
-    position: relative !important;
-    z-index: 1 !important;
+.oj-expand-table {
+    background: #f6f7f7;
+    border: 1px solid #ddd;
+    cursor: pointer;
+    padding: 8px 10px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    order: 2; /* Place expand button after close table button */
+    flex-shrink: 0; /* Prevent button from shrinking */
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.oj-orders-table .oj-expand-table:hover {
-    background: #e8e9ea !important;
-    border-color: #999 !important;
+.oj-expand-table:hover {
+    background: #e8e9ea;
+    border-color: #999;
 }
 
-.oj-orders-table .oj-expand-arrow {
-    font-size: 16px !important;
-    color: #2271b1 !important;
-    display: inline-block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    transition: transform 0.2s !important;
-    line-height: 1 !important;
-    font-family: Arial, sans-serif !important;
-    font-weight: bold !important;
-    text-align: center !important;
-    width: 16px !important;
-    height: 16px !important;
-    background: rgba(34, 113, 177, 0.1) !important;
-    border-radius: 2px !important;
+.oj-expand-table .dashicons {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    color: #646970;
+    display: block;
 }
 
-.oj-orders-table .oj-table-group-row.expanded .oj-expand-arrow {
-    transform: rotate(180deg) !important;
-    color: #135e96 !important;
+.oj-table-group-row.expanded .oj-expand-table .dashicons {
+    transform: rotate(180deg);
 }
 
 .oj-close-table-group {
