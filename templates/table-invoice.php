@@ -2,6 +2,7 @@
 /**
  * Orders Jet - Table Invoice Template
  * Displays invoice for table orders after payment
+ * Supports both Parent-Child and Legacy systems
  */
 
 if (!defined('ABSPATH')) {
@@ -11,54 +12,118 @@ if (!defined('ABSPATH')) {
 // Get table number and payment method from URL
 $table_number = sanitize_text_field($_GET['table'] ?? '');
 $payment_method = sanitize_text_field($_GET['payment_method'] ?? 'cash');
+$parent_order_id = intval($_GET['parent_order_id'] ?? 0);
 
 if (empty($table_number)) {
     wp_die(__('Table number is required', 'orders-jet'));
 }
 
-// Get all completed orders for this table
-$args = array(
-    'post_type' => 'shop_order',
-    'post_status' => array('wc-completed'),
-    'meta_query' => array(
-        array(
-            'key' => '_oj_table_number',
-            'value' => $table_number,
-            'compare' => '='
-        )
-    ),
-    'posts_per_page' => -1,
-    'orderby' => 'date',
-    'order' => 'DESC'
-);
+// Check if parent-child system is enabled and parent order ID is provided
+$parent_child_manager = new Orders_Jet_Parent_Child_Manager();
+$use_parent_child = $parent_child_manager->is_parent_child_enabled() && !empty($parent_order_id);
 
-$orders = get_posts($args);
-$total_amount = 0;
-$order_data = array();
-
-foreach ($orders as $order_post) {
-    $order = wc_get_order($order_post->ID);
-    if (!$order) continue;
+if ($use_parent_child) {
+    // PARENT-CHILD SYSTEM: Use parent order for invoice
+    $parent_order = wc_get_order($parent_order_id);
     
-    $order_items = array();
-    foreach ($order->get_items() as $item) {
-        $order_items[] = array(
-            'name' => $item->get_name(),
-            'quantity' => $item->get_quantity(),
-            'total' => $item->get_total()
-        );
+    if (!$parent_order || $parent_order->get_meta('_oj_table_number') != $table_number) {
+        wp_die(__('Invalid parent order for this table', 'orders-jet'));
     }
     
-    $order_data[] = array(
-        'order_id' => $order->get_id(),
-        'order_number' => $order->get_order_number(),
-        'total' => $order->get_total(),
-        'items' => $order_items,
-        'date' => $order->get_date_created()->format('Y-m-d H:i:s'),
-        'payment_method' => $order->get_meta('_oj_payment_method') ?: $payment_method
-    );
+    // Get child orders data from parent order meta
+    $child_orders_data = $parent_order->get_meta('_oj_child_orders') ?: array();
     
-    $total_amount += $order->get_total();
+    // Calculate totals from parent order (WooCommerce native)
+    $subtotal = $parent_order->get_subtotal();
+    $total_tax = $parent_order->get_total_tax();
+    $grand_total = $parent_order->get_total();
+    
+    // Get tax breakdown
+    $tax_totals = $parent_order->get_tax_totals();
+    $service_tax = 0;
+    $vat_tax = 0;
+    
+    foreach ($tax_totals as $tax_code => $tax) {
+        $tax_rate = floatval($tax->rate);
+        $tax_amount = floatval($tax->amount);
+        
+        if ($tax_rate == 12.0) {
+            $service_tax = $tax_amount;
+        } elseif ($tax_rate == 14.0) {
+            $vat_tax = $tax_amount;
+        }
+    }
+    
+    $invoice_system = 'parent_child';
+    $order_data = $child_orders_data; // Use child orders for display
+    
+} else {
+    // LEGACY SYSTEM: Get all completed orders for this table
+    $args = array(
+        'post_type' => 'shop_order',
+        'post_status' => array('wc-completed'),
+        'meta_query' => array(
+            array(
+                'key' => '_oj_table_number',
+                'value' => $table_number,
+                'compare' => '='
+            )
+        ),
+        'posts_per_page' => -1,
+        'orderby' => 'date',
+        'order' => 'DESC'
+    );
+
+    $orders = get_posts($args);
+    $total_amount = 0;
+    $order_data = array();
+
+    foreach ($orders as $order_post) {
+        $order = wc_get_order($order_post->ID);
+        if (!$order) continue;
+        
+        $order_items = array();
+        foreach ($order->get_items() as $item) {
+            $order_items[] = array(
+                'name' => $item->get_name(),
+                'quantity' => $item->get_quantity(),
+                'total' => $item->get_total()
+            );
+        }
+        
+        $order_data[] = array(
+            'order_id' => $order->get_id(),
+            'order_number' => $order->get_order_number(),
+            'total' => $order->get_total(),
+            'items' => $order_items,
+            'date' => $order->get_date_created()->format('Y-m-d H:i:s'),
+            'payment_method' => $order->get_meta('_oj_payment_method') ?: $payment_method
+        );
+        
+        $total_amount += $order->get_total();
+    }
+    
+    // Legacy system: Try to get stored tax data or calculate basic totals
+    $session_id = 'table_' . $table_number . '_' . date('Y-m-d');
+    $table_tax_data = get_option('oj_table_tax_' . $session_id);
+    
+    if ($table_tax_data && is_array($table_tax_data)) {
+        // Use stored tax data from legacy system
+        $subtotal = $table_tax_data['subtotal'] ?? $total_amount;
+        $service_tax = $table_tax_data['service_tax'] ?? 0;
+        $vat_tax = $table_tax_data['vat_tax'] ?? 0;
+        $total_tax = $table_tax_data['total_tax'] ?? 0;
+        $grand_total = $table_tax_data['grand_total'] ?? $total_amount;
+    } else {
+        // Fallback: Basic calculation without tax breakdown
+        $subtotal = $total_amount;
+        $service_tax = 0;
+        $vat_tax = 0;
+        $total_tax = 0;
+        $grand_total = $total_amount;
+    }
+    
+    $invoice_system = 'legacy';
 }
 
 // Get table information
@@ -183,6 +248,7 @@ $table_location = $table_id ? get_post_meta($table_id, '_oj_table_location', tru
         .item-row {
             display: flex;
             justify-content: space-between;
+            align-items: flex-start;
             padding: 8px 0;
             border-bottom: 1px solid #e9ecef;
         }
@@ -191,8 +257,35 @@ $table_location = $table_id ? get_post_meta($table_id, '_oj_table_location', tru
             border-bottom: none;
         }
         
-        .item-name {
+        .item-details {
             flex: 1;
+        }
+        
+        .item-name {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+        
+        .item-variations,
+        .item-addons,
+        .item-notes {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 1px;
+        }
+        
+        .item-variations {
+            font-style: italic;
+        }
+        
+        .item-addons {
+            color: #007cba;
+        }
+        
+        .item-notes {
+            color: #d63638;
         }
         
         .item-quantity {
@@ -218,17 +311,60 @@ $table_location = $table_id ? get_post_meta($table_id, '_oj_table_location', tru
             background: #c41e3a;
             color: white;
             padding: 25px 30px;
-            text-align: center;
         }
         
         .invoice-total h2 {
             font-size: 24px;
-            margin-bottom: 5px;
+            margin-bottom: 20px;
+            text-align: center;
         }
         
-        .invoice-total p {
-            opacity: 0.9;
+        .total-breakdown {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .total-row:last-child {
+            border-bottom: none;
+        }
+        
+        .total-row.subtotal {
             font-size: 16px;
+        }
+        
+        .total-row.tax {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .total-row.total-tax {
+            font-size: 16px;
+            font-weight: 600;
+            border-top: 1px solid rgba(255, 255, 255, 0.3);
+            margin-top: 5px;
+            padding-top: 12px;
+        }
+        
+        .total-row.grand-total {
+            font-size: 20px;
+            font-weight: bold;
+            border-top: 2px solid rgba(255, 255, 255, 0.5);
+            margin-top: 10px;
+            padding-top: 15px;
+        }
+        
+        .system-indicator {
+            text-align: center;
+            margin-top: 15px;
+            opacity: 0.7;
         }
         
         .payment-info {
@@ -376,31 +512,115 @@ $table_location = $table_id ? get_post_meta($table_id, '_oj_table_location', tru
                 <?php foreach ($order_data as $order): ?>
                     <div class="order-item">
                         <div class="order-header">
-                            <span class="order-number"><?php printf(__('Order #%s', 'orders-jet'), $order['order_number']); ?></span>
-                            <span class="order-date"><?php echo esc_html($order['date']); ?></span>
+                            <?php if ($invoice_system === 'parent_child'): ?>
+                                <span class="order-number"><?php printf(__('Order #%s', 'orders-jet'), $order['order_number'] ?? $order['child_order_id']); ?></span>
+                                <span class="order-date"><?php echo esc_html($order['order_time'] ?? $order['order_date']); ?></span>
+                                <?php if (!empty($order['customer_name'])): ?>
+                                    <span class="customer-name"><?php echo esc_html($order['customer_name']); ?></span>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                <span class="order-number"><?php printf(__('Order #%s', 'orders-jet'), $order['order_number']); ?></span>
+                                <span class="order-date"><?php echo esc_html($order['date']); ?></span>
+                            <?php endif; ?>
                         </div>
                         
                         <div class="order-items">
-                            <?php foreach ($order['items'] as $item): ?>
+                            <?php 
+                            $items = $order['items'];
+                            foreach ($items as $item): 
+                                if ($invoice_system === 'parent_child') {
+                                    // Parent-child system: items have different structure
+                                    $item_name = $item['name'];
+                                    $item_quantity = $item['quantity'];
+                                    $item_total = $item['total'];
+                                    $item_variations = $item['variations'] ?? '';
+                                    $item_addons = $item['addons'] ?? '';
+                                    $item_notes = $item['notes'] ?? '';
+                                } else {
+                                    // Legacy system: standard structure
+                                    $item_name = $item['name'];
+                                    $item_quantity = $item['quantity'];
+                                    $item_total = $item['total'];
+                                    $item_variations = '';
+                                    $item_addons = '';
+                                    $item_notes = '';
+                                }
+                            ?>
                                 <div class="item-row">
-                                    <span class="item-name"><?php echo esc_html($item['name']); ?></span>
-                                    <span class="item-quantity"><?php echo esc_html($item['quantity']); ?></span>
-                                    <span class="item-total"><?php echo wc_price($item['total']); ?></span>
+                                    <div class="item-details">
+                                        <span class="item-name"><?php echo esc_html($item_name); ?></span>
+                                        <?php if (!empty($item_variations)): ?>
+                                            <small class="item-variations"><?php echo esc_html($item_variations); ?></small>
+                                        <?php endif; ?>
+                                        <?php if (!empty($item_addons)): ?>
+                                            <small class="item-addons"><?php echo esc_html($item_addons); ?></small>
+                                        <?php endif; ?>
+                                        <?php if (!empty($item_notes)): ?>
+                                            <small class="item-notes"><?php _e('Note:', 'orders-jet'); ?> <?php echo esc_html($item_notes); ?></small>
+                                        <?php endif; ?>
+                                    </div>
+                                    <span class="item-quantity">×<?php echo esc_html($item_quantity); ?></span>
+                                    <span class="item-total"><?php echo wc_price($item_total); ?></span>
                                 </div>
                             <?php endforeach; ?>
                         </div>
                         
+                        <?php if ($invoice_system === 'legacy'): ?>
                         <div class="order-total">
                             <?php printf(__('Order Total: %s', 'orders-jet'), wc_price($order['total'])); ?>
                         </div>
+                        <?php else: ?>
+                        <div class="order-subtotal">
+                            <?php printf(__('Order Subtotal: %s', 'orders-jet'), wc_price($order['subtotal'])); ?>
+                        </div>
+                        <?php endif; ?>
                     </div>
                 <?php endforeach; ?>
             <?php endif; ?>
         </div>
         
         <div class="invoice-total">
-            <h2><?php _e('Total Amount', 'orders-jet'); ?></h2>
-            <p><?php echo wc_price($total_amount); ?></p>
+            <h2><?php _e('Invoice Summary', 'orders-jet'); ?></h2>
+            
+            <div class="total-breakdown">
+                <div class="total-row subtotal">
+                    <span><?php _e('Subtotal:', 'orders-jet'); ?></span>
+                    <span><?php echo wc_price($subtotal); ?></span>
+                </div>
+                
+                <?php if ($service_tax > 0): ?>
+                <div class="total-row tax">
+                    <span><?php _e('Service Tax (12%):', 'orders-jet'); ?></span>
+                    <span><?php echo wc_price($service_tax); ?></span>
+                </div>
+                <?php endif; ?>
+                
+                <?php if ($vat_tax > 0): ?>
+                <div class="total-row tax">
+                    <span><?php _e('VAT (14%):', 'orders-jet'); ?></span>
+                    <span><?php echo wc_price($vat_tax); ?></span>
+                </div>
+                <?php endif; ?>
+                
+                <?php if ($total_tax > 0): ?>
+                <div class="total-row total-tax">
+                    <span><?php _e('Total Tax:', 'orders-jet'); ?></span>
+                    <span><?php echo wc_price($total_tax); ?></span>
+                </div>
+                <?php endif; ?>
+                
+                <div class="total-row grand-total">
+                    <span><?php _e('Grand Total:', 'orders-jet'); ?></span>
+                    <span><?php echo wc_price($grand_total); ?></span>
+                </div>
+            </div>
+            
+            <!-- System indicator for debugging -->
+            <?php if (defined('WP_DEBUG') && WP_DEBUG): ?>
+            <div class="system-indicator">
+                <small><?php printf(__('System: %s', 'orders-jet'), $invoice_system); ?></small>
+            </div>
+            <?php endif; ?>
         </div>
         
         <div class="payment-info">
