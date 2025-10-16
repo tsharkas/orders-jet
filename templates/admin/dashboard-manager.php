@@ -359,7 +359,6 @@ $pickup_orders_all = array_merge($pickup_orders,
                                 <!-- Total Column: Order count highlighted + Total amount -->
                                 <td class="oj-table-total">
                                     <span class="oj-order-count-highlight"><?php echo $item['order_count']; ?></span>
-                                    <span class="oj-orders-text"><?php _e('Orders', 'orders-jet'); ?></span>
                                     <span class="oj-separator">|</span>
                                     <span class="oj-total-amount"><?php echo number_format($item['total_amount'], 2); ?></span>
                                 </td>
@@ -688,10 +687,6 @@ $pickup_orders_all = array_merge($pickup_orders,
     text-align: center;
 }
 
-.oj-orders-text {
-    color: #646970;
-    font-size: 13px;
-}
 
 .oj-total-amount {
     font-weight: 600;
@@ -724,17 +719,22 @@ $pickup_orders_all = array_merge($pickup_orders,
     align-items: center;
     gap: 8px;
     justify-content: flex-end;
-    min-width: 180px;
+    min-width: 200px;
+    white-space: nowrap;
 }
 
 .oj-expand-table {
     background: #f6f7f7;
     border: 1px solid #ddd;
     cursor: pointer;
-    padding: 6px 8px;
+    padding: 8px 10px;
     border-radius: 4px;
     transition: all 0.2s;
     order: 2; /* Place expand button after close table button */
+    flex-shrink: 0; /* Prevent button from shrinking */
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .oj-expand-table:hover {
@@ -743,10 +743,11 @@ $pickup_orders_all = array_merge($pickup_orders,
 }
 
 .oj-expand-table .dashicons {
-    font-size: 16px;
-    width: 16px;
-    height: 16px;
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
     color: #646970;
+    display: block;
 }
 
 .oj-table-group-row.expanded .oj-expand-table .dashicons {
@@ -755,6 +756,11 @@ $pickup_orders_all = array_merge($pickup_orders,
 
 .oj-close-table-group {
     order: 1; /* Place close table button first */
+    flex-shrink: 0; /* Prevent button from shrinking */
+    font-size: 12px;
+    padding: 6px 12px;
+    height: auto;
+    line-height: 1.4;
 }
 
 /* Child Order Styles */
