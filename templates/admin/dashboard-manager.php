@@ -13,8 +13,7 @@ if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manag
     wp_die(__('You do not have permission to access this page.', 'orders-jet'));
 }
 
-// Include the manager navigation
-include ORDERS_JET_PLUGIN_DIR . 'templates/admin/manager-navigation.php';
+// Manager navigation removed - using WordPress default
 
 // Get current date
 $today_formatted = date('F j, Y');
@@ -1352,23 +1351,18 @@ html, body {
 
 @media (max-width: 480px) {
     .oj-filters {
-        padding: 12px 15px !important;
-        gap: 10px !important;
-        margin: 15px 0 !important;
+        padding: 8px 12px !important;
+        gap: 8px !important;
+        margin-bottom: 20px !important;
         overflow-x: auto !important;
         -webkit-overflow-scrolling: touch !important;
         display: flex !important;
         white-space: nowrap !important;
-        background: white !important;
-        border: 1px solid #e1e5e9 !important;
-        border-radius: 8px !important;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+        background: #f8f9fa !important;
+        border-bottom: 1px solid #e1e5e9 !important;
         /* Enhanced scrolling indicators */
         scrollbar-width: thin !important;
         scrollbar-color: #007cba transparent !important;
-        /* Ensure it doesn't conflict with top navigation */
-        position: relative !important;
-        z-index: 1 !important;
     }
     
     /* Show scrollbar on mobile for better UX */
