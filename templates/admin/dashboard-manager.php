@@ -1436,6 +1436,14 @@ html, body {
         min-width: 800px; /* Ensure table doesn't get too cramped */
     }
     
+    /* Make table actions horizontal on mobile */
+    .oj-table-actions {
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        justify-content: flex-end !important;
+    }
+    
     /* Make collapse button more touch-friendly on mobile */
     .oj-expand-table {
         min-height: 44px !important;
@@ -1444,12 +1452,21 @@ html, body {
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
+        flex-shrink: 0 !important;
     }
     
     .oj-expand-table .dashicons {
         font-size: 20px !important;
         width: 20px !important;
         height: 20px !important;
+    }
+    
+    /* Make Close Table button more compact on mobile */
+    .oj-close-table-group {
+        padding: 8px 12px !important;
+        font-size: 12px !important;
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
     }
 }
 
