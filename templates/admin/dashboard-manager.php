@@ -1191,6 +1191,180 @@ $pickup_orders_all = array_merge($pickup_orders,
     padding: 40px;
     color: #d63638;
 }
+
+/* ========================================
+   RESPONSIVE DESIGN - MOBILE FIRST
+   ======================================== */
+
+/* Tablet and smaller desktop (768px and below) */
+@media (max-width: 768px) {
+    .oj-orders-table {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .wp-list-table {
+        min-width: 700px; /* Ensure minimum width for readability */
+    }
+    
+    /* Hide less critical columns on tablet */
+    .wp-list-table th:nth-child(4), /* Type */
+    .wp-list-table td:nth-child(4) { /* Type */
+        display: none;
+    }
+    
+    /* Make action buttons more compact */
+    .oj-table-actions {
+        white-space: nowrap;
+        min-width: 100px;
+    }
+    
+    .oj-view-action {
+        width: 50px;
+        padding: 4px 8px;
+    }
+    
+    .oj-view-order {
+        font-size: 16px;
+        padding: 6px 8px;
+    }
+    
+    /* Compact status badges */
+    .oj-status-badge {
+        font-size: 11px;
+        padding: 3px 8px;
+    }
+    
+    /* Make total column more compact */
+    .oj-table-total {
+        font-size: 13px;
+    }
+    
+    .oj-order-count-highlight {
+        font-size: 14px;
+        padding: 2px 6px;
+    }
+}
+
+/* Mobile devices (480px and below) */
+@media (max-width: 480px) {
+    .oj-orders-table {
+        overflow-x: auto;
+        margin: 0 -10px; /* Extend to screen edges */
+    }
+    
+    .wp-list-table {
+        min-width: 600px;
+    }
+    
+    /* Hide even more columns on mobile */
+    .wp-list-table th:nth-child(3), /* Customer */
+    .wp-list-table th:nth-child(4), /* Type */
+    .wp-list-table td:nth-child(3), /* Customer */
+    .wp-list-table td:nth-child(4) { /* Type */
+        display: none;
+    }
+    
+    /* More compact buttons */
+    .oj-table-actions {
+        min-width: 80px;
+    }
+    
+    .oj-view-action {
+        width: 40px;
+        padding: 2px 4px;
+    }
+    
+    .oj-view-order {
+        font-size: 14px;
+        padding: 4px 6px;
+    }
+    
+    /* Smaller text for mobile */
+    .wp-list-table th,
+    .wp-list-table td {
+        font-size: 12px;
+        padding: 6px 4px;
+    }
+    
+    /* Compact table group styling */
+    .oj-table-total {
+        font-size: 11px;
+    }
+    
+    .oj-order-count-highlight {
+        font-size: 12px;
+        padding: 1px 4px;
+    }
+    
+    .oj-separator {
+        margin: 0 2px;
+    }
+    
+    /* Compact buttons */
+    .button {
+        font-size: 11px;
+        padding: 4px 8px;
+        line-height: 1.2;
+    }
+    
+    .oj-close-table-group {
+        font-size: 10px;
+        padding: 3px 6px;
+    }
+    
+    .oj-expand-table {
+        padding: 2px 4px;
+    }
+    
+    .oj-expand-table .dashicons {
+        font-size: 14px;
+        width: 14px;
+        height: 14px;
+    }
+}
+
+/* Add horizontal scroll indicator */
+.oj-orders-table::-webkit-scrollbar {
+    height: 8px;
+}
+
+.oj-orders-table::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.oj-orders-table::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+.oj-orders-table::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Touch-friendly improvements */
+@media (hover: none) and (pointer: coarse) {
+    .oj-view-order {
+        min-height: 44px;
+        min-width: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .button {
+        min-height: 44px;
+        padding: 8px 12px;
+    }
+    
+    .oj-expand-table {
+        min-height: 44px;
+        min-width: 44px;
+    }
+}
 </style>
 
 <script>
