@@ -23,72 +23,74 @@ $all_orders = array();
 $processing_orders = array();
 $ready_orders = array();
 
-// Get orders using WooCommerce native function
+// Get orders using WooCommerce native function with unified query approach
 if (function_exists('wc_get_orders')) {
-    // Get processing orders (cooking) - FIFO approach like kitchen dashboard
-    $processing_wc_orders = wc_get_orders(array(
-        'status' => 'processing',
-        'limit' => -1,
+    // Single query to get all relevant orders (with lazy loading - initial 20 per status)
+    $all_wc_orders = wc_get_orders(array(
+        'status' => array('processing', 'pending', 'completed'),
+        'limit' => 80, // 20 processing + 20 pending + 40 completed (buffer for mixed results)
         'orderby' => 'date',
-        'order' => 'ASC' // Oldest first - operational priority (FIFO)
+        'order' => 'DESC' // Get newest first, then we'll sort by priority
     ));
     
-    // Get ready orders (pending - awaiting payment) - FIFO approach like kitchen dashboard
-    $ready_wc_orders = wc_get_orders(array(
-        'status' => 'pending',
-        'limit' => -1,
-        'orderby' => 'date',
-        'order' => 'ASC' // Oldest first - operational priority (FIFO)
-    ));
-    
-    // Get recent completed orders (minimal load - only latest 15) - newest first for recent view
-    $recent_completed_wc_orders = wc_get_orders(array(
-        'status' => 'completed',
-        'limit' => 15, // Only latest 15 for performance
-        'orderby' => 'date_modified',
-        'order' => 'DESC' // Newest first for completed orders (recent view)
-    ));
-    
-    // Process processing orders
-    foreach ($processing_wc_orders as $order) {
-        $processing_orders[] = array(
-            'id' => $order->get_id(),
-            'status' => $order->get_status(),
-            'total' => $order->get_total(),
-            'customer' => $order->get_billing_first_name() ?: 'Guest',
-            'table' => $order->get_meta('_oj_table_number') ?: '',
-            'date' => $order->get_date_created()->format('H:i'),
-            'type' => !empty($order->get_meta('_oj_table_number')) ? 'table' : 'pickup'
-        );
-    }
-    
-    // Process ready orders
-    foreach ($ready_wc_orders as $order) {
-        $ready_orders[] = array(
-            'id' => $order->get_id(),
-            'status' => $order->get_status(),
-            'total' => $order->get_total(),
-            'customer' => $order->get_billing_first_name() ?: 'Guest',
-            'table' => $order->get_meta('_oj_table_number') ?: '',
-            'date' => $order->get_date_created()->format('H:i'),
-            'type' => !empty($order->get_meta('_oj_table_number')) ? 'table' : 'pickup'
-        );
-    }
-    
-    // Process recent completed orders
+    // Initialize arrays and counters
+    $processing_orders = array();
+    $ready_orders = array();
     $recent_completed_orders = array();
-    foreach ($recent_completed_wc_orders as $order) {
-        $recent_completed_orders[] = array(
+    $processing_count = 0;
+    $ready_count = 0;
+    $completed_count = 0;
+    
+    // Process all orders in one loop and categorize by status
+    foreach ($all_wc_orders as $order) {
+        $order_data = array(
             'id' => $order->get_id(),
             'status' => $order->get_status(),
             'total' => $order->get_total(),
             'customer' => $order->get_billing_first_name() ?: 'Guest',
             'table' => $order->get_meta('_oj_table_number') ?: '',
-            'date' => $order->get_date_modified()->format('H:i'),
-            'payment_method' => $order->get_meta('_oj_payment_method') ?: '',
-            'type' => !empty($order->get_meta('_oj_table_number')) ? 'table' : 'pickup'
+            'date' => $order->get_date_created()->format('H:i'),
+            'type' => !empty($order->get_meta('_oj_table_number')) ? 'table' : 'pickup',
+            'created_timestamp' => $order->get_date_created()->getTimestamp() // For sorting
         );
+        
+        // Categorize by status with lazy loading limits
+        switch ($order->get_status()) {
+            case 'processing':
+                if ($processing_count < 20) {
+                    $processing_orders[] = $order_data;
+                    $processing_count++;
+                }
+                break;
+            case 'pending':
+                if ($ready_count < 20) {
+                    $ready_orders[] = $order_data;
+                    $ready_count++;
+                }
+                break;
+            case 'completed':
+                if ($completed_count < 20) {
+                    // Add additional fields needed for completed orders display
+                    $order_data['date'] = $order->get_date_modified()->format('H:i');
+                    $order_data['payment_method'] = $order->get_meta('_oj_payment_method') ?: '';
+                    $recent_completed_orders[] = $order_data;
+                    $completed_count++;
+                }
+                break;
+        }
     }
+    
+    // Sort active orders by priority (FIFO - oldest first for operational efficiency)
+    usort($processing_orders, function($a, $b) {
+        return $a['created_timestamp'] - $b['created_timestamp'];
+    });
+    usort($ready_orders, function($a, $b) {
+        return $a['created_timestamp'] - $b['created_timestamp'];
+    });
+    
+    // Completed orders stay in DESC order (newest first) - no need to sort
+    
+    // Recent completed orders are already processed above with proper structure
     
     // Combine active orders only (exclude completed from main operations)
     $active_orders = array_merge($processing_orders, $ready_orders);
@@ -511,6 +513,24 @@ $pickup_orders_all = array_merge($pickup_orders,
                         
                     <?php endforeach; ?>
                     
+                    <!-- Load More Button for Active Orders (Processing + Ready) -->
+                    <tr class="oj-load-more-row" id="oj-load-more-active" style="display: none;">
+                        <td colspan="9" class="oj-load-more-container">
+                            <button class="button button-secondary oj-load-more" 
+                                    data-status="processing" 
+                                    data-offset="<?php echo count($processing_orders); ?>"
+                                    data-section="active">
+                                <?php _e('Load 20 More Processing Orders', 'orders-jet'); ?>
+                            </button>
+                            <button class="button button-secondary oj-load-more" 
+                                    data-status="pending" 
+                                    data-offset="<?php echo count($ready_orders); ?>"
+                                    data-section="active">
+                                <?php _e('Load 20 More Ready Orders', 'orders-jet'); ?>
+                            </button>
+                        </td>
+                    </tr>
+                    
                     <!-- COMPLETED ORDERS: Only shown when filtering for completed -->
                     <?php if (!empty($recent_completed_orders)) : ?>
                         <?php foreach ($recent_completed_orders as $completed_order) : ?>
@@ -559,6 +579,18 @@ $pickup_orders_all = array_merge($pickup_orders,
                                 </td>
                             </tr>
                         <?php endforeach; ?>
+                        
+                        <!-- Load More Button for Completed Orders -->
+                        <tr class="oj-load-more-row" id="oj-load-more-completed" style="display: none;">
+                            <td colspan="9" class="oj-load-more-container">
+                                <button class="button button-secondary oj-load-more" 
+                                        data-status="completed" 
+                                        data-offset="<?php echo count($recent_completed_orders); ?>"
+                                        data-section="completed">
+                                    <?php _e('Load 20 More Completed Orders', 'orders-jet'); ?>
+                                </button>
+                            </td>
+                        </tr>
                     <?php endif; ?>
                     
                 <?php else : ?>
@@ -1554,6 +1586,48 @@ html, body {
 
 .oj-orders-table::-webkit-scrollbar-thumb:hover {
     background: #a8a8a8;
+}
+
+/* Load More Buttons */
+.oj-load-more-container {
+    text-align: center;
+    padding: 20px;
+    background: #f8f9fa;
+    border-top: 1px solid #e1e5e9;
+}
+
+.oj-load-more {
+    margin: 0 8px;
+    padding: 8px 16px;
+    font-size: 13px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.oj-load-more:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.oj-load-more:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Mobile load more buttons */
+@media (max-width: 480px) {
+    .oj-load-more-container {
+        padding: 15px 10px;
+    }
+    
+    .oj-load-more {
+        display: block;
+        width: 100%;
+        margin: 5px 0;
+        padding: 12px;
+        font-size: 14px;
+    }
 }
 
 /* Clean Modal Responsive Styles */
@@ -2574,6 +2648,181 @@ jQuery(document).ready(function($) {
         modal.find('.oj-modal-close').on('click', function() {
             modal.remove();
         });
+    }
+    
+    // Lazy Loading: Load More Orders Functionality
+    $(document).ready(function() {
+        // Show load more buttons based on initial counts
+        showLoadMoreButtons();
+        
+        // Handle load more button clicks
+        $(document).on('click', '.oj-load-more', function() {
+            const $button = $(this);
+            const status = $button.data('status');
+            const offset = $button.data('offset');
+            const section = $button.data('section');
+            
+            // Disable button and show loading
+            $button.prop('disabled', true);
+            const originalText = $button.text();
+            $button.text('<?php _e('Loading...', 'orders-jet'); ?>');
+            
+            $.ajax({
+                url: '<?php echo admin_url('admin-ajax.php'); ?>',
+                type: 'POST',
+                data: {
+                    action: 'oj_load_more_orders',
+                    status: status,
+                    offset: offset,
+                    nonce: '<?php echo wp_create_nonce('oj_dashboard_nonce'); ?>'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        const orders = response.data.orders;
+                        const hasMore = response.data.has_more;
+                        const newOffset = response.data.new_offset;
+                        
+                        // Append new orders to the table
+                        appendOrdersToTable(orders, status, section);
+                        
+                        // Update button offset
+                        $button.data('offset', newOffset);
+                        
+                        // Hide button if no more orders
+                        if (!hasMore || orders.length === 0) {
+                            $button.closest('.oj-load-more-row').hide();
+                        }
+                        
+                        // Re-enable button
+                        $button.prop('disabled', false);
+                        $button.text(originalText);
+                        
+                        // Reapply current filter to new orders
+                        const currentFilter = $('.oj-filter-btn.active').data('filter') || 'all';
+                        applyFilter(currentFilter);
+                        
+                    } else {
+                        alert('<?php _e('Failed to load more orders', 'orders-jet'); ?>');
+                        $button.prop('disabled', false);
+                        $button.text(originalText);
+                    }
+                },
+                error: function() {
+                    alert('<?php _e('Error loading more orders', 'orders-jet'); ?>');
+                    $button.prop('disabled', false);
+                    $button.text(originalText);
+                }
+            });
+        });
+    });
+    
+    // Show/hide load more buttons based on order counts
+    function showLoadMoreButtons() {
+        const processingCount = <?php echo count($processing_orders); ?>;
+        const readyCount = <?php echo count($ready_orders); ?>;
+        const completedCount = <?php echo count($recent_completed_orders); ?>;
+        
+        // Show active orders load more if we have 20 or more of either type
+        if (processingCount >= 20 || readyCount >= 20) {
+            $('#oj-load-more-active').show();
+            
+            // Hide individual buttons if their count is less than 20
+            if (processingCount < 20) {
+                $('#oj-load-more-active .oj-load-more[data-status="processing"]').hide();
+            }
+            if (readyCount < 20) {
+                $('#oj-load-more-active .oj-load-more[data-status="pending"]').hide();
+            }
+        }
+        
+        // Show completed orders load more if we have 20 or more
+        if (completedCount >= 20) {
+            $('#oj-load-more-completed').show();
+        }
+    }
+    
+    // Append new orders to the table
+    function appendOrdersToTable(orders, status, section) {
+        const $tbody = $('.oj-orders-table tbody');
+        let insertPoint;
+        
+        if (status === 'completed') {
+            // Insert before the completed load more button
+            insertPoint = $('#oj-load-more-completed');
+        } else {
+            // Insert before the active load more button
+            insertPoint = $('#oj-load-more-active');
+        }
+        
+        orders.forEach(function(order) {
+            const orderHtml = createOrderRowHtml(order, status);
+            insertPoint.before(orderHtml);
+        });
+    }
+    
+    // Create HTML for a new order row
+    function createOrderRowHtml(order, status) {
+        const isCompleted = status === 'completed';
+        const statusClass = isCompleted ? 'completed-order' : (order.type === 'pickup' ? 'pickup-order' : 'oj-child-order-row');
+        const statusBadge = getStatusBadge(order.status);
+        const typeBadge = order.table ? `🍽️ <?php _e('Table', 'orders-jet'); ?> ${order.table}` : `🥡 <?php _e('Pickup', 'orders-jet'); ?>`;
+        
+        let actionsHtml = '';
+        if (isCompleted) {
+            actionsHtml = `
+                <button class="button button-small oj-invoice-print" 
+                        data-order-id="${order.id}"
+                        title="<?php _e('Print Thermal Invoice', 'orders-jet'); ?>">
+                    🖨️
+                </button>`;
+        } else {
+            actionsHtml = `
+                <button class="button button-primary oj-complete-order" 
+                        data-order-id="${order.id}">
+                    <?php _e('Complete', 'orders-jet'); ?>
+                </button>`;
+        }
+        
+        return `
+            <tr class="oj-order-row ${statusClass}" 
+                data-status="${order.status}"
+                data-type="${order.type}"
+                data-table="${order.table || ''}"
+                data-order-id="${order.id}">
+                <td class="check-column">
+                    <input type="checkbox" name="order_ids[]" value="${order.id}" />
+                </td>
+                <td class="oj-order-number">
+                    <strong>#${order.id}</strong>
+                </td>
+                <td class="oj-customer">${order.customer}</td>
+                <td class="oj-type">${typeBadge}</td>
+                <td class="oj-status">${statusBadge}</td>
+                <td class="oj-total">${order.formatted_total}</td>
+                <td class="oj-time">${order.date}</td>
+                <td class="oj-actions">${actionsHtml}</td>
+                <td class="oj-view-action">
+                    <button class="button button-small oj-view-order" 
+                            data-order-id="${order.id}"
+                            title="<?php _e('View Order Details', 'orders-jet'); ?>">
+                        👁️
+                    </button>
+                </td>
+            </tr>`;
+    }
+    
+    // Get status badge HTML
+    function getStatusBadge(status) {
+        switch (status) {
+            case 'processing':
+                return '<span class="oj-status processing">🍳 <?php _e('Cooking', 'orders-jet'); ?></span>';
+            case 'pending':
+                return '<span class="oj-status ready">✅ <?php _e('Ready', 'orders-jet'); ?></span>';
+            case 'completed':
+                return '<span class="oj-status completed">✅ <?php _e('Completed', 'orders-jet'); ?></span>';
+            default:
+                return '<span class="oj-status">' + status + '</span>';
+        }
     }
     
 });
