@@ -1868,8 +1868,8 @@ jQuery(document).ready(function($) {
     function applyFilter(filter) {
         console.log('Applying filter:', filter);
         
-        // STEP 1: Filter all individual order rows directly (works for both desktop and mobile)
-        $('.oj-child-order-row, .pickup-order, .completed-order').each(function() {
+        // STEP 1: Filter all order rows including table groups (works for both desktop and mobile)
+        $('.oj-child-order-row, .pickup-order, .completed-order, .oj-table-group-row').each(function() {
             const $row = $(this);
             const status = $row.data('status');
             const type = $row.data('type');
@@ -1878,22 +1878,28 @@ jQuery(document).ready(function($) {
             
             switch(filter) {
                 case 'all':
-                    show = status !== 'completed';
+                    // Show active orders and table groups
+                    show = (status !== 'completed') || (type === 'table_group');
                     break;
                 case 'processing':
-                    show = status === 'processing';
+                    // Show processing orders and table groups with processing orders
+                    show = (status === 'processing') || (type === 'table_group');
                     break;
                 case 'ready':
-                    show = status === 'pending';
+                    // Show ready orders and table groups with ready orders
+                    show = (status === 'pending') || (type === 'table_group');
                     break;
                 case 'table':
-                    show = type === 'table' && status !== 'completed';
+                    // Show table orders and table groups only
+                    show = (type === 'table' && status !== 'completed') || (type === 'table_group');
                     break;
                 case 'pickup':
-                    show = type === 'pickup' && status !== 'completed';
+                    // Show pickup orders only - NO table groups
+                    show = (type === 'pickup' && status !== 'completed');
                     break;
                 case 'completed':
-                    show = status === 'completed';
+                    // Show completed orders only - NO table groups
+                    show = (status === 'completed');
                     break;
             }
             
