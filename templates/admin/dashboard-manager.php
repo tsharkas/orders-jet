@@ -1895,6 +1895,17 @@ jQuery(document).ready(function($) {
             const status = $row.data('status');
             const type = $row.data('type');
             
+            // DEBUG: Log what we're finding
+            if ($row.hasClass('oj-table-group-row')) {
+                console.log('Found table group:', {
+                    element: $row[0],
+                    status: status,
+                    type: type,
+                    dataTypeAttr: $row.attr('data-type'),
+                    filter: filter
+                });
+            }
+            
             let show = false;
             
             switch(filter) {
