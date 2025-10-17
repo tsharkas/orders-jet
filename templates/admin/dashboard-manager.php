@@ -328,8 +328,9 @@ $pickup_orders_all = array_merge($pickup_orders,
                 </tr>
             </thead>
             <tbody>
-                <?php if (!empty($all_orders)) : ?>
-                    <?php foreach ($all_orders as $item) : ?>
+                <?php if (!empty($display_orders)) : ?>
+                    <!-- ACTIVE ORDERS: Table Groups and Pickup Orders -->
+                    <?php foreach ($display_orders as $item) : ?>
                         
                         <?php if ($item['type'] === 'table_group') : ?>
                             <!-- TABLE GROUP ROW (Expanded by default) - Formatted to match table headers -->
@@ -512,6 +513,56 @@ $pickup_orders_all = array_merge($pickup_orders,
                         <?php endif; ?>
                         
                     <?php endforeach; ?>
+                    
+                    <!-- COMPLETED ORDERS: Only shown when filtering for completed -->
+                    <?php if (!empty($recent_completed_orders)) : ?>
+                        <?php foreach ($recent_completed_orders as $completed_order) : ?>
+                            <tr class="oj-order-row completed-order" 
+                                data-status="completed"
+                                data-type="<?php echo esc_attr($completed_order['type']); ?>"
+                                data-order-id="<?php echo esc_attr($completed_order['id']); ?>">
+                                
+                                <td class="check-column">
+                                    <input type="checkbox" class="oj-order-checkbox" value="<?php echo esc_attr($completed_order['id']); ?>" />
+                                </td>
+                                
+                                <td><strong>#<?php echo $completed_order['id']; ?></strong></td>
+                                
+                                <td><?php echo esc_html($completed_order['customer']); ?></td>
+                                
+                                <td>
+                                    <?php if ($completed_order['type'] === 'table') : ?>
+                                        🍽️ <?php echo sprintf(__('Table %s', 'orders-jet'), $completed_order['table']); ?>
+                                    <?php else : ?>
+                                        🥡 <?php _e('Pickup', 'orders-jet'); ?>
+                                    <?php endif; ?>
+                                </td>
+                                
+                                <td><span class="oj-status completed">✅ <?php _e('Completed', 'orders-jet'); ?></span></td>
+                                
+                                <td><?php echo wc_price($completed_order['total']); ?></td>
+                                
+                                <td><?php echo $completed_order['date']; ?></td>
+                                
+                                <td>
+                                    <button class="button-link oj-quick-invoice" 
+                                            data-order-id="<?php echo $completed_order['id']; ?>" 
+                                            data-type="<?php echo $completed_order['type']; ?>">
+                                        📄 <?php _e('Invoice', 'orders-jet'); ?>
+                                    </button>
+                                </td>
+                                
+                                <td class="oj-view-action">
+                                    <button class="button-link oj-view-order" 
+                                            data-order-id="<?php echo $completed_order['id']; ?>"
+                                            title="<?php _e('View Order Details', 'orders-jet'); ?>">
+                                        👁️
+                                    </button>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                    
                 <?php else : ?>
                     <tr>
                         <td colspan="8" class="oj-no-orders">
@@ -1415,7 +1466,8 @@ html, body {
     
     /* Transform individual orders to clean grid cards */
     .oj-orders-table .oj-child-order-row,
-    .oj-orders-table .pickup-order {
+    .oj-orders-table .pickup-order,
+    .oj-orders-table .completed-order {
         display: grid !important;
         grid-template-areas: 
             "order-num status total"
@@ -1740,7 +1792,7 @@ jQuery(document).ready(function($) {
         console.log('Applying filter:', filter);
         
         // STEP 1: Filter all individual order rows directly (works for both desktop and mobile)
-        $('.oj-child-order-row, .pickup-order').each(function() {
+        $('.oj-child-order-row, .pickup-order, .completed-order').each(function() {
             const $row = $(this);
             const status = $row.data('status');
             const type = $row.data('type');
