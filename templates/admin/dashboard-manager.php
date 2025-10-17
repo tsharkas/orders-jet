@@ -1362,6 +1362,28 @@ html, body {
         background: #f8f9fa !important;
         border-bottom: 1px solid #e1e5e9 !important;
         position: sticky !important;
+        /* Enhanced scrolling indicators */
+        scrollbar-width: thin !important;
+        scrollbar-color: #ccc transparent !important;
+    }
+    
+    /* Show scrollbar on mobile for better UX */
+    .oj-filters::-webkit-scrollbar {
+        height: 4px !important;
+        display: block !important;
+    }
+    
+    .oj-filters::-webkit-scrollbar-track {
+        background: transparent !important;
+    }
+    
+    .oj-filters::-webkit-scrollbar-thumb {
+        background: #ccc !important;
+        border-radius: 2px !important;
+    }
+    
+    .oj-filters::-webkit-scrollbar-thumb:hover {
+        background: #999 !important;
     }
     
     .oj-filter-btn {
