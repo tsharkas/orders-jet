@@ -437,6 +437,23 @@ $pickup_orders_all = array_merge($pickup_orders,
                                         <?php elseif ($child_order['status'] === 'pending') : ?>
                                             <span class="oj-status-note ready">✅ <?php _e('Ready', 'orders-jet'); ?></span>
                                         <?php endif; ?>
+                                        
+                                        <!-- Close Table Button for Table Orders -->
+                                        <?php 
+                                        // Check if all orders for this table are ready
+                                        $all_table_orders_ready = true;
+                                        foreach ($item['orders'] as $check_order) {
+                                            if ($check_order['status'] !== 'pending') {
+                                                $all_table_orders_ready = false;
+                                                break;
+                                            }
+                                        }
+                                        ?>
+                                        <button class="button oj-close-table-btn <?php echo $all_table_orders_ready ? '' : 'disabled'; ?>" 
+                                                data-table="<?php echo esc_attr($item['table_number']); ?>"
+                                                <?php echo $all_table_orders_ready ? '' : 'disabled'; ?>>
+                                            <?php _e('Close Table', 'orders-jet'); ?>
+                                        </button>
                                     </td>
                                     <td class="oj-view-action">
                                         <button class="button-link oj-view-order" 
@@ -1361,336 +1378,169 @@ $pickup_orders_all = array_merge($pickup_orders,
     }
 }
 
-/* Mobile devices (480px and below) - CARD LAYOUT */
-@media screen and (max-width: 480px) {
-    .oj-orders-table {
-        overflow-x: visible !important;
-        margin: 0 !important;
-        padding: 0 10px !important;
-    }
-    
-    /* Hide table header on mobile */
+/* Mobile devices (480px and below) - SIMPLE CARD LAYOUT */
+@media (max-width: 480px) {
+    /* Hide table header */
     .wp-list-table thead {
-        display: none !important;
+        display: none;
     }
     
-    /* Convert table to card layout */
+    /* Convert table to simple card layout */
     .wp-list-table,
     .wp-list-table tbody {
-        display: block !important;
-        width: 100% !important;
+        display: block;
     }
     
+    /* Simple card styling for ALL orders */
     .wp-list-table tr {
-        display: block !important;
-        background: white !important;
-        border: 1px solid #e1e5e9 !important;
-        border-radius: 12px !important;
-        margin-bottom: 16px !important;
-        padding: 16px !important;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
-        position: relative !important;
-        width: 100% !important;
-        box-sizing: border-box !important;
-    }
-    
-    /* TABLE GROUP CARDS - Special styling */
-    .oj-table-group-row {
-        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
-        border: 2px solid #0073aa;
-        border-radius: 16px;
-        box-shadow: 0 6px 16px rgba(0,115,170,0.2);
-        margin-bottom: 20px;
+        display: block;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        margin-bottom: 12px;
+        padding: 16px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         position: relative;
     }
     
-    .oj-table-group-row::before {
+    /* Table order flag */
+    .wp-list-table tr[data-type="table_group"],
+    .wp-list-table tr.oj-child-order-row {
+        border-left: 4px solid #0073aa;
+    }
+    
+    .wp-list-table tr[data-type="table_group"]::before,
+    .wp-list-table tr.oj-child-order-row::before {
         content: "🏷️ TABLE";
         position: absolute;
-        top: -8px;
-        left: 16px;
+        top: 8px;
+        right: 8px;
         background: #0073aa;
         color: white;
-        padding: 4px 8px;
+        padding: 2px 6px;
         border-radius: 4px;
         font-size: 10px;
         font-weight: bold;
     }
     
-    /* CHILD ORDER CARDS - Indented and connected */
-    .oj-child-order-row {
-        background: #f8f9fa !important;
-        border: 1px solid #dee2e6;
-        border-left: 4px solid #0073aa;
-        border-radius: 12px;
-        margin-left: 24px;
-        margin-bottom: 12px;
-        margin-top: 8px;
-        box-shadow: 0 2px 8px rgba(0,115,170,0.1);
-        position: relative;
-    }
-    
-    .oj-child-order-row::before {
-        content: "└─";
-        position: absolute;
-        left: -28px;
-        top: 16px;
-        color: #0073aa;
-        font-weight: bold;
-        font-size: 16px;
-    }
-    
-    /* Hide checkbox column */
+    /* Hide checkbox and make all cells block */
     .wp-list-table td:first-child {
-        display: none !important;
+        display: none;
     }
     
-    /* Ensure proper table structure reset */
-    .wp-list-table {
-        table-layout: auto !important;
-        border-collapse: separate !important;
-        border-spacing: 0 !important;
-    }
-    
-    /* Card content layout */
     .wp-list-table td {
-        display: block !important;
-        border: none !important;
-        padding: 0 !important;
-        margin-bottom: 8px !important;
-        position: relative !important;
-        width: 100% !important;
-        box-sizing: border-box !important;
+        display: block;
+        border: none;
+        padding: 4px 0;
+        text-align: left;
     }
     
-    /* Order number and status header */
-    .wp-list-table td:nth-child(2) { /* Order # */
-        font-size: 18px !important;
-        font-weight: bold !important;
-        color: #0073aa !important;
-        margin-bottom: 12px !important;
-        display: flex !important;
-        justify-content: space-between !important;
-        align-items: center !important;
-        text-align: left !important;
-    }
-    
-    /* Table group order number styling */
-    .oj-table-group-row .wp-list-table td:nth-child(2) {
-        font-size: 24px;
+    /* Order number */
+    .wp-list-table td:nth-child(2) {
+        font-size: 18px;
+        font-weight: bold;
         color: #0073aa;
-        text-align: center;
-        margin-bottom: 16px;
+        margin-bottom: 8px;
     }
     
-    /* Customer info */
-    .wp-list-table td:nth-child(3) { /* Customer */
-        display: flex !important;
-        align-items: center;
+    /* Customer */
+    .wp-list-table td:nth-child(3) {
         font-size: 14px;
         color: #666;
-        margin-bottom: 8px;
+        margin-bottom: 4px;
     }
     
     .wp-list-table td:nth-child(3):before {
         content: "👤 ";
-        margin-right: 6px;
     }
     
-    /* Type info */
-    .wp-list-table td:nth-child(4) { /* Type */
-        display: flex !important;
-        align-items: center;
+    /* Type */
+    .wp-list-table td:nth-child(4) {
         font-size: 14px;
         color: #666;
-        margin-bottom: 12px;
+        margin-bottom: 8px;
     }
     
-    /* Status with better styling */
-    .wp-list-table td:nth-child(5) { /* Status */
-        margin-bottom: 12px;
-        text-align: center;
+    /* Status */
+    .wp-list-table td:nth-child(5) {
+        margin-bottom: 8px;
     }
     
-    /* Table group status indicators */
-    .oj-table-group-row .wp-list-table td:nth-child(5) {
-        display: flex;
-        justify-content: center;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-bottom: 16px;
-    }
-    
-    .oj-status-indicator {
-        background: white;
-        padding: 6px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: bold;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    /* Total with prominent display */
-    .wp-list-table td:nth-child(6) { /* Total */
-        font-size: 20px;
+    /* Total */
+    .wp-list-table td:nth-child(6) {
+        font-size: 16px;
         font-weight: bold;
         color: #2271b1;
-        text-align: center;
         background: #f8f9fa;
-        padding: 12px;
-        border-radius: 8px;
-        margin-bottom: 12px;
-    }
-    
-    /* Table group total - special styling */
-    .oj-table-group-row .wp-list-table td:nth-child(6) {
-        background: linear-gradient(135deg, #fff3e0 0%, #ffcc02 100%);
-        border: 2px solid #ff9800;
-        color: #e65100;
-        font-size: 18px;
-        font-weight: bold;
+        padding: 8px;
+        border-radius: 4px;
         text-align: center;
-        padding: 16px;
-        border-radius: 12px;
-        margin-bottom: 16px;
+        margin-bottom: 8px;
     }
     
-    /* Time info */
-    .wp-list-table td:nth-child(7) { /* Time */
+    /* Time */
+    .wp-list-table td:nth-child(7) {
         font-size: 12px;
         color: #666;
-        text-align: center;
-        margin-bottom: 16px;
+        margin-bottom: 12px;
     }
     
     .wp-list-table td:nth-child(7):before {
         content: "🕐 ";
-        margin-right: 4px;
     }
     
-    /* Actions at bottom of card */
-    .wp-list-table td:nth-child(8) { /* Actions */
+    /* Actions */
+    .wp-list-table td:nth-child(8) {
         display: flex;
-        justify-content: center;
         gap: 8px;
         margin-bottom: 8px;
     }
     
-    .wp-list-table td:nth-child(9) { /* View */
+    /* View button */
+    .wp-list-table td:nth-child(9) {
         display: flex;
         justify-content: center;
-        margin-bottom: 0;
-    }
-    
-    /* Button styling for cards */
-    .wp-list-table .button {
-        flex: 1;
-        max-width: 200px;
-        margin: 0 4px;
-        padding: 12px 16px;
-        font-size: 14px;
-        border-radius: 8px;
-        text-align: center;
-        min-height: 44px;
     }
     
     .oj-view-order {
         background: #f0f6fc;
         color: #0073aa;
         border: 2px solid #0073aa;
-        padding: 12px;
+        padding: 8px;
         border-radius: 50%;
-        width: 48px;
-        height: 48px;
+        width: 40px;
+        height: 40px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 20px;
-        margin: 0 auto;
-        min-height: 48px;
-        min-width: 48px;
+        font-size: 16px;
     }
     
-    /* Table group specific actions */
-    .oj-table-group-row .wp-list-table td:nth-child(8) {
-        display: flex;
-        gap: 12px;
-        justify-content: center;
-        margin-bottom: 8px;
+    /* Buttons */
+    .wp-list-table .button {
+        flex: 1;
+        padding: 10px 12px;
+        font-size: 12px;
+        border-radius: 4px;
+        text-align: center;
+        min-height: 40px;
     }
     
-    .oj-close-table-group {
-        flex: 2;
+    /* Close table button for table orders */
+    .oj-close-table-btn {
         background: #0073aa;
         color: white;
         border: none;
-        padding: 16px 24px;
-        font-size: 16px;
-        font-weight: bold;
-        border-radius: 12px;
-        min-height: 48px;
+        padding: 10px 12px;
+        font-size: 12px;
+        border-radius: 4px;
+        flex: 1;
+        min-height: 40px;
     }
     
-    .oj-close-table-group:disabled {
+    .oj-close-table-btn:disabled {
         background: #ccc;
         color: #666;
-    }
-    
-    .oj-expand-table {
-        flex: 1;
-        background: white;
-        border: 2px solid #0073aa;
-        color: #0073aa;
-        padding: 16px;
-        border-radius: 12px;
-        font-weight: bold;
-        min-height: 48px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    .oj-expand-table .dashicons {
-        font-size: 18px;
-        width: 18px;
-        height: 18px;
-    }
-    
-    /* Status badges in cards */
-    .oj-status-badge,
-    .oj-status {
-        display: inline-block;
-        padding: 6px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: bold;
-        text-transform: uppercase;
-    }
-    
-    .oj-status.cooking {
-        background: #fff3cd;
-        color: #856404;
-        border: 1px solid #ffeaa7;
-    }
-    
-    .oj-status.ready {
-        background: #d1edff;
-        color: #0c5460;
-        border: 1px solid #bee5eb;
-    }
-    
-    /* Hide/Show child orders based on expand state */
-    .oj-table-group-row.collapsed ~ .oj-child-order-row {
-        display: none;
-    }
-    
-    .oj-table-group-row.expanded ~ .oj-child-order-row {
-        display: block;
-    }
-    
-    /* Empty view action for table groups */
-    .oj-table-group-row .wp-list-table td:nth-child(9) {
-        display: none;
     }
 }
 
@@ -1949,6 +1799,22 @@ jQuery(document).ready(function($) {
         
         if ($button.prop('disabled')) {
             alert('<?php _e('All orders must be ready before closing the table', 'orders-jet'); ?>');
+            return;
+        }
+        
+        if (confirm('<?php _e('Close this table and create consolidated invoice?', 'orders-jet'); ?>')) {
+            // Show payment method modal for table group
+            showPaymentMethodModal(null, 'table_group', tableNumber);
+        }
+    });
+    
+    // NEW: Close Table Button functionality (for individual table order cards)
+    $('.oj-close-table-btn').on('click', function() {
+        const tableNumber = $(this).data('table');
+        const $button = $(this);
+        
+        if ($button.prop('disabled') || $button.hasClass('disabled')) {
+            alert('<?php _e('All table orders must be ready before closing the table', 'orders-jet'); ?>');
             return;
         }
         
