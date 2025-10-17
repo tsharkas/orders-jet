@@ -1396,11 +1396,13 @@ html, body {
     /* Hide unnecessary columns in table group row for cleaner mobile view */
     .oj-orders-table .oj-table-group-row td:nth-child(1), /* Checkbox */
     .oj-orders-table .oj-table-group-row td:nth-child(3), /* "Table Guest" */
-    .oj-orders-table .oj-table-group-row td:nth-child(4)  /* "🍽️ Dine In" */ {
+    .oj-orders-table .oj-table-group-row td:nth-child(4), /* "🍽️ Dine In" */
+    .oj-orders-table .oj-table-group-row td:nth-child(5), /* "Opened" Status */
+    .oj-orders-table .oj-table-group-row td:nth-child(7)  /* Time */ {
         display: none !important;
     }
     
-    /* Hide status indicators (cooking/ready icons) but keep "Opened" text */
+    /* Hide status indicators (cooking/ready icons) - status column is hidden anyway */
     .oj-orders-table .oj-table-group-row .oj-status-indicator {
         display: none !important;
     }
