@@ -490,7 +490,7 @@ $pickup_orders_all = array_merge($pickup_orders,
                                     <?php elseif ($item['status'] === 'pending') : ?>
                                         <button class="button button-primary oj-complete-order" 
                                                 data-order-id="<?php echo $item['id']; ?>">
-                                            <?php _e('Complete Order', 'orders-jet'); ?>
+                                            <?php _e('Complete', 'orders-jet'); ?>
                                         </button>
                                     <?php elseif ($item['status'] === 'completed') : ?>
                                         <button class="button-link oj-quick-invoice" 
