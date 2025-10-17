@@ -1953,15 +1953,18 @@ jQuery(document).ready(function($) {
         });
         
         // STEP 2: Update table group visibility based on visible children (desktop only)
-        $('.oj-table-group-row').each(function() {
-            const $group = $(this);
-            const tableNumber = $group.data('table');
-            const $children = $(`.oj-child-order-row[data-table="${tableNumber}"]`);
-            const hasVisibleChildren = $children.filter(':visible').length > 0;
-            
-            // Show group only if it has visible children
-            $group.toggle(hasVisibleChildren);
-        });
+        // BUT RESPECT filter decisions from STEP 1 (don't override pickup/completed filter hiding)
+        if (filter !== 'pickup' && filter !== 'completed') {
+            $('.oj-table-group-row').each(function() {
+                const $group = $(this);
+                const tableNumber = $group.data('table');
+                const $children = $(`.oj-child-order-row[data-table="${tableNumber}"]`);
+                const hasVisibleChildren = $children.filter(':visible').length > 0;
+                
+                // Show group only if it has visible children
+                $group.toggle(hasVisibleChildren);
+            });
+        }
     }
     
     // NEW: Table Group Expand/Collapse Functionality
