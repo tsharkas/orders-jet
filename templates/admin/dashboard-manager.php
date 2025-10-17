@@ -1368,30 +1368,32 @@ html, body {
     /* Transform individual orders to clean grid cards */
     .oj-orders-table .oj-child-order-row,
     .oj-orders-table .pickup-order {
-        display: grid;
+        display: grid !important;
         grid-template-areas: 
             "order-num status total"
             "customer time type"
             "actions actions view";
         grid-template-columns: 1fr auto auto;
         gap: 12px 16px;
-        background: white;
-        border: 1px solid #e1e5e9;
-        border-radius: 12px;
-        padding: 20px;
-        margin-bottom: 16px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-        position: relative;
+        background: white !important;
+        border: 2px solid #e1e5e9 !important;
+        border-radius: 12px !important;
+        padding: 20px !important;
+        margin-bottom: 16px !important;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
+        position: relative !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
     
     /* Table orders - blue left border */
     .oj-orders-table .oj-child-order-row {
-        border-left: 4px solid #0073aa;
+        border-left: 4px solid #0073aa !important;
     }
     
     /* Pickup orders - red left border */
     .oj-orders-table .pickup-order {
-        border-left: 4px solid #d63638;
+        border-left: 4px solid #d63638 !important;
     }
     
     /* Grid positioning for table cells */
