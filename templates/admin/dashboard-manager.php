@@ -1345,7 +1345,14 @@ $pickup_orders_all = array_merge($pickup_orders,
         min-width: auto !important;
     }
     
-    .oj-orders-table .wp-list-table tr {
+    /* HIDE TABLE GROUPS on tablet too */
+    .oj-orders-table .oj-table-group-row {
+        display: none !important;
+    }
+    
+    /* Show child orders and pickup orders as cards */
+    .oj-orders-table .oj-child-order-row,
+    .oj-orders-table .pickup-order {
         display: block !important;
         background: white !important;
         border: 2px solid #e1e5e9 !important;
@@ -1358,7 +1365,8 @@ $pickup_orders_all = array_merge($pickup_orders,
         box-sizing: border-box !important;
     }
     
-    .oj-orders-table .wp-list-table td {
+    .oj-orders-table .oj-child-order-row td,
+    .oj-orders-table .pickup-order td {
         display: block !important;
         border: none !important;
         padding: 6px 0 !important;
@@ -1426,8 +1434,13 @@ $pickup_orders_all = array_merge($pickup_orders,
         min-width: auto !important;
     }
     
-    /* Simple card styling for ALL orders */
-    .oj-orders-table .wp-list-table tr {
+    /* HIDE TABLE GROUPS - Show only child orders as individual cards */
+    .oj-orders-table .oj-table-group-row {
+        display: none !important;
+    }
+    
+    /* Show child orders as individual cards */
+    .oj-orders-table .oj-child-order-row {
         display: block !important;
         background: white !important;
         border: 2px solid #e1e5e9 !important;
@@ -1440,32 +1453,62 @@ $pickup_orders_all = array_merge($pickup_orders,
         box-sizing: border-box !important;
     }
     
-    /* Table order flag */
-    .wp-list-table tr[data-type="table_group"],
-    .wp-list-table tr.oj-child-order-row {
-        border-left: 4px solid #0073aa;
+    /* Pickup orders as individual cards */
+    .oj-orders-table .pickup-order {
+        display: block !important;
+        background: white !important;
+        border: 2px solid #e1e5e9 !important;
+        border-radius: 12px !important;
+        margin-bottom: 16px !important;
+        padding: 20px !important;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
+        position: relative !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
     
-    .wp-list-table tr[data-type="table_group"]::before,
-    .wp-list-table tr.oj-child-order-row::before {
+    /* Table order flag for child orders */
+    .oj-orders-table .oj-child-order-row {
+        border-left: 4px solid #0073aa !important;
+    }
+    
+    .oj-orders-table .oj-child-order-row::before {
         content: "🏷️ TABLE";
         position: absolute;
-        top: 8px;
-        right: 8px;
+        top: 12px;
+        right: 12px;
         background: #0073aa;
         color: white;
-        padding: 2px 6px;
-        border-radius: 4px;
-        font-size: 10px;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 12px;
         font-weight: bold;
+        z-index: 10;
     }
     
-    /* Hide checkbox and make all cells block */
-    .oj-orders-table .wp-list-table td:first-child {
+    /* Pickup order flag */
+    .oj-orders-table .pickup-order::before {
+        content: "🥡 PICKUP";
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        background: #d63638;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: bold;
+        z-index: 10;
+    }
+    
+    /* Hide checkbox and make all cells block for child orders and pickup orders */
+    .oj-orders-table .oj-child-order-row td:first-child,
+    .oj-orders-table .pickup-order td:first-child {
         display: none !important;
     }
     
-    .oj-orders-table .wp-list-table td {
+    .oj-orders-table .oj-child-order-row td,
+    .oj-orders-table .pickup-order td {
         display: block !important;
         border: none !important;
         padding: 8px 0 !important;
@@ -1475,7 +1518,8 @@ $pickup_orders_all = array_merge($pickup_orders,
     }
     
     /* Order number - Make it prominent */
-    .oj-orders-table .wp-list-table td:nth-child(2) {
+    .oj-orders-table .oj-child-order-row td:nth-child(2),
+    .oj-orders-table .pickup-order td:nth-child(2) {
         font-size: 22px !important;
         font-weight: bold !important;
         color: #0073aa !important;
@@ -1485,14 +1529,16 @@ $pickup_orders_all = array_merge($pickup_orders,
     }
     
     /* Customer */
-    .oj-orders-table .wp-list-table td:nth-child(3) {
+    .oj-orders-table .oj-child-order-row td:nth-child(3),
+    .oj-orders-table .pickup-order td:nth-child(3) {
         font-size: 16px !important;
         color: #333 !important;
         margin-bottom: 8px !important;
         font-weight: 500 !important;
     }
     
-    .oj-orders-table .wp-list-table td:nth-child(3):before {
+    .oj-orders-table .oj-child-order-row td:nth-child(3):before,
+    .oj-orders-table .pickup-order td:nth-child(3):before {
         content: "👤 ";
         margin-right: 6px;
     }
@@ -1510,7 +1556,8 @@ $pickup_orders_all = array_merge($pickup_orders,
     }
     
     /* Total - Make it prominent */
-    .oj-orders-table .wp-list-table td:nth-child(6) {
+    .oj-orders-table .oj-child-order-row td:nth-child(6),
+    .oj-orders-table .pickup-order td:nth-child(6) {
         font-size: 20px !important;
         font-weight: bold !important;
         color: #2271b1 !important;
@@ -1523,20 +1570,23 @@ $pickup_orders_all = array_merge($pickup_orders,
     }
     
     /* Time */
-    .oj-orders-table .wp-list-table td:nth-child(7) {
+    .oj-orders-table .oj-child-order-row td:nth-child(7),
+    .oj-orders-table .pickup-order td:nth-child(7) {
         font-size: 14px !important;
         color: #666 !important;
         margin-bottom: 16px !important;
         font-weight: 500 !important;
     }
     
-    .oj-orders-table .wp-list-table td:nth-child(7):before {
+    .oj-orders-table .oj-child-order-row td:nth-child(7):before,
+    .oj-orders-table .pickup-order td:nth-child(7):before {
         content: "🕐 ";
         margin-right: 6px;
     }
     
     /* Actions - Make buttons full width and prominent */
-    .oj-orders-table .wp-list-table td:nth-child(8) {
+    .oj-orders-table .oj-child-order-row td:nth-child(8),
+    .oj-orders-table .pickup-order td:nth-child(8) {
         display: flex !important;
         gap: 12px !important;
         margin-bottom: 12px !important;
