@@ -345,12 +345,171 @@ $pickup_orders_all = array_merge($pickup_orders,
                 </tr>
             </thead>
             <tbody>
-                <?php if (!empty($display_orders)) : ?>
-                    <!-- ACTIVE ORDERS: Table Groups and Pickup Orders -->
-                    <?php foreach ($display_orders as $item) : ?>
+                <!-- SIMPLE APPROACH: Display all orders directly from queries -->
+                
+                <!-- PROCESSING ORDERS -->
+                <?php foreach ($processing_orders as $order) : ?>
+                    <tr class="oj-order-row processing-order" 
+                        data-status="processing"
+                        data-type="<?php echo esc_attr($order['type']); ?>"
+                        data-table="<?php echo esc_attr($order['table']); ?>"
+                        data-order-id="<?php echo esc_attr($order['id']); ?>">
                         
-                        <?php if ($item['type'] === 'table_group') : ?>
-                            <!-- TABLE GROUP ROW (Expanded by default) - Formatted to match table headers -->
+                        <td class="check-column">
+                            <input type="checkbox" name="order_ids[]" value="<?php echo esc_attr($order['id']); ?>" />
+                        </td>
+                        
+                        <td class="oj-order-number">
+                            <strong>#<?php echo $order['id']; ?></strong>
+                        </td>
+                        
+                        <td class="oj-customer"><?php echo esc_html($order['customer']); ?></td>
+                        
+                        <td class="oj-type">
+                            <?php if (!empty($order['table'])) : ?>
+                                🍽️ <?php _e('Table', 'orders-jet'); ?> <?php echo esc_html($order['table']); ?>
+                            <?php else : ?>
+                                🥡 <?php _e('Pickup', 'orders-jet'); ?>
+                            <?php endif; ?>
+                        </td>
+                        
+                        <td class="oj-status">
+                            <span class="oj-status processing">🍳 <?php _e('Cooking', 'orders-jet'); ?></span>
+                        </td>
+                        
+                        <td class="oj-total"><?php echo wc_price($order['total']); ?></td>
+                        
+                        <td class="oj-time"><?php echo esc_html($order['date']); ?></td>
+                        
+                        <td class="oj-actions">
+                            <button class="button button-primary oj-complete-order" 
+                                    data-order-id="<?php echo esc_attr($order['id']); ?>">
+                                <?php _e('Complete', 'orders-jet'); ?>
+                            </button>
+                        </td>
+                        
+                        <td class="oj-view-action">
+                            <button class="button button-small oj-view-order" 
+                                    data-order-id="<?php echo esc_attr($order['id']); ?>"
+                                    title="<?php _e('View Order Details', 'orders-jet'); ?>">
+                                👁️
+                            </button>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                
+                <!-- READY ORDERS -->
+                <?php foreach ($ready_orders as $order) : ?>
+                    <tr class="oj-order-row ready-order" 
+                        data-status="pending"
+                        data-type="<?php echo esc_attr($order['type']); ?>"
+                        data-table="<?php echo esc_attr($order['table']); ?>"
+                        data-order-id="<?php echo esc_attr($order['id']); ?>">
+                        
+                        <td class="check-column">
+                            <input type="checkbox" name="order_ids[]" value="<?php echo esc_attr($order['id']); ?>" />
+                        </td>
+                        
+                        <td class="oj-order-number">
+                            <strong>#<?php echo $order['id']; ?></strong>
+                        </td>
+                        
+                        <td class="oj-customer"><?php echo esc_html($order['customer']); ?></td>
+                        
+                        <td class="oj-type">
+                            <?php if (!empty($order['table'])) : ?>
+                                🍽️ <?php _e('Table', 'orders-jet'); ?> <?php echo esc_html($order['table']); ?>
+                            <?php else : ?>
+                                🥡 <?php _e('Pickup', 'orders-jet'); ?>
+                            <?php endif; ?>
+                        </td>
+                        
+                        <td class="oj-status">
+                            <span class="oj-status ready">✅ <?php _e('Ready', 'orders-jet'); ?></span>
+                        </td>
+                        
+                        <td class="oj-total"><?php echo wc_price($order['total']); ?></td>
+                        
+                        <td class="oj-time"><?php echo esc_html($order['date']); ?></td>
+                        
+                        <td class="oj-actions">
+                            <button class="button button-primary oj-complete-order" 
+                                    data-order-id="<?php echo esc_attr($order['id']); ?>">
+                                <?php _e('Complete', 'orders-jet'); ?>
+                            </button>
+                        </td>
+                        
+                        <td class="oj-view-action">
+                            <button class="button button-small oj-view-order" 
+                                    data-order-id="<?php echo esc_attr($order['id']); ?>"
+                                    title="<?php _e('View Order Details', 'orders-jet'); ?>">
+                                👁️
+                            </button>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                
+                <!-- COMPLETED ORDERS -->
+                <?php foreach ($recent_completed_orders as $order) : ?>
+                    <tr class="oj-order-row completed-order" 
+                        data-status="completed"
+                        data-type="<?php echo esc_attr($order['type']); ?>"
+                        data-table="<?php echo esc_attr($order['table']); ?>"
+                        data-order-id="<?php echo esc_attr($order['id']); ?>">
+                        
+                        <td class="check-column">
+                            <input type="checkbox" name="order_ids[]" value="<?php echo esc_attr($order['id']); ?>" />
+                        </td>
+                        
+                        <td class="oj-order-number">
+                            <strong>#<?php echo $order['id']; ?></strong>
+                        </td>
+                        
+                        <td class="oj-customer"><?php echo esc_html($order['customer']); ?></td>
+                        
+                        <td class="oj-type">
+                            <?php if (!empty($order['table'])) : ?>
+                                🍽️ <?php _e('Table', 'orders-jet'); ?> <?php echo esc_html($order['table']); ?>
+                            <?php else : ?>
+                                🥡 <?php _e('Pickup', 'orders-jet'); ?>
+                            <?php endif; ?>
+                        </td>
+                        
+                        <td class="oj-status">
+                            <span class="oj-status completed">✅ <?php _e('Completed', 'orders-jet'); ?></span>
+                        </td>
+                        
+                        <td class="oj-total"><?php echo wc_price($order['total']); ?></td>
+                        
+                        <td class="oj-time"><?php echo esc_html($order['date']); ?></td>
+                        
+                        <td class="oj-actions">
+                            <button class="button button-small oj-invoice-print" 
+                                    data-order-id="<?php echo esc_attr($order['id']); ?>"
+                                    title="<?php _e('Print Thermal Invoice', 'orders-jet'); ?>">
+                                🖨️
+                            </button>
+                        </td>
+                        
+                        <td class="oj-view-action">
+                            <button class="button button-small oj-view-order" 
+                                    data-order-id="<?php echo esc_attr($order['id']); ?>"
+                                    title="<?php _e('View Order Details', 'orders-jet'); ?>">
+                                👁️
+                            </button>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                
+                <!-- Show message if no orders at all -->
+                <?php if (empty($processing_orders) && empty($ready_orders) && empty($recent_completed_orders)) : ?>
+                    <tr>
+                        <td colspan="9" class="oj-no-orders">
+                            <?php _e('No orders found.', 'orders-jet'); ?>
+                        </td>
+                    </tr>
+                <?php endif; ?>
+            </tbody>
                             <tr class="oj-table-group-row expanded" 
                                 data-table="<?php echo esc_attr($item['table_number']); ?>"
                                 data-type="table_group">
@@ -464,8 +623,12 @@ $pickup_orders_all = array_merge($pickup_orders,
                                 </tr>
                             <?php endforeach; ?>
                             
-                        <?php else : ?>
-                            <!-- PICKUP ORDER ROW (Individual) -->
+        </table>
+    </div>
+
+</div>
+
+<style>
                             <tr class="oj-order-row pickup-order" 
                                 data-status="<?php echo esc_attr($item['status']); ?>"
                                 data-type="pickup"
