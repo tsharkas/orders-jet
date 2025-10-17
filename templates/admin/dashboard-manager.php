@@ -531,7 +531,7 @@ $pickup_orders_all = array_merge($pickup_orders,
                         </td>
                     </tr>
                     
-                    <!-- COMPLETED ORDERS: Only shown when filtering for completed -->
+                    <!-- COMPLETED ORDERS: Recent completed orders (always visible) -->
                     <?php if (!empty($recent_completed_orders)) : ?>
                         <?php foreach ($recent_completed_orders as $completed_order) : ?>
                             <tr class="oj-order-row completed-order" 
@@ -1698,7 +1698,7 @@ html, body {
 <script>
 jQuery(document).ready(function($) {
     
-    // Apply default filter on page load (Active Orders)
+    // Apply default filter on page load (All Orders - Active + Recent)
     applyFilter('all');
     
     // Filter functionality
@@ -1728,11 +1728,11 @@ jQuery(document).ready(function($) {
             
             switch(filter) {
                 case 'all':
-                    // Show active orders and table groups (if they have active orders)
+                    // Show ALL orders: active orders, completed orders, and table groups
                     if (type === 'table_group') {
                         show = true; // Show table groups in 'all' filter
                     } else {
-                        show = status !== 'completed';
+                        show = true; // Show ALL orders including completed
                     }
                     break;
                 case 'processing':
