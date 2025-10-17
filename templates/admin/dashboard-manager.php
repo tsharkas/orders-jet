@@ -1523,23 +1523,27 @@ html, body {
         font-weight: 500;
     }
     
-    /* Action buttons styling */
+    /* Action buttons styling - Horizontal & Compact */
     .oj-orders-table .oj-child-order-row td:nth-child(8),
     .oj-orders-table .pickup-order td:nth-child(8) {
         display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
+        gap: 6px;
+        flex-wrap: nowrap;
+        align-items: center;
     }
     
     .oj-orders-table .oj-child-order-row .button,
     .oj-orders-table .pickup-order .button {
-        padding: 10px 16px;
-        border-radius: 8px;
-        font-size: 14px;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-size: 12px;
         font-weight: 600;
-        min-height: 44px;
+        min-height: 36px;
         border: none;
         cursor: pointer;
+        white-space: nowrap;
+        flex: 1;
+        text-align: center;
     }
     
     .oj-orders-table .oj-mark-ready {
