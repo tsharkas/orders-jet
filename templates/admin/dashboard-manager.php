@@ -23,27 +23,39 @@ $all_orders = array();
 $processing_orders = array();
 $ready_orders = array();
 
-// Get orders using WooCommerce native function with unified query approach
+// Get orders using WooCommerce native function with balanced query approach
 if (function_exists('wc_get_orders')) {
-    // Single query to get all relevant orders (with lazy loading - initial 20 per status)
-    $all_wc_orders = wc_get_orders(array(
-        'status' => array('processing', 'pending', 'completed'),
-        'limit' => 80, // 20 processing + 20 pending + 40 completed (buffer for mixed results)
+    // BALANCED APPROACH: Get specific amounts from each status to guarantee results
+    // This ensures we always get active orders even if there are many completed orders
+    
+    // Get processing orders (oldest first - FIFO for kitchen operations)
+    $processing_wc_orders = wc_get_orders(array(
+        'status' => 'processing',
+        'limit' => 20,
         'orderby' => 'date',
-        'order' => 'DESC' // Get newest first, then we'll sort by priority
+        'order' => 'ASC' // Oldest first - operational priority
     ));
     
-    // Initialize arrays and counters
-    $processing_orders = array();
-    $ready_orders = array();
-    $recent_completed_orders = array();
-    $processing_count = 0;
-    $ready_count = 0;
-    $completed_count = 0;
+    // Get ready orders (oldest first - FIFO for service operations)  
+    $ready_wc_orders = wc_get_orders(array(
+        'status' => 'pending',
+        'limit' => 20,
+        'orderby' => 'date', 
+        'order' => 'ASC' // Oldest first - operational priority
+    ));
     
-    // Process all orders in one loop and categorize by status
-    foreach ($all_wc_orders as $order) {
-        $order_data = array(
+    // Get recent completed orders (newest first - recent activity view)
+    $completed_wc_orders = wc_get_orders(array(
+        'status' => 'completed',
+        'limit' => 20,
+        'orderby' => 'date_modified',
+        'order' => 'DESC' // Newest first - recent view
+    ));
+    
+    // Process each status group
+    $processing_orders = array();
+    foreach ($processing_wc_orders as $order) {
+        $processing_orders[] = array(
             'id' => $order->get_id(),
             'status' => $order->get_status(),
             'total' => $order->get_total(),
@@ -51,46 +63,42 @@ if (function_exists('wc_get_orders')) {
             'table' => $order->get_meta('_oj_table_number') ?: '',
             'date' => $order->get_date_created()->format('H:i'),
             'type' => !empty($order->get_meta('_oj_table_number')) ? 'table' : 'pickup',
-            'created_timestamp' => $order->get_date_created()->getTimestamp() // For sorting
+            'created_timestamp' => $order->get_date_created()->getTimestamp()
         );
-        
-        // Categorize by status with lazy loading limits
-        switch ($order->get_status()) {
-            case 'processing':
-                if ($processing_count < 20) {
-                    $processing_orders[] = $order_data;
-                    $processing_count++;
-                }
-                break;
-            case 'pending':
-                if ($ready_count < 20) {
-                    $ready_orders[] = $order_data;
-                    $ready_count++;
-                }
-                break;
-            case 'completed':
-                if ($completed_count < 20) {
-                    // Add additional fields needed for completed orders display
-                    $order_data['date'] = $order->get_date_modified()->format('H:i');
-                    $order_data['payment_method'] = $order->get_meta('_oj_payment_method') ?: '';
-                    $recent_completed_orders[] = $order_data;
-                    $completed_count++;
-                }
-                break;
-        }
     }
     
-    // Sort active orders by priority (FIFO - oldest first for operational efficiency)
-    usort($processing_orders, function($a, $b) {
-        return $a['created_timestamp'] - $b['created_timestamp'];
-    });
-    usort($ready_orders, function($a, $b) {
-        return $a['created_timestamp'] - $b['created_timestamp'];
-    });
+    $ready_orders = array();
+    foreach ($ready_wc_orders as $order) {
+        $ready_orders[] = array(
+            'id' => $order->get_id(),
+            'status' => $order->get_status(),
+            'total' => $order->get_total(),
+            'customer' => $order->get_billing_first_name() ?: 'Guest',
+            'table' => $order->get_meta('_oj_table_number') ?: '',
+            'date' => $order->get_date_created()->format('H:i'),
+            'type' => !empty($order->get_meta('_oj_table_number')) ? 'table' : 'pickup',
+            'created_timestamp' => $order->get_date_created()->getTimestamp()
+        );
+    }
     
-    // Completed orders stay in DESC order (newest first) - no need to sort
+    $recent_completed_orders = array();
+    foreach ($completed_wc_orders as $order) {
+        $recent_completed_orders[] = array(
+            'id' => $order->get_id(),
+            'status' => $order->get_status(),
+            'total' => $order->get_total(),
+            'customer' => $order->get_billing_first_name() ?: 'Guest',
+            'table' => $order->get_meta('_oj_table_number') ?: '',
+            'date' => $order->get_date_modified()->format('H:i'), // Use modified date for completed
+            'payment_method' => $order->get_meta('_oj_payment_method') ?: '',
+            'type' => !empty($order->get_meta('_oj_table_number')) ? 'table' : 'pickup',
+            'created_timestamp' => $order->get_date_created()->getTimestamp()
+        );
+    }
     
-    // Recent completed orders are already processed above with proper structure
+    // Orders are already sorted correctly by the queries:
+    // - Processing/Ready: ASC (oldest first - FIFO operational priority)
+    // - Completed: DESC (newest first - recent activity view)
     
     // Combine active orders only (exclude completed from main operations)
     $active_orders = array_merge($processing_orders, $ready_orders);
