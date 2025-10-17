@@ -2026,16 +2026,7 @@ jQuery(document).ready(function($) {
                     ${childOrderIds.length > 0 ? `<p><small><?php _e('Child Orders:', 'orders-jet'); ?> ${childOrderIds.map(id => '#' + id).join(', ')}</small></p>` : ''}
                     <div class="oj-invoice-actions">
                         <button class="button button-primary oj-view-consolidated-invoice" data-order-id="${consolidatedOrderId}" data-table="${tableNumber}">
-                            📄 <?php _e('View Invoice', 'orders-jet'); ?>
-                        </button>
-                        <button class="button button-secondary oj-print-consolidated-invoice" data-order-id="${consolidatedOrderId}" data-table="${tableNumber}">
-                            🖨️ <?php _e('Print Invoice', 'orders-jet'); ?>
-                        </button>
-                        <button class="button button-secondary oj-download-consolidated-invoice" data-order-id="${consolidatedOrderId}" data-table="${tableNumber}">
-                            💾 <?php _e('Download PDF', 'orders-jet'); ?>
-                        </button>
-                        <button class="button oj-refresh-page">
-                            🔄 <?php _e('Refresh Dashboard', 'orders-jet'); ?>
+                            🖨️ <?php _e('View/Print Invoice', 'orders-jet'); ?>
                         </button>
                         <button class="button oj-close-success">
                             <?php _e('Close', 'orders-jet'); ?>
@@ -2047,95 +2038,30 @@ jQuery(document).ready(function($) {
         
         $('body').append(modal);
         
-        // Handle view consolidated invoice
+        // Handle view/print consolidated thermal invoice
         modal.find('.oj-view-consolidated-invoice').on('click', function() {
             const orderId = $(this).data('order-id');
             const tableNumber = $(this).data('table');
             if (orderId) {
-                // Use standard WooCommerce order view or custom invoice template
-                const invoiceUrl = '<?php echo admin_url('post.php'); ?>?post=' + orderId + '&action=edit';
-                window.open(invoiceUrl, '_blank');
+                // Use thermal invoice endpoint with print button for table orders
+                const thermalInvoiceUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_get_order_invoice&order_id=' + orderId + '&type=table&print=1';
+                window.open(thermalInvoiceUrl, '_blank');
             } else {
                 alert('<?php _e('No consolidated order found.', 'orders-jet'); ?>');
             }
         });
         
-        // Handle print consolidated invoice
-        modal.find('.oj-print-consolidated-invoice').on('click', function() {
-            const orderId = $(this).data('order-id');
-            if (orderId) {
-                // Generate PDF for consolidated order
-                const pdfUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_admin_pdf&order_id=' + orderId + '&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
-                
-                // Create hidden iframe for printing
-                const iframe = document.createElement('iframe');
-                iframe.style.display = 'none';
-                iframe.src = pdfUrl;
-                document.body.appendChild(iframe);
-                
-                iframe.onload = function() {
-                    try {
-                        // Try to print the PDF directly
-                        iframe.contentWindow.print();
-                    } catch (e) {
-                        // Fallback: open in new window for manual printing
-                        window.open(pdfUrl, '_blank');
-                    }
-                    // Remove iframe after printing
-                    setTimeout(() => {
-                        if (document.body.contains(iframe)) {
-                            document.body.removeChild(iframe);
-                        }
-                    }, 2000);
-                };
-                
-                // Fallback if iframe fails to load
-                iframe.onerror = function() {
-                    window.open(pdfUrl, '_blank');
-                    if (document.body.contains(iframe)) {
-                        document.body.removeChild(iframe);
-                    }
-                };
-            } else {
-                alert('<?php _e('No orders found for this table.', 'orders-jet'); ?>');
-            }
-        });
-        
-        // Handle download consolidated invoice
-        modal.find('.oj-download-consolidated-invoice').on('click', function() {
-            const orderId = $(this).data('order-id');
-            const tableNumber = $(this).data('table');
-            if (orderId) {
-                // Generate PDF for consolidated order download
-                const downloadUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_admin_pdf&order_id=' + orderId + '&force_download=1&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
-                
-                // Create temporary link for download
-                const link = document.createElement('a');
-                link.href = downloadUrl;
-                link.download = 'consolidated-order-' + orderId + '-table-' + tableNumber + '.pdf';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-            } else {
-                alert('<?php _e('No orders found for this table.', 'orders-jet'); ?>');
-            }
-        });
-        
-        // Handle refresh dashboard
-        modal.find('.oj-refresh-page').on('click', function() {
+        // Handle close (with refresh)
+        modal.find('.oj-close-success').on('click', function() {
             modal.remove();
             location.reload();
         });
         
-        // Handle close (without refresh)
-        modal.find('.oj-close-success').on('click', function() {
-            modal.remove();
-        });
-        
-        // Close on overlay click (without refresh)
+        // Close on overlay click (with refresh)
         modal.on('click', function(e) {
             if (e.target === this) {
                 modal.remove();
+                location.reload();
             }
         });
     }
