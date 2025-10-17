@@ -542,8 +542,16 @@ $pickup_orders_all = array_merge($pickup_orders,
 </div>
 
 <style>
+/* Prevent horizontal scroll globally */
+html, body {
+    overflow-x: hidden !important;
+    max-width: 100% !important;
+}
+
 .oj-manager-orders {
     max-width: 1200px;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
 }
 
 .oj-header {
@@ -1042,6 +1050,7 @@ $pickup_orders_all = array_merge($pickup_orders,
     width: 90%;
     max-height: 80vh;
     overflow-y: auto;
+    box-sizing: border-box;
 }
 
 .oj-modal-header {
@@ -1670,6 +1679,96 @@ $pickup_orders_all = array_merge($pickup_orders,
 
 .oj-orders-table::-webkit-scrollbar-thumb:hover {
     background: #a8a8a8;
+}
+
+/* Mobile Modal Responsive Styles */
+@media (max-width: 768px) {
+    .oj-order-details-modal {
+        width: 95% !important;
+        max-width: none !important;
+        margin: 10px !important;
+        max-height: 90vh !important;
+        border-radius: 12px !important;
+    }
+    
+    .oj-modal-header {
+        padding: 15px !important;
+        flex-wrap: wrap !important;
+    }
+    
+    .oj-modal-header h3 {
+        font-size: 18px !important;
+        word-break: break-word !important;
+        flex: 1 !important;
+        margin-right: 10px !important;
+    }
+    
+    .oj-modal-content {
+        padding: 15px !important;
+    }
+    
+    .oj-order-meta {
+        padding: 12px !important;
+        margin-bottom: 15px !important;
+    }
+    
+    .oj-order-meta p {
+        font-size: 14px !important;
+        word-break: break-word !important;
+    }
+    
+    .oj-order-item {
+        padding: 12px !important;
+        margin-bottom: 8px !important;
+    }
+    
+    .oj-item-info h4 {
+        font-size: 16px !important;
+        word-break: break-word !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .oj-order-details-modal {
+        width: 98% !important;
+        margin: 5px !important;
+        max-height: 95vh !important;
+        border-radius: 8px !important;
+    }
+    
+    .oj-modal-header {
+        padding: 12px !important;
+    }
+    
+    .oj-modal-header h3 {
+        font-size: 16px !important;
+    }
+    
+    .oj-modal-content {
+        padding: 12px !important;
+    }
+}
+
+/* Prevent horizontal scroll on main container */
+@media (max-width: 768px) {
+    .wrap.oj-manager-orders {
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+        box-sizing: border-box !important;
+    }
+    
+    .oj-orders-table {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+        box-sizing: border-box !important;
+    }
+    
+    .oj-orders-table .wp-list-table {
+        width: 100% !important;
+        max-width: 100% !important;
+        table-layout: auto !important;
+    }
 }
 
 /* Touch-friendly improvements */
