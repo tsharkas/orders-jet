@@ -1418,9 +1418,9 @@ html, body {
         display: none;
     }
     
-    /* Mobile Table Group Styling - Keep visible and clean */
+    /* Mobile Table Group Styling - Allow JavaScript hide/show */
     .oj-orders-table .oj-table-group-row {
-        display: table-row !important;
+        display: table-row; /* No !important - allows JavaScript to hide */
         font-size: 14px !important;
         padding: 8px 4px !important;
         background: #f8f9fa !important;
@@ -1528,7 +1528,8 @@ html, body {
     /* Ensure JavaScript hide/show works properly */
     .oj-orders-table .oj-child-order-row[style*="display: none"],
     .oj-orders-table .pickup-order[style*="display: none"],
-    .oj-orders-table .completed-order[style*="display: none"] {
+    .oj-orders-table .completed-order[style*="display: none"],
+    .oj-orders-table .oj-table-group-row[style*="display: none"] {
         display: none !important;
     }
     
