@@ -1347,16 +1347,15 @@ html, body {
     }
 }
 
-/* Clean Mobile Cards - Simple & Consistent */
+/* Clean Mobile Cards - CSS Grid Approach */
 @media (max-width: 480px) {
-    /* Hide table headers */
+    /* Hide table structure elements */
     .oj-orders-table .wp-list-table thead {
         display: none;
     }
     
-    /* Remove horizontal scroll */
-    .oj-orders-table {
-        overflow-x: visible;
+    .oj-orders-table .oj-table-group-row {
+        display: none;
     }
     
     /* Convert table to block layout */
@@ -1364,157 +1363,181 @@ html, body {
     .oj-orders-table .wp-list-table tbody {
         display: block;
         width: 100%;
-        min-width: auto;
     }
     
-    /* Hide table groups - show only individual orders */
-    .oj-orders-table .oj-table-group-row {
-        display: none;
-    }
-    
-    /* Clean card styling for individual orders */
+    /* Transform individual orders to clean grid cards */
     .oj-orders-table .oj-child-order-row,
     .oj-orders-table .pickup-order {
-        display: block;
+        display: grid;
+        grid-template-areas: 
+            "order-num status total"
+            "customer time type"
+            "actions actions view";
+        grid-template-columns: 1fr auto auto;
+        gap: 12px 16px;
         background: white;
         border: 1px solid #e1e5e9;
         border-radius: 12px;
+        padding: 20px;
         margin-bottom: 16px;
-        padding: 16px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.08);
         position: relative;
-        width: 100%;
-        box-sizing: border-box;
     }
     
-    /* Table order left border */
+    /* Table orders - blue left border */
     .oj-orders-table .oj-child-order-row {
         border-left: 4px solid #0073aa;
     }
     
-    /* Pickup order left border */
+    /* Pickup orders - red left border */
     .oj-orders-table .pickup-order {
         border-left: 4px solid #d63638;
     }
     
-    /* Stack table cells vertically */
-    .oj-orders-table .oj-child-order-row td,
-    .oj-orders-table .pickup-order td {
-        display: block;
-        border: none;
-        padding: 4px 0;
-        text-align: left;
-        width: 100%;
+    /* Grid positioning for table cells */
+    .oj-orders-table .oj-child-order-row td:nth-child(2),
+    .oj-orders-table .pickup-order td:nth-child(2) { 
+        grid-area: order-num; 
     }
     
-    /* Hide checkbox */
-    .oj-orders-table td:first-child {
+    .oj-orders-table .oj-child-order-row td:nth-child(3),
+    .oj-orders-table .pickup-order td:nth-child(3) { 
+        grid-area: customer; 
+    }
+    
+    .oj-orders-table .oj-child-order-row td:nth-child(4),
+    .oj-orders-table .pickup-order td:nth-child(4) { 
+        grid-area: type; 
+    }
+    
+    .oj-orders-table .oj-child-order-row td:nth-child(5),
+    .oj-orders-table .pickup-order td:nth-child(5) { 
+        grid-area: status; 
+    }
+    
+    .oj-orders-table .oj-child-order-row td:nth-child(6),
+    .oj-orders-table .pickup-order td:nth-child(6) { 
+        grid-area: total; 
+    }
+    
+    .oj-orders-table .oj-child-order-row td:nth-child(7),
+    .oj-orders-table .pickup-order td:nth-child(7) { 
+        grid-area: time; 
+    }
+    
+    .oj-orders-table .oj-child-order-row td:nth-child(8),
+    .oj-orders-table .pickup-order td:nth-child(8) { 
+        grid-area: actions; 
+    }
+    
+    .oj-orders-table .oj-child-order-row td:nth-child(9),
+    .oj-orders-table .pickup-order td:nth-child(9) { 
+        grid-area: view; 
+    }
+    
+    /* Hide checkbox column */
+    .oj-orders-table .oj-child-order-row td:first-child,
+    .oj-orders-table .pickup-order td:first-child {
         display: none;
     }
     
-    /* Style order number prominently */
-    .oj-orders-table td:nth-child(2) {
-        font-size: 18px;
-        font-weight: bold;
-        color: #0073aa;
-        margin-bottom: 8px;
-        padding-bottom: 4px;
-        border-bottom: 1px solid #f0f0f0;
+    /* Reset table cell styling */
+    .oj-orders-table .oj-child-order-row td,
+    .oj-orders-table .pickup-order td {
+        border: none;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        margin: 0;
     }
     
-    /* Customer name */
-    .oj-orders-table td:nth-child(3) {
+    /* Order number styling */
+    .oj-orders-table .oj-child-order-row td:nth-child(2),
+    .oj-orders-table .pickup-order td:nth-child(2) {
+        font-size: 20px;
+        font-weight: bold;
+        color: #0073aa;
+    }
+    
+    /* Customer styling */
+    .oj-orders-table .oj-child-order-row td:nth-child(3),
+    .oj-orders-table .pickup-order td:nth-child(3) {
         font-size: 14px;
         color: #333;
         font-weight: 500;
-        margin-bottom: 4px;
     }
     
-    .oj-orders-table td:nth-child(3):before {
-        content: "👤 ";
-        margin-right: 4px;
-    }
-    
-    /* Type - make it a badge */
-    .oj-orders-table td:nth-child(4) {
-        display: inline-block;
-        background: #f8f9fa;
+    /* Type styling - small badge */
+    .oj-orders-table .oj-child-order-row td:nth-child(4),
+    .oj-orders-table .pickup-order td:nth-child(4) {
+        font-size: 11px;
         color: #666;
+        background: #f8f9fa;
         padding: 4px 8px;
         border-radius: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    /* Status styling - prominent badges */
+    .oj-orders-table .oj-child-order-row td:nth-child(5) .oj-status,
+    .oj-orders-table .pickup-order td:nth-child(5) .oj-status {
+        padding: 6px 12px;
+        border-radius: 16px;
         font-size: 12px;
         font-weight: 600;
-        margin-bottom: 8px;
+        text-transform: uppercase;
     }
     
-    /* Status - make it a prominent badge */
-    .oj-orders-table td:nth-child(5) {
-        margin-bottom: 8px;
-    }
-    
-    .oj-orders-table td:nth-child(5) .oj-status.cooking {
+    .oj-orders-table .oj-child-order-row td:nth-child(5) .oj-status.cooking,
+    .oj-orders-table .pickup-order td:nth-child(5) .oj-status.cooking {
         background: #fff3cd;
         color: #856404;
-        padding: 6px 12px;
-        border-radius: 16px;
-        font-size: 12px;
-        font-weight: 600;
-        text-transform: uppercase;
     }
     
-    .oj-orders-table td:nth-child(5) .oj-status.ready {
+    .oj-orders-table .oj-child-order-row td:nth-child(5) .oj-status.ready,
+    .oj-orders-table .pickup-order td:nth-child(5) .oj-status.ready {
         background: #d1f2eb;
         color: #0f5132;
-        padding: 6px 12px;
-        border-radius: 16px;
-        font-size: 12px;
-        font-weight: 600;
-        text-transform: uppercase;
     }
     
-    /* Total - make it prominent */
-    .oj-orders-table td:nth-child(6) {
-        font-size: 18px;
+    /* Total styling - prominent box */
+    .oj-orders-table .oj-child-order-row td:nth-child(6),
+    .oj-orders-table .pickup-order td:nth-child(6) {
+        font-size: 16px;
         font-weight: bold;
         color: #2271b1;
         background: #f0f6fc;
-        padding: 12px;
+        padding: 8px 12px;
         border-radius: 8px;
-        text-align: center;
-        margin: 12px 0;
         border: 2px solid #2271b1;
     }
     
-    /* Time */
-    .oj-orders-table td:nth-child(7) {
-        font-size: 14px;
+    /* Time styling */
+    .oj-orders-table .oj-child-order-row td:nth-child(7),
+    .oj-orders-table .pickup-order td:nth-child(7) {
+        font-size: 13px;
         color: #666;
-        margin-bottom: 12px;
         font-weight: 500;
     }
     
-    .oj-orders-table td:nth-child(7):before {
-        content: "🕐 ";
-        margin-right: 4px;
-    }
-    
-    /* Action buttons */
-    .oj-orders-table td:nth-child(8) {
+    /* Action buttons styling */
+    .oj-orders-table .oj-child-order-row td:nth-child(8),
+    .oj-orders-table .pickup-order td:nth-child(8) {
         display: flex;
         gap: 8px;
-        margin-bottom: 8px;
         flex-wrap: wrap;
     }
     
-    .oj-orders-table .button {
-        flex: 1;
-        padding: 12px 16px;
-        text-align: center;
+    .oj-orders-table .oj-child-order-row .button,
+    .oj-orders-table .pickup-order .button {
+        padding: 10px 16px;
         border-radius: 8px;
         font-size: 14px;
         font-weight: 600;
         min-height: 44px;
         border: none;
+        cursor: pointer;
     }
     
     .oj-orders-table .oj-mark-ready {
@@ -1531,25 +1554,25 @@ html, body {
     .oj-orders-table .button:disabled {
         background: #ddd;
         color: #999;
+        cursor: not-allowed;
     }
     
-    /* View button */
-    .oj-orders-table td:nth-child(9) {
-        display: flex;
+    /* View button styling */
+    .oj-orders-table .oj-child-order-row td:nth-child(9),
+    .oj-orders-table .pickup-order td:nth-child(9) {
         justify-content: center;
-        margin-top: 8px;
     }
     
     .oj-orders-table .oj-view-order {
         background: #f0f6fc;
         color: #0073aa;
         border: 2px solid #0073aa;
-        padding: 8px 16px;
+        padding: 10px;
         border-radius: 8px;
-        font-size: 14px;
-        font-weight: 500;
+        font-size: 16px;
         text-decoration: none;
         min-height: 44px;
+        min-width: 44px;
         display: flex;
         align-items: center;
         justify-content: center;
