@@ -3576,14 +3576,14 @@ class Orders_Jet_AJAX_Handlers {
     }
     
     /**
-     * Generate HTML for single order invoice
+     * Generate HTML for single order invoice (thermal printer optimized)
      */
     private function generate_single_order_invoice_html($order, $print_mode = false) {
         $order_id = $order->get_id();
         $table_number = $order->get_meta('_oj_table_number');
         $order_type = !empty($table_number) ? 'Table' : 'Pickup';
         
-        // Get order items
+        // Get order items for thermal format
         $items_html = '';
         foreach ($order->get_items() as $item_id => $item) {
             $product = $item->get_product();
@@ -3606,95 +3606,235 @@ class Orders_Jet_AJAX_Handlers {
                 }
             }
             
+            $name = $item->get_name();
+            // Truncate long names for thermal width (max 25 chars)
+            if (strlen($name) > 25) {
+                $name = substr($name, 0, 22) . '...';
+            }
+            
             $items_html .= '<tr>';
-            $items_html .= '<td>' . $item->get_name();
+            $items_html .= '<td>' . $name;
             if ($notes) {
-                $items_html .= '<br><small style="color: #666;">Note: ' . esc_html($notes) . '</small>';
+                $items_html .= '<br><span class="thermal-note">Note: ' . esc_html($notes) . '</span>';
             }
             if ($addons_text) {
-                $items_html .= '<br><small style="color: #666;">Addons: ' . esc_html($addons_text) . '</small>';
+                $items_html .= '<br><span class="thermal-note">+ ' . esc_html($addons_text) . '</span>';
             }
             $items_html .= '</td>';
-            $items_html .= '<td style="text-align: center;">' . $item->get_quantity() . '</td>';
-            $items_html .= '<td style="text-align: right;">' . wc_price($product->get_price()) . '</td>';
-            $items_html .= '<td style="text-align: right;">' . wc_price($item->get_total()) . '</td>';
+            $items_html .= '<td class="thermal-center">' . $item->get_quantity() . '</td>';
+            $items_html .= '<td class="thermal-right">' . number_format($item->get_total(), 2) . '</td>';
             $items_html .= '</tr>';
         }
         
         $print_button = $print_mode ? '
-            <div style="text-align: center; margin: 20px; print:none;">
-                <button onclick="window.print()" style="background: #c41e3a; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">🖨️ Print Invoice</button>
+            <div class="thermal-print-button">
+                <button onclick="window.print()">🖨️ Print Invoice</button>
             </div>' : '';
+        
+        // Get currency symbol
+        $currency = get_woocommerce_currency();
         
         $html = '<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Invoice - Order #' . $order->get_order_number() . '</title>
+    <title>Invoice #' . $order->get_order_number() . '</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-        .invoice-container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .invoice-header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #c41e3a; padding-bottom: 20px; }
-        .invoice-header h1 { color: #c41e3a; margin: 0; font-size: 28px; }
-        .invoice-header p { margin: 5px 0; color: #666; }
-        .order-info { display: flex; justify-content: space-between; margin-bottom: 30px; }
-        .order-info div { flex: 1; }
-        .order-info h3 { color: #333; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-        .items-table th, .items-table td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
-        .items-table th { background: #f8f9fa; font-weight: 600; color: #333; }
-        .totals { text-align: right; margin-top: 20px; }
-        .totals div { margin: 8px 0; }
-        .grand-total { font-size: 18px; font-weight: bold; color: #c41e3a; border-top: 2px solid #c41e3a; padding-top: 10px; margin-top: 15px; }
+        /* Screen styles */
+        body { 
+            font-family: "Courier New", monospace; 
+            margin: 0; 
+            padding: 20px; 
+            background: #f5f5f5; 
+            font-size: 14px;
+            line-height: 1.3;
+        }
+        
+        .invoice-container { 
+            max-width: 400px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        }
+        
+        .thermal-header { 
+            text-align: center; 
+            border-bottom: 1px dashed #000; 
+            padding-bottom: 10px; 
+            margin-bottom: 15px; 
+        }
+        
+        .thermal-header h1 { 
+            margin: 0 0 5px 0; 
+            font-size: 18px; 
+            font-weight: bold; 
+        }
+        
+        .thermal-header p { 
+            margin: 2px 0; 
+            font-size: 12px; 
+        }
+        
+        .thermal-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin: 10px 0; 
+        }
+        
+        .thermal-table td { 
+            padding: 3px 2px; 
+            border: none; 
+            vertical-align: top; 
+            font-size: 12px;
+        }
+        
+        .thermal-table th {
+            padding: 5px 2px;
+            border: none;
+            font-weight: bold;
+            font-size: 12px;
+        }
+        
+        .thermal-center { text-align: center; }
+        .thermal-right { text-align: right; }
+        
+        .thermal-separator { 
+            border-top: 1px dashed #000; 
+            margin: 8px 0; 
+        }
+        
+        .thermal-total { 
+            font-weight: bold; 
+            font-size: 14px; 
+        }
+        
+        .thermal-note {
+            font-size: 10px;
+            color: #666;
+        }
+        
+        .thermal-print-button {
+            text-align: center;
+            margin: 20px 0;
+            print: none;
+        }
+        
+        .thermal-print-button button {
+            background: #c41e3a;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        .thermal-print-button button:hover {
+            background: #a01729;
+        }
+        
+        .thermal-footer {
+            text-align: center;
+            font-size: 10px;
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px dashed #000;
+        }
+        
+        /* Thermal printer optimizations */
         @media print {
-            body { background: white; }
-            .invoice-container { box-shadow: none; }
+            body {
+                font-family: "Courier New", monospace !important;
+                font-size: 12px !important;
+                line-height: 1.2 !important;
+                margin: 0 !important;
+                padding: 5px !important;
+                width: 80mm !important;
+                background: white !important;
+            }
+            
+            .invoice-container {
+                width: 100% !important;
+                max-width: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+                border-radius: 0 !important;
+            }
+            
+            .thermal-print-button {
+                display: none !important;
+            }
+            
+            .thermal-header h1 {
+                font-size: 16px !important;
+            }
+            
+            .thermal-table td, .thermal-table th {
+                font-size: 10px !important;
+                padding: 1px !important;
+            }
+            
+            .thermal-total {
+                font-size: 12px !important;
+            }
+            
+            .thermal-note {
+                font-size: 8px !important;
+            }
+            
+            .thermal-footer {
+                font-size: 8px !important;
+            }
         }
     </style>
 </head>
 <body>
     ' . $print_button . '
     <div class="invoice-container">
-        <div class="invoice-header">
-            <h1>INVOICE</h1>
-            <p>' . get_bloginfo('name') . '</p>
-            <p>Order #' . $order->get_order_number() . ' - ' . $order_type . ' Order</p>
+        <div class="thermal-header">
+            <h1>' . strtoupper(get_bloginfo('name')) . '</h1>
+            <p>INVOICE</p>
+            <p>Order #' . $order->get_order_number() . ' - ' . $order_type . '</p>
         </div>
         
-        <div class="order-info">
-            <div>
-                <h3>Order Details</h3>
-                <p><strong>Order ID:</strong> #' . $order->get_id() . '</p>
-                <p><strong>Type:</strong> ' . $order_type . '</p>
-                ' . (!empty($table_number) ? '<p><strong>Table:</strong> ' . $table_number . '</p>' : '') . '
-                <p><strong>Status:</strong> ' . ucfirst($order->get_status()) . '</p>
-            </div>
-            <div>
-                <h3>Date & Time</h3>
-                <p><strong>Order Date:</strong> ' . $order->get_date_created()->format('Y-m-d') . '</p>
-                <p><strong>Order Time:</strong> ' . $order->get_date_created()->format('H:i:s') . '</p>
-                <p><strong>Generated:</strong> ' . current_time('Y-m-d H:i:s') . '</p>
-            </div>
-        </div>
-        
-        <table class="items-table">
-            <thead>
-                <tr>
-                    <th>Item</th>
-                    <th style="text-align: center;">Qty</th>
-                    <th style="text-align: right;">Price</th>
-                    <th style="text-align: right;">Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                ' . $items_html . '
-            </tbody>
+        <table class="thermal-table">
+            <tr><td>Order ID:</td><td class="thermal-right">#' . $order->get_id() . '</td></tr>
+            <tr><td>Type:</td><td class="thermal-right">' . $order_type . '</td></tr>
+            ' . (!empty($table_number) ? '<tr><td>Table:</td><td class="thermal-right">' . $table_number . '</td></tr>' : '') . '
+            <tr><td>Date:</td><td class="thermal-right">' . $order->get_date_created()->format('Y-m-d H:i') . '</td></tr>
+            <tr><td>Status:</td><td class="thermal-right">' . ucfirst($order->get_status()) . '</td></tr>
         </table>
         
-        <div class="totals">
-            <div>Subtotal: ' . wc_price($order->get_subtotal()) . '</div>
-            ' . ($order->get_total_tax() > 0 ? '<div>Tax: ' . wc_price($order->get_total_tax()) . '</div>' : '') . '
-            <div class="grand-total">Total: ' . wc_price($order->get_total()) . '</div>
+        <div class="thermal-separator"></div>
+        
+        <table class="thermal-table">
+            <tr>
+                <th>Item</th>
+                <th class="thermal-center">Qty</th>
+                <th class="thermal-right">Total</th>
+            </tr>
+            <tr><td colspan="3" class="thermal-separator"></td></tr>
+            ' . $items_html . '
+        </table>
+        
+        <div class="thermal-separator"></div>
+        
+        <table class="thermal-table">
+            <tr><td>Subtotal:</td><td class="thermal-right">' . number_format($order->get_subtotal(), 2) . ' ' . $currency . '</td></tr>
+            ' . ($order->get_total_tax() > 0 ? '<tr><td>Tax:</td><td class="thermal-right">' . number_format($order->get_total_tax(), 2) . ' ' . $currency . '</td></tr>' : '') . '
+            <tr class="thermal-total">
+                <td>TOTAL:</td>
+                <td class="thermal-right">' . number_format($order->get_total(), 2) . ' ' . $currency . '</td>
+            </tr>
+        </table>
+        
+        <div class="thermal-footer">
+            <div>Thank you for your visit!</div>
+            <div>Generated: ' . current_time('Y-m-d H:i:s') . '</div>
         </div>
     </div>
 </body>
