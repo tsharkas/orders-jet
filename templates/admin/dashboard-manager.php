@@ -1352,19 +1352,23 @@ html, body {
 
 @media (max-width: 480px) {
     .oj-filters {
-        padding: 8px 12px !important;
-        gap: 8px !important;
-        top: 46px !important;
+        padding: 12px 15px !important;
+        gap: 10px !important;
+        margin: 15px 0 !important;
         overflow-x: auto !important;
         -webkit-overflow-scrolling: touch !important;
         display: flex !important;
         white-space: nowrap !important;
-        background: #f8f9fa !important;
-        border-bottom: 1px solid #e1e5e9 !important;
-        position: sticky !important;
+        background: white !important;
+        border: 1px solid #e1e5e9 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
         /* Enhanced scrolling indicators */
         scrollbar-width: thin !important;
-        scrollbar-color: #ccc transparent !important;
+        scrollbar-color: #007cba transparent !important;
+        /* Ensure it doesn't conflict with top navigation */
+        position: relative !important;
+        z-index: 1 !important;
     }
     
     /* Show scrollbar on mobile for better UX */
@@ -1378,12 +1382,12 @@ html, body {
     }
     
     .oj-filters::-webkit-scrollbar-thumb {
-        background: #ccc !important;
+        background: #007cba !important;
         border-radius: 2px !important;
     }
     
     .oj-filters::-webkit-scrollbar-thumb:hover {
-        background: #999 !important;
+        background: #005a87 !important;
     }
     
     .oj-filter-btn {
