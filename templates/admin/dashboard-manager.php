@@ -373,8 +373,8 @@ $pickup_orders_all = array_merge($pickup_orders,
                                 <!-- Time Column: Opened time -->
                                 <td><?php echo esc_html($item['earliest_time']); ?></td>
                                 
-                                <!-- Actions Column: Close Table + Collapse icon -->
-                                <td class="oj-table-actions">
+                                <!-- Actions + View Column: Close Table + Collapse icon (merged for more space) -->
+                                <td class="oj-table-actions" colspan="2">
                                     <?php if ($item['all_ready']) : ?>
                                         <button class="button button-primary oj-close-table-group" 
                                                 data-table="<?php echo esc_attr($item['table_number']); ?>">
@@ -391,9 +391,6 @@ $pickup_orders_all = array_merge($pickup_orders,
                                     <button class="oj-expand-table" data-table="<?php echo esc_attr($item['table_number']); ?>">
                                         <span class="dashicons dashicons-arrow-down-alt2"></span>
                                     </button>
-                                </td>
-                                <td class="oj-view-action">
-                                    <!-- Empty for table group rows -->
                                 </td>
                             </tr>
                             
@@ -1436,12 +1433,13 @@ html, body {
         min-width: 800px; /* Ensure table doesn't get too cramped */
     }
     
-    /* Make table actions horizontal on mobile */
+    /* Make table actions horizontal on mobile with more space */
     .oj-table-actions {
         display: flex !important;
         align-items: center !important;
-        gap: 8px !important;
-        justify-content: flex-end !important;
+        gap: 12px !important;
+        justify-content: space-between !important;
+        padding: 8px 12px !important;
     }
     
     /* Make collapse button more touch-friendly on mobile */
@@ -1461,12 +1459,13 @@ html, body {
         height: 20px !important;
     }
     
-    /* Make Close Table button more compact on mobile */
+    /* Make Close Table button larger with more space available */
     .oj-close-table-group {
-        padding: 8px 12px !important;
-        font-size: 12px !important;
+        padding: 12px 16px !important;
+        font-size: 14px !important;
         white-space: nowrap !important;
         flex-shrink: 0 !important;
+        min-height: 44px !important;
     }
 }
 
