@@ -1963,13 +1963,7 @@ jQuery(document).ready(function($) {
                     <p><?php _e('Order', 'orders-jet'); ?> #${orderId} <?php _e('has been completed.', 'orders-jet'); ?></p>
                     <div class="oj-invoice-actions">
                         <button class="button button-primary oj-view-invoice" data-order-id="${orderId}">
-                            📄 <?php _e('View PDF Invoice', 'orders-jet'); ?>
-                        </button>
-                        <button class="button button-secondary oj-print-invoice" data-order-id="${orderId}">
-                            🖨️ <?php _e('Print PDF Invoice', 'orders-jet'); ?>
-                        </button>
-                        <button class="button button-secondary oj-download-invoice" data-order-id="${orderId}">
-                            💾 <?php _e('Download PDF', 'orders-jet'); ?>
+                            🖨️ <?php _e('View/Print Invoice', 'orders-jet'); ?>
                         </button>
                         <button class="button oj-close-success">
                             <?php _e('Close', 'orders-jet'); ?>
@@ -1981,64 +1975,12 @@ jQuery(document).ready(function($) {
         
         $('body').append(modal);
         
-        // Handle view PDF invoice
+        // Handle view/print thermal invoice
         modal.find('.oj-view-invoice').on('click', function() {
             const orderId = $(this).data('order-id');
-            // Use our secure admin PDF endpoint
-            const invoiceUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_admin_pdf&order_id=' + orderId + '&document_type=invoice&output=html&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
-            window.open(invoiceUrl, '_blank');
-        });
-        
-        // Handle print PDF invoice
-        modal.find('.oj-print-invoice').on('click', function() {
-            const orderId = $(this).data('order-id');
-            // Use our secure admin PDF endpoint for printing
-            const pdfUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_admin_pdf&order_id=' + orderId + '&document_type=invoice&output=pdf&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
-            
-            // Create hidden iframe for printing
-            const iframe = document.createElement('iframe');
-            iframe.style.display = 'none';
-            iframe.src = pdfUrl;
-            document.body.appendChild(iframe);
-            
-            iframe.onload = function() {
-                try {
-                    // Try to print the PDF directly
-                    iframe.contentWindow.print();
-                } catch (e) {
-                    // Fallback: open in new window for manual printing
-                    window.open(pdfUrl, '_blank');
-                }
-                // Remove iframe after printing
-                setTimeout(() => {
-                    if (document.body.contains(iframe)) {
-                        document.body.removeChild(iframe);
-                    }
-                }, 2000);
-            };
-            
-            // Fallback if iframe fails to load
-            iframe.onerror = function() {
-                window.open(pdfUrl, '_blank');
-                if (document.body.contains(iframe)) {
-                    document.body.removeChild(iframe);
-                }
-            };
-        });
-        
-        // Handle download PDF invoice
-        modal.find('.oj-download-invoice').on('click', function() {
-            const orderId = $(this).data('order-id');
-            // Use our secure admin PDF endpoint for download
-            const downloadUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_generate_admin_pdf&order_id=' + orderId + '&document_type=invoice&output=pdf&force_download=1&nonce=<?php echo wp_create_nonce('oj_admin_pdf'); ?>';
-            
-            // Create temporary link for download
-            const link = document.createElement('a');
-            link.href = downloadUrl;
-            link.download = 'invoice-' + orderId + '.pdf';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            // Use thermal invoice endpoint with print button
+            const thermalInvoiceUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_get_order_invoice&order_id=' + orderId + '&type=pickup&print=1';
+            window.open(thermalInvoiceUrl, '_blank');
         });
         
         // Handle close
