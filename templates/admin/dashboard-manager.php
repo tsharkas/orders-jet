@@ -1441,20 +1441,59 @@ html, body {
         display: none !important;
     }
     
-    /* Make table group actions more compact */
-    .oj-orders-table .oj-table-group-row .oj-table-actions {
-        padding: 4px !important;
+    /* Enhanced table group row styling for better presentation */
+    .oj-orders-table .oj-table-group-row {
+        background: #f8f9fa !important;
+        border-left: 4px solid #007cba !important;
+        border-radius: 8px !important;
+        padding: 12px 16px !important;
+        margin-bottom: 12px !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
     }
     
+    /* Compact and polished Close Table button */
     .oj-orders-table .oj-table-group-row .oj-close-table-group {
-        font-size: 12px !important;
-        padding: 4px 8px !important;
-        margin-right: 4px !important;
+        font-size: 11px !important;
+        padding: 6px 12px !important;
+        margin-right: 8px !important;
+        border-radius: 6px !important;
+        font-weight: 600 !important;
+        min-height: 32px !important;
+        line-height: 1.2 !important;
     }
     
+    /* Compact expand/collapse button */
     .oj-orders-table .oj-table-group-row .oj-expand-table {
-        padding: 4px !important;
+        padding: 6px !important;
         font-size: 12px !important;
+        min-height: 32px !important;
+        min-width: 32px !important;
+        border-radius: 6px !important;
+    }
+    
+    /* Make order count and total more compact */
+    .oj-orders-table .oj-table-group-row .oj-order-count-highlight {
+        font-size: 14px !important;
+        font-weight: 700 !important;
+        background: #0073aa !important;
+        color: white !important;
+        padding: 4px 8px !important;
+        border-radius: 12px !important;
+        min-width: 24px !important;
+        text-align: center !important;
+        display: inline-block !important;
+    }
+    
+    .oj-orders-table .oj-table-group-row .oj-total-amount {
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        color: #0073aa !important;
+    }
+    
+    .oj-orders-table .oj-table-group-row .oj-separator {
+        margin: 0 8px !important;
+        color: #666 !important;
+        font-weight: 400 !important;
     }
     
     /* Convert table to block layout */
@@ -1493,9 +1532,18 @@ html, body {
         display: none !important;
     }
     
-    /* Table orders - blue left border */
+    /* Table orders - enhanced styling to match pickup order quality */
     .oj-orders-table .oj-child-order-row {
         border-left: 4px solid #0073aa !important;
+        /* Enhanced visual polish */
+        background: white !important;
+        border: 2px solid #e1e5e9 !important;
+        border-left: 4px solid #0073aa !important; /* Override to keep blue */
+        border-radius: 12px !important;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
+        padding: 20px !important;
+        margin-bottom: 16px !important;
+        gap: 12px 16px !important;
     }
     
     /* Pickup orders - red left border */
@@ -1545,6 +1593,37 @@ html, body {
     }
     
     /* Hide checkbox column */
+    /* Polish status badges and buttons for table orders */
+    .oj-orders-table .oj-child-order-row .oj-status {
+        padding: 6px 12px !important;
+        border-radius: 20px !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        text-align: center !important;
+    }
+    
+    .oj-orders-table .oj-child-order-row .button {
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        font-size: 13px !important;
+    }
+    
+    .oj-orders-table .oj-child-order-row .oj-mark-ready {
+        background: #0073aa !important;
+        border-color: #0073aa !important;
+        color: white !important;
+    }
+    
+    .oj-orders-table .oj-child-order-row .oj-status-note.ready {
+        background: #d1e7dd !important;
+        color: #0f5132 !important;
+        border: 1px solid #badbcc !important;
+        padding: 6px 12px !important;
+        border-radius: 20px !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+    }
+    
     .oj-orders-table .oj-child-order-row td:first-child,
     .oj-orders-table .pickup-order td:first-child {
         display: none;
