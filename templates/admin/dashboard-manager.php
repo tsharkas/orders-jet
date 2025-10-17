@@ -1532,18 +1532,9 @@ html, body {
         display: none !important;
     }
     
-    /* Table orders - enhanced styling to match pickup order quality */
+    /* Table orders - blue left border only (inherits all other styling from general rule above) */
     .oj-orders-table .oj-child-order-row {
         border-left: 4px solid #0073aa !important;
-        /* Enhanced visual polish */
-        background: white !important;
-        border: 2px solid #e1e5e9 !important;
-        border-left: 4px solid #0073aa !important; /* Override to keep blue */
-        border-radius: 12px !important;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
-        padding: 20px !important;
-        margin-bottom: 16px !important;
-        gap: 12px 16px !important;
     }
     
     /* Pickup orders - red left border */
