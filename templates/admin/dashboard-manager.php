@@ -661,7 +661,8 @@ html, body {
     margin-bottom: 20px;
     display: flex;
     gap: 10px;
-    flex-wrap: wrap;
+    overflow-x: auto;
+    white-space: nowrap;
     }
     
     .oj-filter-btn {
@@ -671,6 +672,8 @@ html, body {
     cursor: pointer;
     border-radius: 4px;
     transition: all 0.3s;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .oj-filter-btn:hover,
