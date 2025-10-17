@@ -100,9 +100,8 @@ if (function_exists('wc_get_orders')) {
     // - Processing/Ready: ASC (oldest modified first - FIFO operational priority)
     // - Completed: DESC (newest first - recent activity view)
     
-    // Smart fallback logic: Show completed orders only when no active orders exist
-    $has_active_orders = !empty($processing_orders) || !empty($ready_orders);
-    $show_completed_as_fallback = !$has_active_orders;
+    // Simple approach: Each filter shows exactly what it says
+    // No complex fallback logic needed
     
     // Combine active orders only (exclude completed from main operations)
     $active_orders = array_merge($processing_orders, $ready_orders);
@@ -206,6 +205,7 @@ $total_display_items = count($display_orders); // Table groups + pickup orders
 $processing_count = count($processing_orders);
 $ready_count = count($ready_orders);
 $recent_completed_count = count($recent_completed_orders);
+$total_orders_count = $processing_count + $ready_count + $recent_completed_count;
 
 // Count table groups and pickup orders separately
 $table_groups_count = count($table_groups);
@@ -279,6 +279,10 @@ $pickup_orders_all = array_merge($pickup_orders,
     <!-- Sticky Filters -->
     <div class="oj-filters">
         <button class="oj-filter-btn active" data-filter="all">
+            <span class="oj-filter-icon">📊</span>
+            <?php _e('All Orders', 'orders-jet'); ?> (<?php echo $total_orders_count; ?>)
+        </button>
+        <button class="oj-filter-btn" data-filter="active">
             <span class="oj-filter-icon">📋</span>
             <?php _e('Active Orders', 'orders-jet'); ?> (<?php echo $active_orders_count; ?>)
         </button>
@@ -1710,14 +1714,9 @@ html, body {
 <script>
 jQuery(document).ready(function($) {
     
-    // Smart fallback: Pass PHP logic to JavaScript
-    window.hasActiveOrders = <?php echo $has_active_orders ? 'true' : 'false'; ?>;
-    window.showCompletedAsFallback = <?php echo $show_completed_as_fallback ? 'true' : 'false'; ?>;
+    // Simple filter approach: Each filter shows exactly what it says
     
-    // Update filter button text based on content
-    updateFilterButtonText();
-    
-    // Apply default filter on page load (Active Orders)
+    // Apply default filter on page load (All Orders)
     applyFilter('all');
     
     // Filter functionality
@@ -1747,13 +1746,15 @@ jQuery(document).ready(function($) {
             
             switch(filter) {
                 case 'all':
-                    // Smart logic: Show active orders, or completed as fallback when no active orders
+                    // Show ALL orders: active orders, completed orders, and table groups
+                    show = true; // Show everything - complete overview
+                    break;
+                case 'active':
+                    // Show only active orders (processing + pending) and their table groups
                     if (type === 'table_group') {
-                        show = window.hasActiveOrders; // Show table groups only if there are active orders
-                    } else if (status === 'completed') {
-                        show = window.showCompletedAsFallback; // Show completed only as fallback
+                        show = true; // Show table groups for active orders
                     } else {
-                        show = true; // Always show active orders (processing/pending)
+                        show = status !== 'completed'; // Hide completed orders
                     }
                     break;
                 case 'processing':
@@ -2846,22 +2847,8 @@ jQuery(document).ready(function($) {
         }
     }
     
-    // Update filter button text based on content
-    function updateFilterButtonText() {
-        const $allButton = $('.oj-filter-btn[data-filter="all"]');
-        const processingCount = <?php echo count($processing_orders); ?>;
-        const readyCount = <?php echo count($ready_orders); ?>;
-        const completedCount = <?php echo count($recent_completed_orders); ?>;
-        const activeCount = processingCount + readyCount;
-        
-        if (window.hasActiveOrders) {
-            // Show active orders count
-            $allButton.html('<span class="oj-filter-icon">📋</span> <?php _e('Active Orders', 'orders-jet'); ?> (' + activeCount + ')');
-        } else {
-            // Show recent orders as fallback
-            $allButton.html('<span class="oj-filter-icon">📋</span> <?php _e('Recent Orders', 'orders-jet'); ?> (' + completedCount + ')');
-        }
-    }
+    // Simple filter approach: No dynamic button text needed
+    // Each filter has a fixed, predictable purpose
     
 });
 </script>
