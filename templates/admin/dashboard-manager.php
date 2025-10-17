@@ -1506,9 +1506,9 @@ html, body {
     }
     
     /* Transform individual orders to clean grid cards */
-    .oj-orders-table .oj-child-order-row,
-    .oj-orders-table .pickup-order,
-    .oj-orders-table .completed-order {
+    .oj-orders-table .oj-child-order-row:not([style*="display: none"]),
+    .oj-orders-table .pickup-order:not([style*="display: none"]),
+    .oj-orders-table .completed-order:not([style*="display: none"]) {
         display: grid;
         grid-template-areas: 
             "order-num status total"
@@ -1935,13 +1935,10 @@ jQuery(document).ready(function($) {
                     // Show pickup orders only - HIDE all table groups and table orders
                     if (type === 'table_group') {
                         show = false; // HIDE table groups in pickup filter
-                        console.log('PICKUP: Hiding table group');
                     } else if (type === 'table') {
                         show = false; // HIDE individual table orders in pickup filter
-                        console.log('PICKUP: Hiding table order', $row[0]);
                     } else {
                         show = type === 'pickup' && status !== 'completed';
-                        console.log('PICKUP: Pickup order', {show, type, status});
                     }
                     break;
                 case 'completed':
