@@ -1362,33 +1362,36 @@ $pickup_orders_all = array_merge($pickup_orders,
 }
 
 /* Mobile devices (480px and below) - CARD LAYOUT */
-@media (max-width: 480px) {
+@media screen and (max-width: 480px) {
     .oj-orders-table {
-        overflow-x: visible;
-        margin: 0;
-        padding: 0 10px;
+        overflow-x: visible !important;
+        margin: 0 !important;
+        padding: 0 10px !important;
     }
     
     /* Hide table header on mobile */
     .wp-list-table thead {
-        display: none;
+        display: none !important;
     }
     
     /* Convert table to card layout */
     .wp-list-table,
     .wp-list-table tbody {
-        display: block;
+        display: block !important;
+        width: 100% !important;
     }
     
     .wp-list-table tr {
-        display: block;
-        background: white;
-        border: 1px solid #e1e5e9;
-        border-radius: 12px;
-        margin-bottom: 16px;
-        padding: 16px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        position: relative;
+        display: block !important;
+        background: white !important;
+        border: 1px solid #e1e5e9 !important;
+        border-radius: 12px !important;
+        margin-bottom: 16px !important;
+        padding: 16px !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+        position: relative !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
     
     /* TABLE GROUP CARDS - Special styling */
@@ -1439,27 +1442,37 @@ $pickup_orders_all = array_merge($pickup_orders,
     
     /* Hide checkbox column */
     .wp-list-table td:first-child {
-        display: none;
+        display: none !important;
+    }
+    
+    /* Ensure proper table structure reset */
+    .wp-list-table {
+        table-layout: auto !important;
+        border-collapse: separate !important;
+        border-spacing: 0 !important;
     }
     
     /* Card content layout */
     .wp-list-table td {
-        display: block;
-        border: none;
-        padding: 0;
-        margin-bottom: 8px;
-        position: relative;
+        display: block !important;
+        border: none !important;
+        padding: 0 !important;
+        margin-bottom: 8px !important;
+        position: relative !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
     
     /* Order number and status header */
     .wp-list-table td:nth-child(2) { /* Order # */
-        font-size: 18px;
-        font-weight: bold;
-        color: #0073aa;
-        margin-bottom: 12px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+        font-size: 18px !important;
+        font-weight: bold !important;
+        color: #0073aa !important;
+        margin-bottom: 12px !important;
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        text-align: left !important;
     }
     
     /* Table group order number styling */
