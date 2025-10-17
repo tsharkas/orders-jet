@@ -1899,28 +1899,52 @@ jQuery(document).ready(function($) {
             
             switch(filter) {
                 case 'all':
-                    // Show active orders and table groups
-                    show = (status !== 'completed') || (type === 'table_group');
+                    // Show active orders and table groups (if they have active orders)
+                    if (type === 'table_group') {
+                        show = true; // Show table groups in 'all' filter
+                    } else {
+                        show = status !== 'completed';
+                    }
                     break;
                 case 'processing':
-                    // Show processing orders and table groups with processing orders
-                    show = (status === 'processing') || (type === 'table_group');
+                    // Show processing orders and table groups (if they have processing orders)
+                    if (type === 'table_group') {
+                        show = true; // Show table groups in 'processing' filter
+                    } else {
+                        show = status === 'processing';
+                    }
                     break;
                 case 'ready':
-                    // Show ready orders and table groups with ready orders
-                    show = (status === 'pending') || (type === 'table_group');
+                    // Show ready orders and table groups (if they have ready orders)
+                    if (type === 'table_group') {
+                        show = true; // Show table groups in 'ready' filter
+                    } else {
+                        show = status === 'pending';
+                    }
                     break;
                 case 'table':
                     // Show table orders and table groups only
-                    show = (type === 'table' && status !== 'completed') || (type === 'table_group');
+                    if (type === 'table_group') {
+                        show = true; // Show table groups in 'table' filter
+                    } else {
+                        show = type === 'table' && status !== 'completed';
+                    }
                     break;
                 case 'pickup':
-                    // Show pickup orders only - NO table groups
-                    show = (type === 'pickup' && status !== 'completed');
+                    // Show pickup orders only - HIDE all table groups
+                    if (type === 'table_group') {
+                        show = false; // HIDE table groups in pickup filter
+                    } else {
+                        show = type === 'pickup' && status !== 'completed';
+                    }
                     break;
                 case 'completed':
-                    // Show completed orders only - NO table groups
-                    show = (status === 'completed');
+                    // Show completed orders only - HIDE all table groups
+                    if (type === 'table_group') {
+                        show = false; // HIDE table groups in completed filter
+                    } else {
+                        show = status === 'completed';
+                    }
                     break;
             }
             
