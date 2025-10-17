@@ -1328,15 +1328,42 @@ $pickup_orders_all = array_merge($pickup_orders,
 
 /* Tablet and smaller desktop (768px and below) */
 @media (max-width: 768px) {
-    .oj-orders-table {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    /* Apply card layout for tablets too */
+    .oj-orders-table .wp-list-table thead {
+        display: none !important;
     }
     
-    .wp-list-table {
-        min-width: 700px; /* Ensure minimum width for readability */
+    .oj-orders-table {
+        overflow-x: visible !important;
+        -webkit-overflow-scrolling: auto !important;
+    }
+    
+    .oj-orders-table .wp-list-table,
+    .oj-orders-table .wp-list-table tbody {
+        display: block !important;
+        width: 100% !important;
+        min-width: auto !important;
+    }
+    
+    .oj-orders-table .wp-list-table tr {
+        display: block !important;
+        background: white !important;
+        border: 2px solid #e1e5e9 !important;
+        border-radius: 10px !important;
+        margin-bottom: 14px !important;
+        padding: 18px !important;
+        box-shadow: 0 3px 6px rgba(0,0,0,0.1) !important;
+        position: relative !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    
+    .oj-orders-table .wp-list-table td {
+        display: block !important;
+        border: none !important;
+        padding: 6px 0 !important;
+        text-align: left !important;
+        width: 100% !important;
     }
     
     /* Hide less critical columns on tablet */
@@ -1380,27 +1407,37 @@ $pickup_orders_all = array_merge($pickup_orders,
 
 /* Mobile devices (480px and below) - SIMPLE CARD LAYOUT */
 @media (max-width: 480px) {
-    /* Hide table header */
-    .wp-list-table thead {
-        display: none;
+    /* Force hide table header */
+    .oj-orders-table .wp-list-table thead {
+        display: none !important;
+    }
+    
+    /* Remove horizontal scroll */
+    .oj-orders-table {
+        overflow-x: visible !important;
+        -webkit-overflow-scrolling: auto !important;
     }
     
     /* Convert table to simple card layout */
-    .wp-list-table,
-    .wp-list-table tbody {
-        display: block;
+    .oj-orders-table .wp-list-table,
+    .oj-orders-table .wp-list-table tbody {
+        display: block !important;
+        width: 100% !important;
+        min-width: auto !important;
     }
     
     /* Simple card styling for ALL orders */
-    .wp-list-table tr {
-        display: block;
-        background: white;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        margin-bottom: 12px;
-        padding: 16px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        position: relative;
+    .oj-orders-table .wp-list-table tr {
+        display: block !important;
+        background: white !important;
+        border: 2px solid #e1e5e9 !important;
+        border-radius: 12px !important;
+        margin-bottom: 16px !important;
+        padding: 20px !important;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
+        position: relative !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
     
     /* Table order flag */
@@ -1424,34 +1461,40 @@ $pickup_orders_all = array_merge($pickup_orders,
     }
     
     /* Hide checkbox and make all cells block */
-    .wp-list-table td:first-child {
-        display: none;
+    .oj-orders-table .wp-list-table td:first-child {
+        display: none !important;
     }
     
-    .wp-list-table td {
-        display: block;
-        border: none;
-        padding: 4px 0;
-        text-align: left;
+    .oj-orders-table .wp-list-table td {
+        display: block !important;
+        border: none !important;
+        padding: 8px 0 !important;
+        text-align: left !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
     
-    /* Order number */
-    .wp-list-table td:nth-child(2) {
-        font-size: 18px;
-        font-weight: bold;
-        color: #0073aa;
-        margin-bottom: 8px;
+    /* Order number - Make it prominent */
+    .oj-orders-table .wp-list-table td:nth-child(2) {
+        font-size: 22px !important;
+        font-weight: bold !important;
+        color: #0073aa !important;
+        margin-bottom: 12px !important;
+        padding-bottom: 8px !important;
+        border-bottom: 1px solid #f0f0f0 !important;
     }
     
     /* Customer */
-    .wp-list-table td:nth-child(3) {
-        font-size: 14px;
-        color: #666;
-        margin-bottom: 4px;
+    .oj-orders-table .wp-list-table td:nth-child(3) {
+        font-size: 16px !important;
+        color: #333 !important;
+        margin-bottom: 8px !important;
+        font-weight: 500 !important;
     }
     
-    .wp-list-table td:nth-child(3):before {
+    .oj-orders-table .wp-list-table td:nth-child(3):before {
         content: "👤 ";
+        margin-right: 6px;
     }
     
     /* Type */
@@ -1466,34 +1509,38 @@ $pickup_orders_all = array_merge($pickup_orders,
         margin-bottom: 8px;
     }
     
-    /* Total */
-    .wp-list-table td:nth-child(6) {
-        font-size: 16px;
-        font-weight: bold;
-        color: #2271b1;
-        background: #f8f9fa;
-        padding: 8px;
-        border-radius: 4px;
-        text-align: center;
-        margin-bottom: 8px;
+    /* Total - Make it prominent */
+    .oj-orders-table .wp-list-table td:nth-child(6) {
+        font-size: 20px !important;
+        font-weight: bold !important;
+        color: #2271b1 !important;
+        background: #f0f6fc !important;
+        padding: 12px !important;
+        border-radius: 8px !important;
+        text-align: center !important;
+        margin: 12px 0 !important;
+        border: 2px solid #2271b1 !important;
     }
     
     /* Time */
-    .wp-list-table td:nth-child(7) {
-        font-size: 12px;
-        color: #666;
-        margin-bottom: 12px;
+    .oj-orders-table .wp-list-table td:nth-child(7) {
+        font-size: 14px !important;
+        color: #666 !important;
+        margin-bottom: 16px !important;
+        font-weight: 500 !important;
     }
     
-    .wp-list-table td:nth-child(7):before {
+    .oj-orders-table .wp-list-table td:nth-child(7):before {
         content: "🕐 ";
+        margin-right: 6px;
     }
     
-    /* Actions */
-    .wp-list-table td:nth-child(8) {
-        display: flex;
-        gap: 8px;
-        margin-bottom: 8px;
+    /* Actions - Make buttons full width and prominent */
+    .oj-orders-table .wp-list-table td:nth-child(8) {
+        display: flex !important;
+        gap: 12px !important;
+        margin-bottom: 12px !important;
+        flex-wrap: wrap !important;
     }
     
     /* View button */
@@ -1516,31 +1563,43 @@ $pickup_orders_all = array_merge($pickup_orders,
         font-size: 16px;
     }
     
-    /* Buttons */
-    .wp-list-table .button {
-        flex: 1;
-        padding: 10px 12px;
-        font-size: 12px;
-        border-radius: 4px;
-        text-align: center;
-        min-height: 40px;
+    /* Buttons - Make them prominent and touch-friendly */
+    .oj-orders-table .wp-list-table .button {
+        flex: 1 !important;
+        padding: 14px 16px !important;
+        font-size: 14px !important;
+        border-radius: 8px !important;
+        text-align: center !important;
+        min-height: 48px !important;
+        font-weight: 600 !important;
+        border: 2px solid transparent !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    /* Mark Ready button */
+    .oj-orders-table .oj-mark-ready {
+        background: #2271b1 !important;
+        color: white !important;
+        border-color: #2271b1 !important;
     }
     
     /* Close table button for table orders */
-    .oj-close-table-btn {
-        background: #0073aa;
-        color: white;
-        border: none;
-        padding: 10px 12px;
-        font-size: 12px;
-        border-radius: 4px;
-        flex: 1;
-        min-height: 40px;
+    .oj-orders-table .oj-close-table-btn {
+        background: #00a32a !important;
+        color: white !important;
+        border: 2px solid #00a32a !important;
+        padding: 14px 16px !important;
+        font-size: 14px !important;
+        border-radius: 8px !important;
+        flex: 1 !important;
+        min-height: 48px !important;
+        font-weight: 600 !important;
     }
     
-    .oj-close-table-btn:disabled {
-        background: #ccc;
-        color: #666;
+    .oj-orders-table .oj-close-table-btn:disabled {
+        background: #ddd !important;
+        color: #999 !important;
+        border-color: #ddd !important;
     }
 }
 
