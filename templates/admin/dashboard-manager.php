@@ -1384,8 +1384,41 @@ html, body {
         display: none;
     }
     
+    /* Mobile Table Group Styling - Keep visible and clean */
     .oj-orders-table .oj-table-group-row {
-        display: none;
+        display: table-row !important;
+        font-size: 14px !important;
+        padding: 8px 4px !important;
+        background: #f8f9fa !important;
+        border-left: 4px solid #007cba !important;
+    }
+    
+    /* Hide unnecessary columns in table group row for cleaner mobile view */
+    .oj-orders-table .oj-table-group-row td:nth-child(1), /* Checkbox */
+    .oj-orders-table .oj-table-group-row td:nth-child(3), /* "Table Guest" */
+    .oj-orders-table .oj-table-group-row td:nth-child(4)  /* "🍽️ Dine In" */ {
+        display: none !important;
+    }
+    
+    /* Hide status indicators (cooking/ready icons) but keep "Opened" text */
+    .oj-orders-table .oj-table-group-row .oj-status-indicator {
+        display: none !important;
+    }
+    
+    /* Make table group actions more compact */
+    .oj-orders-table .oj-table-group-row .oj-table-actions {
+        padding: 4px !important;
+    }
+    
+    .oj-orders-table .oj-table-group-row .oj-close-table-group {
+        font-size: 12px !important;
+        padding: 4px 8px !important;
+        margin-right: 4px !important;
+    }
+    
+    .oj-orders-table .oj-table-group-row .oj-expand-table {
+        padding: 4px !important;
+        font-size: 12px !important;
     }
     
     /* Convert table to block layout */
