@@ -263,25 +263,31 @@ $pickup_orders_all = array_merge($pickup_orders,
         </div>
     </div>
 
-    <!-- Filters -->
+    <!-- Sticky Filters -->
     <div class="oj-filters">
         <button class="oj-filter-btn active" data-filter="all">
+            <span class="oj-filter-icon">📋</span>
             <?php _e('Active Orders', 'orders-jet'); ?> (<?php echo $active_orders_count; ?>)
         </button>
         <button class="oj-filter-btn" data-filter="processing">
+            <span class="oj-filter-icon">🍳</span>
             <?php _e('In Kitchen', 'orders-jet'); ?> (<?php echo $processing_count; ?>)
         </button>
         <button class="oj-filter-btn" data-filter="ready">
+            <span class="oj-filter-icon">✅</span>
             <?php _e('Ready Orders', 'orders-jet'); ?> (<?php echo $ready_count; ?>)
         </button>
         <button class="oj-filter-btn" data-filter="table">
+            <span class="oj-filter-icon">🏷️</span>
             <?php _e('Table Groups', 'orders-jet'); ?> (<?php echo $table_groups_count; ?>)
         </button>
         <button class="oj-filter-btn" data-filter="pickup">
+            <span class="oj-filter-icon">🥡</span>
             <?php _e('Pickup Orders', 'orders-jet'); ?> (<?php echo $pickup_orders_count; ?>)
         </button>
         <button class="oj-filter-btn" data-filter="completed">
-            ✅ <?php _e('Recent', 'orders-jet'); ?> (<?php echo $recent_completed_count; ?>)
+            <span class="oj-filter-icon">🎯</span>
+            <?php _e('Recent', 'orders-jet'); ?> (<?php echo $recent_completed_count; ?>)
         </button>
     </div>
     
@@ -1193,6 +1199,113 @@ $pickup_orders_all = array_merge($pickup_orders,
 }
 
 /* ========================================
+   STICKY FILTER TABS - MANAGER DASHBOARD
+   ======================================== */
+
+/* Sticky Filter Tabs */
+.oj-filters {
+    background: white;
+    border-radius: 15px;
+    padding: 15px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    position: sticky;
+    top: 32px; /* Below WordPress admin bar */
+    z-index: 100;
+    white-space: nowrap;
+}
+
+.oj-filters::-webkit-scrollbar {
+    display: none;
+}
+
+.oj-filter-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border: 2px solid #e9ecef;
+    background: white;
+    color: #495057;
+    text-decoration: none;
+    border-radius: 25px;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0; /* Prevent buttons from shrinking */
+}
+
+.oj-filter-btn:hover {
+    border-color: #007cba;
+    background: #f8f9fa;
+    color: #007cba;
+    transform: translateY(-1px);
+    text-decoration: none;
+}
+
+.oj-filter-btn.active {
+    background: #007cba;
+    color: white;
+    border-color: #007cba;
+}
+
+.oj-filter-btn.active:hover {
+    background: #005a87;
+    color: white;
+}
+
+.oj-filter-icon {
+    font-size: 16px;
+    margin-right: 4px;
+}
+
+/* Mobile filter styles */
+@media (max-width: 768px) {
+    .oj-filters {
+        padding: 10px;
+        gap: 8px;
+        margin: 0 -10px 20px -10px; /* Extend to screen edges */
+        border-radius: 0;
+        top: 46px; /* Adjust for mobile admin bar */
+    }
+    
+    .oj-filter-btn {
+        padding: 10px 14px;
+        font-size: 13px;
+        border-radius: 20px;
+    }
+    
+    .oj-filter-icon {
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    .oj-filters {
+        padding: 8px;
+        gap: 6px;
+        top: 46px;
+    }
+    
+    .oj-filter-btn {
+        padding: 8px 12px;
+        font-size: 12px;
+        border-radius: 18px;
+    }
+    
+    .oj-filter-icon {
+        font-size: 12px;
+    }
+}
+
+/* ========================================
    RESPONSIVE DESIGN - MOBILE FIRST
    ======================================== */
 
@@ -1248,81 +1361,323 @@ $pickup_orders_all = array_merge($pickup_orders,
     }
 }
 
-/* Mobile devices (480px and below) */
+/* Mobile devices (480px and below) - CARD LAYOUT */
 @media (max-width: 480px) {
     .oj-orders-table {
-        overflow-x: auto;
-        margin: 0 -10px; /* Extend to screen edges */
+        overflow-x: visible;
+        margin: 0;
+        padding: 0 10px;
     }
     
-    .wp-list-table {
-        min-width: 600px;
-    }
-    
-    /* Hide even more columns on mobile */
-    .wp-list-table th:nth-child(3), /* Customer */
-    .wp-list-table th:nth-child(4), /* Type */
-    .wp-list-table td:nth-child(3), /* Customer */
-    .wp-list-table td:nth-child(4) { /* Type */
+    /* Hide table header on mobile */
+    .wp-list-table thead {
         display: none;
     }
     
-    /* More compact buttons */
-    .oj-table-actions {
-        min-width: 80px;
+    /* Convert table to card layout */
+    .wp-list-table,
+    .wp-list-table tbody {
+        display: block;
     }
     
-    .oj-view-action {
-        width: 40px;
-        padding: 2px 4px;
+    .wp-list-table tr {
+        display: block;
+        background: white;
+        border: 1px solid #e1e5e9;
+        border-radius: 12px;
+        margin-bottom: 16px;
+        padding: 16px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        position: relative;
+    }
+    
+    /* TABLE GROUP CARDS - Special styling */
+    .oj-table-group-row {
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%) !important;
+        border: 2px solid #0073aa;
+        border-radius: 16px;
+        box-shadow: 0 6px 16px rgba(0,115,170,0.2);
+        margin-bottom: 20px;
+        position: relative;
+    }
+    
+    .oj-table-group-row::before {
+        content: "🏷️ TABLE";
+        position: absolute;
+        top: -8px;
+        left: 16px;
+        background: #0073aa;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: bold;
+    }
+    
+    /* CHILD ORDER CARDS - Indented and connected */
+    .oj-child-order-row {
+        background: #f8f9fa !important;
+        border: 1px solid #dee2e6;
+        border-left: 4px solid #0073aa;
+        border-radius: 12px;
+        margin-left: 24px;
+        margin-bottom: 12px;
+        margin-top: 8px;
+        box-shadow: 0 2px 8px rgba(0,115,170,0.1);
+        position: relative;
+    }
+    
+    .oj-child-order-row::before {
+        content: "└─";
+        position: absolute;
+        left: -28px;
+        top: 16px;
+        color: #0073aa;
+        font-weight: bold;
+        font-size: 16px;
+    }
+    
+    /* Hide checkbox column */
+    .wp-list-table td:first-child {
+        display: none;
+    }
+    
+    /* Card content layout */
+    .wp-list-table td {
+        display: block;
+        border: none;
+        padding: 0;
+        margin-bottom: 8px;
+        position: relative;
+    }
+    
+    /* Order number and status header */
+    .wp-list-table td:nth-child(2) { /* Order # */
+        font-size: 18px;
+        font-weight: bold;
+        color: #0073aa;
+        margin-bottom: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    /* Table group order number styling */
+    .oj-table-group-row .wp-list-table td:nth-child(2) {
+        font-size: 24px;
+        color: #0073aa;
+        text-align: center;
+        margin-bottom: 16px;
+    }
+    
+    /* Customer info */
+    .wp-list-table td:nth-child(3) { /* Customer */
+        display: flex !important;
+        align-items: center;
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 8px;
+    }
+    
+    .wp-list-table td:nth-child(3):before {
+        content: "👤 ";
+        margin-right: 6px;
+    }
+    
+    /* Type info */
+    .wp-list-table td:nth-child(4) { /* Type */
+        display: flex !important;
+        align-items: center;
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 12px;
+    }
+    
+    /* Status with better styling */
+    .wp-list-table td:nth-child(5) { /* Status */
+        margin-bottom: 12px;
+        text-align: center;
+    }
+    
+    /* Table group status indicators */
+    .oj-table-group-row .wp-list-table td:nth-child(5) {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+    
+    .oj-status-indicator {
+        background: white;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: bold;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    /* Total with prominent display */
+    .wp-list-table td:nth-child(6) { /* Total */
+        font-size: 20px;
+        font-weight: bold;
+        color: #2271b1;
+        text-align: center;
+        background: #f8f9fa;
+        padding: 12px;
+        border-radius: 8px;
+        margin-bottom: 12px;
+    }
+    
+    /* Table group total - special styling */
+    .oj-table-group-row .wp-list-table td:nth-child(6) {
+        background: linear-gradient(135deg, #fff3e0 0%, #ffcc02 100%);
+        border: 2px solid #ff9800;
+        color: #e65100;
+        font-size: 18px;
+        font-weight: bold;
+        text-align: center;
+        padding: 16px;
+        border-radius: 12px;
+        margin-bottom: 16px;
+    }
+    
+    /* Time info */
+    .wp-list-table td:nth-child(7) { /* Time */
+        font-size: 12px;
+        color: #666;
+        text-align: center;
+        margin-bottom: 16px;
+    }
+    
+    .wp-list-table td:nth-child(7):before {
+        content: "🕐 ";
+        margin-right: 4px;
+    }
+    
+    /* Actions at bottom of card */
+    .wp-list-table td:nth-child(8) { /* Actions */
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+    
+    .wp-list-table td:nth-child(9) { /* View */
+        display: flex;
+        justify-content: center;
+        margin-bottom: 0;
+    }
+    
+    /* Button styling for cards */
+    .wp-list-table .button {
+        flex: 1;
+        max-width: 200px;
+        margin: 0 4px;
+        padding: 12px 16px;
+        font-size: 14px;
+        border-radius: 8px;
+        text-align: center;
+        min-height: 44px;
     }
     
     .oj-view-order {
-        font-size: 14px;
-        padding: 4px 6px;
+        background: #f0f6fc;
+        color: #0073aa;
+        border: 2px solid #0073aa;
+        padding: 12px;
+        border-radius: 50%;
+        width: 48px;
+        height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        margin: 0 auto;
+        min-height: 48px;
+        min-width: 48px;
     }
     
-    /* Smaller text for mobile */
-    .wp-list-table th,
-    .wp-list-table td {
-        font-size: 12px;
-        padding: 6px 4px;
-    }
-    
-    /* Compact table group styling */
-    .oj-table-total {
-        font-size: 11px;
-    }
-    
-    .oj-order-count-highlight {
-        font-size: 12px;
-        padding: 1px 4px;
-    }
-    
-    .oj-separator {
-        margin: 0 2px;
-    }
-    
-    /* Compact buttons */
-    .button {
-        font-size: 11px;
-        padding: 4px 8px;
-        line-height: 1.2;
+    /* Table group specific actions */
+    .oj-table-group-row .wp-list-table td:nth-child(8) {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        margin-bottom: 8px;
     }
     
     .oj-close-table-group {
-        font-size: 10px;
-        padding: 3px 6px;
+        flex: 2;
+        background: #0073aa;
+        color: white;
+        border: none;
+        padding: 16px 24px;
+        font-size: 16px;
+        font-weight: bold;
+        border-radius: 12px;
+        min-height: 48px;
+    }
+    
+    .oj-close-table-group:disabled {
+        background: #ccc;
+        color: #666;
     }
     
     .oj-expand-table {
-        padding: 2px 4px;
+        flex: 1;
+        background: white;
+        border: 2px solid #0073aa;
+        color: #0073aa;
+        padding: 16px;
+        border-radius: 12px;
+        font-weight: bold;
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
     
     .oj-expand-table .dashicons {
-        font-size: 14px;
-        width: 14px;
-        height: 14px;
+        font-size: 18px;
+        width: 18px;
+        height: 18px;
+    }
+    
+    /* Status badges in cards */
+    .oj-status-badge,
+    .oj-status {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+    
+    .oj-status.cooking {
+        background: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+    }
+    
+    .oj-status.ready {
+        background: #d1edff;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+    }
+    
+    /* Hide/Show child orders based on expand state */
+    .oj-table-group-row.collapsed ~ .oj-child-order-row {
+        display: none;
+    }
+    
+    .oj-table-group-row.expanded ~ .oj-child-order-row {
+        display: block;
+    }
+    
+    /* Empty view action for table groups */
+    .oj-table-group-row .wp-list-table td:nth-child(9) {
+        display: none;
     }
 }
 
