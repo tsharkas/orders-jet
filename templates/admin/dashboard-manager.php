@@ -438,23 +438,6 @@ $pickup_orders_all = array_merge($pickup_orders,
                                         <?php elseif ($child_order['status'] === 'pending') : ?>
                                             <span class="oj-status-note ready">✅ <?php _e('Ready', 'orders-jet'); ?></span>
                                         <?php endif; ?>
-                                        
-                                        <!-- Close Table Button for Table Orders -->
-                                        <?php 
-                                        // Check if all orders for this table are ready
-                                        $all_table_orders_ready = true;
-                                        foreach ($item['orders'] as $check_order) {
-                                            if ($check_order['status'] !== 'pending') {
-                                                $all_table_orders_ready = false;
-                                                break;
-                                            }
-                                        }
-                                        ?>
-                                        <button class="button oj-close-table-btn <?php echo $all_table_orders_ready ? '' : 'disabled'; ?>" 
-                                                data-table="<?php echo esc_attr($item['table_number']); ?>"
-                                                <?php echo $all_table_orders_ready ? '' : 'disabled'; ?>>
-                                            <?php _e('Close Table', 'orders-jet'); ?>
-                                        </button>
                                     </td>
                                     <td class="oj-view-action">
                                         <button class="button-link oj-view-order" 
