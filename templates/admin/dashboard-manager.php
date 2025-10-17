@@ -1460,7 +1460,7 @@ html, body {
         height: 16px !important;
     }
     
-    /* Make Close Table button smaller and cleaner */
+    /* Make Close Table button match Complete button style */
     .oj-close-table-group {
         padding: 8px 12px !important;
         font-size: 13px !important;
@@ -1468,6 +1468,21 @@ html, body {
         flex-shrink: 0 !important;
         min-height: 36px !important;
         border-radius: 6px !important;
+        background: #2271b1 !important;
+        border-color: #2271b1 !important;
+        color: white !important;
+    }
+    
+    /* Make table group total text smaller */
+    .oj-table-group-row .oj-order-count-highlight,
+    .oj-table-group-row .oj-total-amount,
+    .oj-table-group-row .oj-separator {
+        font-size: 12px !important;
+    }
+    
+    .oj-table-group-row .oj-order-count-highlight {
+        padding: 2px 6px !important;
+        min-width: 18px !important;
     }
     
     /* Add gradient background to table group row for highlighting */
