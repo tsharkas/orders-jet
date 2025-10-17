@@ -1468,7 +1468,7 @@ html, body {
     .oj-orders-table .oj-child-order-row,
     .oj-orders-table .pickup-order,
     .oj-orders-table .completed-order {
-        display: grid !important;
+        display: grid;
         grid-template-areas: 
             "order-num status total"
             "customer time type"
@@ -1484,6 +1484,13 @@ html, body {
         position: relative !important;
         width: 100% !important;
         box-sizing: border-box !important;
+    }
+    
+    /* Ensure JavaScript hide/show works properly */
+    .oj-orders-table .oj-child-order-row[style*="display: none"],
+    .oj-orders-table .pickup-order[style*="display: none"],
+    .oj-orders-table .completed-order[style*="display: none"] {
+        display: none !important;
     }
     
     /* Table orders - blue left border */
