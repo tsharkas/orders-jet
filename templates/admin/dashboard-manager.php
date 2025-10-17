@@ -28,20 +28,20 @@ if (function_exists('wc_get_orders')) {
     // BALANCED APPROACH: Get specific amounts from each status to guarantee results
     // This ensures we always get active orders even if there are many completed orders
     
-    // Get processing orders (oldest first - FIFO for kitchen operations)
+    // Get processing orders (oldest modified first - FIFO for kitchen operations)
     $processing_wc_orders = wc_get_orders(array(
         'status' => 'processing',
         'limit' => 20,
-        'orderby' => 'date',
-        'order' => 'ASC' // Oldest first - operational priority
+        'orderby' => 'date_modified',
+        'order' => 'ASC' // Oldest modified first - operational priority
     ));
     
-    // Get ready orders (oldest first - FIFO for service operations)  
+    // Get ready orders (oldest modified first - FIFO for service operations)  
     $ready_wc_orders = wc_get_orders(array(
         'status' => 'pending',
         'limit' => 20,
-        'orderby' => 'date', 
-        'order' => 'ASC' // Oldest first - operational priority
+        'orderby' => 'date_modified', 
+        'order' => 'ASC' // Oldest modified first - operational priority
     ));
     
     // Get recent completed orders (newest first - recent activity view)
@@ -97,8 +97,12 @@ if (function_exists('wc_get_orders')) {
     }
     
     // Orders are already sorted correctly by the queries:
-    // - Processing/Ready: ASC (oldest first - FIFO operational priority)
+    // - Processing/Ready: ASC (oldest modified first - FIFO operational priority)
     // - Completed: DESC (newest first - recent activity view)
+    
+    // Smart fallback logic: Show completed orders only when no active orders exist
+    $has_active_orders = !empty($processing_orders) || !empty($ready_orders);
+    $show_completed_as_fallback = !$has_active_orders;
     
     // Combine active orders only (exclude completed from main operations)
     $active_orders = array_merge($processing_orders, $ready_orders);
@@ -1706,6 +1710,13 @@ html, body {
 <script>
 jQuery(document).ready(function($) {
     
+    // Smart fallback: Pass PHP logic to JavaScript
+    window.hasActiveOrders = <?php echo $has_active_orders ? 'true' : 'false'; ?>;
+    window.showCompletedAsFallback = <?php echo $show_completed_as_fallback ? 'true' : 'false'; ?>;
+    
+    // Update filter button text based on content
+    updateFilterButtonText();
+    
     // Apply default filter on page load (Active Orders)
     applyFilter('all');
     
@@ -1736,11 +1747,13 @@ jQuery(document).ready(function($) {
             
             switch(filter) {
                 case 'all':
-                    // Show active orders and table groups (if they have active orders)
+                    // Smart logic: Show active orders, or completed as fallback when no active orders
                     if (type === 'table_group') {
-                        show = true; // Show table groups in 'all' filter
+                        show = window.hasActiveOrders; // Show table groups only if there are active orders
+                    } else if (status === 'completed') {
+                        show = window.showCompletedAsFallback; // Show completed only as fallback
                     } else {
-                        show = status !== 'completed';
+                        show = true; // Always show active orders (processing/pending)
                     }
                     break;
                 case 'processing':
@@ -2830,6 +2843,23 @@ jQuery(document).ready(function($) {
                 return '<span class="oj-status completed">✅ <?php _e('Completed', 'orders-jet'); ?></span>';
             default:
                 return '<span class="oj-status">' + status + '</span>';
+        }
+    }
+    
+    // Update filter button text based on content
+    function updateFilterButtonText() {
+        const $allButton = $('.oj-filter-btn[data-filter="all"]');
+        const processingCount = <?php echo count($processing_orders); ?>;
+        const readyCount = <?php echo count($ready_orders); ?>;
+        const completedCount = <?php echo count($recent_completed_orders); ?>;
+        const activeCount = processingCount + readyCount;
+        
+        if (window.hasActiveOrders) {
+            // Show active orders count
+            $allButton.html('<span class="oj-filter-icon">📋</span> <?php _e('Active Orders', 'orders-jet'); ?> (' + activeCount + ')');
+        } else {
+            // Show recent orders as fallback
+            $allButton.html('<span class="oj-filter-icon">📋</span> <?php _e('Recent Orders', 'orders-jet'); ?> (' + completedCount + ')');
         }
     }
     
