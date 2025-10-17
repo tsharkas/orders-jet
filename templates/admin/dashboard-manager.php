@@ -1422,332 +1422,213 @@ html, body {
     }
 }
 
-/* Mobile devices (480px and below) - BEAUTIFUL FLAT 3-ROW CARDS */
+/* Simple Mobile Cards - Clean CSS Only */
 @media (max-width: 480px) {
-    /* Force hide table header */
+    /* Hide table headers */
     .oj-orders-table .wp-list-table thead {
-        display: none !important;
+        display: none;
     }
     
     /* Remove horizontal scroll */
     .oj-orders-table {
-        overflow-x: visible !important;
-        -webkit-overflow-scrolling: auto !important;
+        overflow-x: visible;
+        -webkit-overflow-scrolling: auto;
     }
     
-    /* Convert table to simple card layout */
+    /* Convert table to block layout */
     .oj-orders-table .wp-list-table,
     .oj-orders-table .wp-list-table tbody {
-        display: block !important;
-        width: 100% !important;
-        min-width: auto !important;
+        display: block;
+        width: 100%;
+        min-width: auto;
     }
     
-    /* HIDE TABLE GROUPS - Show only child orders as individual cards */
+    /* Hide table groups - show only individual orders */
     .oj-orders-table .oj-table-group-row {
-        display: none !important;
+        display: none;
     }
     
-    /* BEAUTIFUL FLAT 3-ROW CARDS */
+    /* Style individual order rows as clean cards */
     .oj-orders-table .oj-child-order-row,
     .oj-orders-table .pickup-order {
-        display: block !important;
-        background: white !important;
-        border: 1px solid #e1e5e9 !important;
-        border-radius: 16px !important;
-        margin-bottom: 20px !important;
-        padding: 0 !important;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
-        position: relative !important;
-        width: 100% !important;
-        box-sizing: border-box !important;
-        overflow: hidden !important;
-    }
-    
-    /* Hide all table cells - we'll create custom layout */
-    .oj-orders-table .oj-child-order-row td,
-    .oj-orders-table .pickup-order td {
-        display: none !important;
-    }
-    
-    /* Custom 3-row card content */
-    .oj-orders-table .oj-child-order-row .oj-mobile-card,
-    .oj-orders-table .pickup-order .oj-mobile-card {
-        display: block !important;
-        padding: 20px !important;
-    }
-    
-    /* Row 1: Order#, Status, Type */
-    .oj-mobile-card .oj-row-1 {
-        display: flex !important;
-        justify-content: space-between !important;
-        align-items: center !important;
-        margin-bottom: 12px !important;
-        font-weight: 600 !important;
-        font-size: 16px !important;
-    }
-    
-    .oj-mobile-card .oj-order-number {
-        color: #0073aa !important;
-        font-size: 18px !important;
-        font-weight: bold !important;
-    }
-    
-    .oj-mobile-card .oj-status-badge {
-        padding: 4px 12px !important;
-        border-radius: 20px !important;
-        font-size: 12px !important;
-        font-weight: 600 !important;
-        text-transform: uppercase !important;
-    }
-    
-    .oj-mobile-card .oj-status-badge.cooking {
-        background: #fff3cd !important;
-        color: #856404 !important;
-    }
-    
-    .oj-mobile-card .oj-status-badge.ready {
-        background: #d1f2eb !important;
-        color: #0f5132 !important;
-    }
-    
-    .oj-mobile-card .oj-type-badge {
-        padding: 4px 12px !important;
-        border-radius: 20px !important;
-        font-size: 12px !important;
-        font-weight: 600 !important;
-        text-transform: uppercase !important;
-    }
-    
-    .oj-mobile-card .oj-type-badge.table {
-        background: #0073aa !important;
-        color: white !important;
-    }
-    
-    .oj-mobile-card .oj-type-badge.pickup {
-        background: #d63638 !important;
-        color: white !important;
-    }
-    
-    /* Row 2: Customer, Time, Total */
-    .oj-mobile-card .oj-row-2 {
-        display: flex !important;
-        justify-content: space-between !important;
-        align-items: center !important;
-        margin-bottom: 16px !important;
-        color: #666 !important;
-        font-size: 14px !important;
-    }
-    
-    .oj-mobile-card .oj-customer {
-        font-weight: 500 !important;
-        color: #333 !important;
-    }
-    
-    .oj-mobile-card .oj-time {
-        font-weight: 500 !important;
-    }
-    
-    .oj-mobile-card .oj-total {
-        font-weight: bold !important;
-        color: #2271b1 !important;
-        font-size: 16px !important;
-    }
-    
-    /* Row 3: Actions */
-    .oj-mobile-card .oj-row-3 {
-        display: flex !important;
-        gap: 12px !important;
-        align-items: center !important;
-    }
-    
-    .oj-mobile-card .oj-details-btn {
-        background: #f8f9fa !important;
-        color: #0073aa !important;
-        border: 1px solid #0073aa !important;
-        padding: 8px 16px !important;
-        border-radius: 8px !important;
-        font-size: 14px !important;
-        font-weight: 500 !important;
-        text-decoration: none !important;
-        cursor: pointer !important;
-    }
-    
-    .oj-mobile-card .oj-action-btn {
-        flex: 1 !important;
-        padding: 12px 16px !important;
-        border-radius: 8px !important;
-        font-size: 14px !important;
-        font-weight: 600 !important;
-        border: none !important;
-        cursor: pointer !important;
-        text-align: center !important;
-    }
-    
-    .oj-mobile-card .oj-action-btn.mark-ready {
-        background: #2271b1 !important;
-        color: white !important;
-    }
-    
-    .oj-mobile-card .oj-action-btn.close-table {
-        background: #00a32a !important;
-        color: white !important;
-    }
-    
-    .oj-mobile-card .oj-action-btn.complete-order {
-        background: #00a32a !important;
-        color: white !important;
-    }
-    
-    .oj-mobile-card .oj-action-btn:disabled {
-        background: #ddd !important;
-        color: #999 !important;
-        cursor: not-allowed !important;
+        display: block;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 12px;
+        margin-bottom: 16px;
+        padding: 16px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        position: relative;
+        width: 100%;
+        box-sizing: border-box;
     }
     
     /* Table order left border */
     .oj-orders-table .oj-child-order-row {
-        border-left: 4px solid #0073aa !important;
+        border-left: 4px solid #0073aa;
     }
     
     /* Pickup order left border */
     .oj-orders-table .pickup-order {
-        border-left: 4px solid #d63638 !important;
+        border-left: 4px solid #d63638;
     }
     
-    /* Order number - Make it prominent */
-    .oj-orders-table .oj-child-order-row td:nth-child(2),
-    .oj-orders-table .pickup-order td:nth-child(2) {
-        font-size: 22px !important;
-        font-weight: bold !important;
-        color: #0073aa !important;
-        margin-bottom: 12px !important;
-        padding-bottom: 8px !important;
-        border-bottom: 1px solid #f0f0f0 !important;
+    /* Stack table cells vertically */
+    .oj-orders-table .oj-child-order-row td,
+    .oj-orders-table .pickup-order td {
+        display: block;
+        border: none;
+        padding: 4px 0;
+        text-align: left;
+        width: 100%;
     }
     
-    /* Customer */
-    .oj-orders-table .oj-child-order-row td:nth-child(3),
-    .oj-orders-table .pickup-order td:nth-child(3) {
-        font-size: 16px !important;
-        color: #333 !important;
-        margin-bottom: 8px !important;
-        font-weight: 500 !important;
+    /* Hide checkbox */
+    .oj-orders-table td:first-child {
+        display: none;
     }
     
-    .oj-orders-table .oj-child-order-row td:nth-child(3):before,
-    .oj-orders-table .pickup-order td:nth-child(3):before {
-        content: "👤 ";
-        margin-right: 6px;
+    /* Style order number prominently */
+    .oj-orders-table td:nth-child(2) {
+        font-size: 18px;
+        font-weight: bold;
+        color: #0073aa;
+        margin-bottom: 8px;
+        padding-bottom: 4px;
+        border-bottom: 1px solid #f0f0f0;
     }
     
-    /* Type */
-    .wp-list-table td:nth-child(4) {
+    /* Customer name */
+    .oj-orders-table td:nth-child(3) {
         font-size: 14px;
+        color: #333;
+        font-weight: 500;
+        margin-bottom: 4px;
+    }
+    
+    .oj-orders-table td:nth-child(3):before {
+        content: "👤 ";
+        margin-right: 4px;
+    }
+    
+    /* Type - make it a badge */
+    .oj-orders-table td:nth-child(4) {
+        display: inline-block;
+        background: #f8f9fa;
         color: #666;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
         margin-bottom: 8px;
     }
     
-    /* Status */
-    .wp-list-table td:nth-child(5) {
+    /* Status - make it a prominent badge */
+    .oj-orders-table td:nth-child(5) {
         margin-bottom: 8px;
     }
     
-    /* Total - Make it prominent */
-    .oj-orders-table .oj-child-order-row td:nth-child(6),
-    .oj-orders-table .pickup-order td:nth-child(6) {
-        font-size: 20px !important;
-        font-weight: bold !important;
-        color: #2271b1 !important;
-        background: #f0f6fc !important;
-        padding: 12px !important;
-        border-radius: 8px !important;
-        text-align: center !important;
-        margin: 12px 0 !important;
-        border: 2px solid #2271b1 !important;
+    .oj-orders-table td:nth-child(5) .oj-status.cooking {
+        background: #fff3cd;
+        color: #856404;
+        padding: 6px 12px;
+        border-radius: 16px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .oj-orders-table td:nth-child(5) .oj-status.ready {
+        background: #d1f2eb;
+        color: #0f5132;
+        padding: 6px 12px;
+        border-radius: 16px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    /* Total - make it prominent */
+    .oj-orders-table td:nth-child(6) {
+        font-size: 18px;
+        font-weight: bold;
+        color: #2271b1;
+        background: #f0f6fc;
+        padding: 12px;
+        border-radius: 8px;
+        text-align: center;
+        margin: 12px 0;
+        border: 2px solid #2271b1;
     }
     
     /* Time */
-    .oj-orders-table .oj-child-order-row td:nth-child(7),
-    .oj-orders-table .pickup-order td:nth-child(7) {
-        font-size: 14px !important;
-        color: #666 !important;
-        margin-bottom: 16px !important;
-        font-weight: 500 !important;
+    .oj-orders-table td:nth-child(7) {
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 12px;
+        font-weight: 500;
     }
     
-    .oj-orders-table .oj-child-order-row td:nth-child(7):before,
-    .oj-orders-table .pickup-order td:nth-child(7):before {
+    .oj-orders-table td:nth-child(7):before {
         content: "🕐 ";
-        margin-right: 6px;
+        margin-right: 4px;
     }
     
-    /* Actions - Make buttons full width and prominent */
-    .oj-orders-table .oj-child-order-row td:nth-child(8),
-    .oj-orders-table .pickup-order td:nth-child(8) {
-        display: flex !important;
-        gap: 12px !important;
-        margin-bottom: 12px !important;
-        flex-wrap: wrap !important;
+    /* Action buttons */
+    .oj-orders-table td:nth-child(8) {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 8px;
+        flex-wrap: wrap;
+    }
+    
+    .oj-orders-table .button {
+        flex: 1;
+        padding: 12px 16px;
+        text-align: center;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        min-height: 44px;
+        border: none;
+    }
+    
+    .oj-orders-table .oj-mark-ready {
+        background: #2271b1;
+        color: white;
+    }
+    
+    .oj-orders-table .oj-close-table-btn,
+    .oj-orders-table .oj-complete-order {
+        background: #00a32a;
+        color: white;
+    }
+    
+    .oj-orders-table .button:disabled {
+        background: #ddd;
+        color: #999;
     }
     
     /* View button */
-    .wp-list-table td:nth-child(9) {
+    .oj-orders-table td:nth-child(9) {
         display: flex;
         justify-content: center;
+        margin-top: 8px;
     }
     
-    .oj-view-order {
+    .oj-orders-table .oj-view-order {
         background: #f0f6fc;
         color: #0073aa;
         border: 2px solid #0073aa;
-        padding: 8px;
-        border-radius: 50%;
-        width: 40px;
-        height: 40px;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        text-decoration: none;
+        min-height: 44px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 16px;
-    }
-    
-    /* Buttons - Make them prominent and touch-friendly */
-    .oj-orders-table .wp-list-table .button {
-        flex: 1 !important;
-        padding: 14px 16px !important;
-        font-size: 14px !important;
-        border-radius: 8px !important;
-        text-align: center !important;
-        min-height: 48px !important;
-        font-weight: 600 !important;
-        border: 2px solid transparent !important;
-        transition: all 0.3s ease !important;
-    }
-    
-    /* Mark Ready button */
-    .oj-orders-table .oj-mark-ready {
-        background: #2271b1 !important;
-        color: white !important;
-        border-color: #2271b1 !important;
-    }
-    
-    /* Close table button for table orders */
-    .oj-orders-table .oj-close-table-btn {
-        background: #00a32a !important;
-        color: white !important;
-        border: 2px solid #00a32a !important;
-        padding: 14px 16px !important;
-        font-size: 14px !important;
-        border-radius: 8px !important;
-        flex: 1 !important;
-        min-height: 48px !important;
-        font-weight: 600 !important;
-    }
-    
-    .oj-orders-table .oj-close-table-btn:disabled {
-        background: #ddd !important;
-        color: #999 !important;
-        border-color: #ddd !important;
     }
 }
 
@@ -1884,93 +1765,6 @@ html, body {
 
 <script>
 jQuery(document).ready(function($) {
-    
-    // Create beautiful 3-row mobile cards
-    function createMobileCards() {
-        if (window.innerWidth <= 480) {
-            $('.oj-child-order-row, .pickup-order').each(function() {
-                const $row = $(this);
-                
-                // Skip if already processed
-                if ($row.find('.oj-mobile-card').length > 0) return;
-                
-                // Extract data from table cells
-                const orderNumber = $row.find('td:nth-child(2)').text().trim();
-                const customer = $row.find('td:nth-child(3)').text().trim();
-                const type = $row.hasClass('oj-child-order-row') ? 'table' : 'pickup';
-                const tableNumber = type === 'table' ? $row.data('table') : '';
-                const status = $row.data('status');
-                const total = $row.find('td:nth-child(6)').text().trim();
-                const time = $row.find('td:nth-child(7)').text().trim();
-                const orderId = $row.data('order-id');
-                
-                // Determine status display
-                let statusBadge = '';
-                let statusClass = '';
-                if (status === 'processing') {
-                    statusBadge = 'Cooking';
-                    statusClass = 'cooking';
-                } else if (status === 'pending') {
-                    statusBadge = 'Ready';
-                    statusClass = 'ready';
-                }
-                
-                // Determine type display
-                const typeDisplay = type === 'table' ? 'Table' : 'Pickup';
-                const typeClass = type;
-                
-                // Determine customer display
-                let customerDisplay = customer;
-                if (type === 'table' && tableNumber) {
-                    customerDisplay = 'Table Guest';
-                }
-                
-                // Create action buttons
-                let actionButtons = '';
-                if (status === 'processing') {
-                    actionButtons = `<button class="oj-action-btn mark-ready oj-mark-ready" data-order-id="${orderId}">Mark Ready</button>`;
-                } else if (status === 'pending') {
-                    if (type === 'table') {
-                        actionButtons = `<button class="oj-action-btn close-table oj-close-table-btn" data-table="${tableNumber}">Close Table</button>`;
-                    } else {
-                        actionButtons = `<button class="oj-action-btn complete-order oj-complete-order" data-order-id="${orderId}">Complete Order</button>`;
-                    }
-                }
-                
-                // Create the beautiful 3-row card
-                const mobileCard = `
-                    <div class="oj-mobile-card">
-                        <div class="oj-row-1">
-                            <span class="oj-order-number">${orderNumber}${type === 'table' && tableNumber ? ', ' + tableNumber : ''}</span>
-                            <span class="oj-status-badge ${statusClass}">${statusBadge}</span>
-                            <span class="oj-type-badge ${typeClass}">${typeDisplay}</span>
-                        </div>
-                        <div class="oj-row-2">
-                            <span class="oj-customer">${customerDisplay}</span>
-                            <span class="oj-time">${time}</span>
-                            <span class="oj-total">${total}</span>
-                        </div>
-                        <div class="oj-row-3">
-                            <button class="oj-details-btn oj-view-order" data-order-id="${orderId}">Details</button>
-                            ${actionButtons}
-                        </div>
-                    </div>
-                `;
-                
-                // Add the mobile card to the row
-                $row.append(mobileCard);
-            });
-        }
-    }
-    
-    // Create mobile cards on page load
-    createMobileCards();
-    
-    // Recreate mobile cards on window resize
-    $(window).on('resize', function() {
-        $('.oj-mobile-card').remove();
-        createMobileCards();
-    });
     
     // Apply default filter on page load (Active Orders)
     applyFilter('all');
