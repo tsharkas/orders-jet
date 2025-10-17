@@ -1435,6 +1435,22 @@ html, body {
     .oj-orders-table .wp-list-table {
         min-width: 800px; /* Ensure table doesn't get too cramped */
     }
+    
+    /* Make collapse button more touch-friendly on mobile */
+    .oj-expand-table {
+        min-height: 44px !important;
+        min-width: 44px !important;
+        padding: 12px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    
+    .oj-expand-table .dashicons {
+        font-size: 20px !important;
+        width: 20px !important;
+        height: 20px !important;
+    }
 }
 
 /* Add horizontal scroll indicator */
