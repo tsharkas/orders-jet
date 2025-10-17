@@ -1932,11 +1932,16 @@ jQuery(document).ready(function($) {
                     }
                     break;
                 case 'pickup':
-                    // Show pickup orders only - HIDE all table groups
+                    // Show pickup orders only - HIDE all table groups and table orders
                     if (type === 'table_group') {
                         show = false; // HIDE table groups in pickup filter
+                        console.log('PICKUP: Hiding table group');
+                    } else if (type === 'table') {
+                        show = false; // HIDE individual table orders in pickup filter
+                        console.log('PICKUP: Hiding table order', $row[0]);
                     } else {
                         show = type === 'pickup' && status !== 'completed';
+                        console.log('PICKUP: Pickup order', {show, type, status});
                     }
                     break;
                 case 'completed':
