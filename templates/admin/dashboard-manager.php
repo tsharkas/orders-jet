@@ -1335,94 +1335,19 @@ html, body {
    RESPONSIVE DESIGN - MOBILE FIRST
    ======================================== */
 
-/* Tablet and smaller desktop (768px and below) */
-@media (max-width: 768px) {
-    /* Apply card layout for tablets too */
-    .oj-orders-table .wp-list-table thead {
-        display: none !important;
-    }
-    
+/* Tablet - Simple horizontal scroll approach */
+@media (max-width: 768px) and (min-width: 481px) {
     .oj-orders-table {
-        overflow-x: visible !important;
-        -webkit-overflow-scrolling: auto !important;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
     
-    .oj-orders-table .wp-list-table,
-    .oj-orders-table .wp-list-table tbody {
-        display: block !important;
-        width: 100% !important;
-        min-width: auto !important;
-    }
-    
-    /* HIDE TABLE GROUPS on tablet too */
-    .oj-orders-table .oj-table-group-row {
-        display: none !important;
-    }
-    
-    /* Show child orders and pickup orders as cards */
-    .oj-orders-table .oj-child-order-row,
-    .oj-orders-table .pickup-order {
-        display: block !important;
-        background: white !important;
-        border: 2px solid #e1e5e9 !important;
-        border-radius: 10px !important;
-        margin-bottom: 14px !important;
-        padding: 18px !important;
-        box-shadow: 0 3px 6px rgba(0,0,0,0.1) !important;
-        position: relative !important;
-        width: 100% !important;
-        box-sizing: border-box !important;
-    }
-    
-    .oj-orders-table .oj-child-order-row td,
-    .oj-orders-table .pickup-order td {
-        display: block !important;
-        border: none !important;
-        padding: 6px 0 !important;
-        text-align: left !important;
-        width: 100% !important;
-    }
-    
-    /* Hide less critical columns on tablet */
-    .wp-list-table th:nth-child(4), /* Type */
-    .wp-list-table td:nth-child(4) { /* Type */
-        display: none;
-    }
-    
-    /* Make action buttons more compact */
-    .oj-table-actions {
-        white-space: nowrap;
-        min-width: 100px;
-    }
-    
-    .oj-view-action {
-        width: 50px;
-        padding: 4px 8px;
-    }
-    
-    .oj-view-order {
-        font-size: 16px;
-        padding: 6px 8px;
-    }
-    
-    /* Compact status badges */
-    .oj-status-badge {
-        font-size: 11px;
-        padding: 3px 8px;
-    }
-    
-    /* Make total column more compact */
-    .oj-table-total {
-        font-size: 13px;
-    }
-    
-    .oj-order-count-highlight {
-        font-size: 14px;
-        padding: 2px 6px;
+    .wp-list-table {
+        min-width: 700px;
     }
 }
 
-/* Simple Mobile Cards - Clean CSS Only */
+/* Clean Mobile Cards - Simple & Consistent */
 @media (max-width: 480px) {
     /* Hide table headers */
     .oj-orders-table .wp-list-table thead {
@@ -1432,7 +1357,6 @@ html, body {
     /* Remove horizontal scroll */
     .oj-orders-table {
         overflow-x: visible;
-        -webkit-overflow-scrolling: auto;
     }
     
     /* Convert table to block layout */
@@ -1448,16 +1372,16 @@ html, body {
         display: none;
     }
     
-    /* Style individual order rows as clean cards */
+    /* Clean card styling for individual orders */
     .oj-orders-table .oj-child-order-row,
     .oj-orders-table .pickup-order {
         display: block;
         background: white;
-        border: 1px solid #ddd;
+        border: 1px solid #e1e5e9;
         border-radius: 12px;
         margin-bottom: 16px;
         padding: 16px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.08);
         position: relative;
         width: 100%;
         box-sizing: border-box;
