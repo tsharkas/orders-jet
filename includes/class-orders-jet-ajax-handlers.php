@@ -30,6 +30,8 @@ class Orders_Jet_AJAX_Handlers {
         add_action('wp_ajax_oj_generate_table_pdf', array($this, 'generate_table_pdf'));
         add_action('wp_ajax_oj_bulk_action', array($this, 'bulk_action'));
         add_action('wp_ajax_oj_search_order_invoice', array($this, 'search_order_invoice'));
+        add_action('wp_ajax_oj_get_order_invoice', array($this, 'get_order_invoice'));
+        add_action('wp_ajax_oj_download_order_invoice', array($this, 'download_order_invoice'));
         add_action('wp_ajax_oj_close_table_group', array($this, 'close_table_group'));
         add_action('wp_ajax_oj_get_order_details', array($this, 'get_order_details'));
         
@@ -3498,6 +3500,207 @@ class Orders_Jet_AJAX_Handlers {
             error_log('Orders Jet: Error getting order details: ' . $e->getMessage());
             wp_send_json_error(array('message' => __('Failed to load order details', 'orders-jet')));
         }
+    }
+    
+    /**
+     * Get order invoice (for view/print)
+     */
+    public function get_order_invoice() {
+        try {
+            $order_id = intval($_GET['order_id'] ?? 0);
+            $order_type = sanitize_text_field($_GET['type'] ?? '');
+            $print_mode = isset($_GET['print']);
+            
+            if (!$order_id) {
+                wp_die(__('Invalid order ID', 'orders-jet'));
+            }
+            
+            // Check permissions
+            if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_woocommerce')) {
+                wp_die(__('Permission denied', 'orders-jet'));
+            }
+            
+            $order = wc_get_order($order_id);
+            if (!$order) {
+                wp_die(__('Order not found', 'orders-jet'));
+            }
+            
+            // Generate invoice HTML
+            $invoice_html = $this->generate_single_order_invoice_html($order, $print_mode);
+            
+            // Set proper headers
+            header('Content-Type: text/html; charset=utf-8');
+            
+            echo $invoice_html;
+            exit;
+            
+        } catch (Exception $e) {
+            error_log('Orders Jet: Error generating invoice: ' . $e->getMessage());
+            wp_die(__('Error generating invoice: ', 'orders-jet') . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Download order invoice as PDF
+     */
+    public function download_order_invoice() {
+        try {
+            $order_id = intval($_GET['order_id'] ?? 0);
+            $order_type = sanitize_text_field($_GET['type'] ?? '');
+            
+            if (!$order_id) {
+                wp_die(__('Invalid order ID', 'orders-jet'));
+            }
+            
+            // Check permissions
+            if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_woocommerce')) {
+                wp_die(__('Permission denied', 'orders-jet'));
+            }
+            
+            $order = wc_get_order($order_id);
+            if (!$order) {
+                wp_die(__('Order not found', 'orders-jet'));
+            }
+            
+            // Generate invoice HTML
+            $invoice_html = $this->generate_single_order_invoice_html($order, false);
+            
+            // Generate PDF
+            $this->generate_pdf_from_html($invoice_html, 'order-' . $order_id, true);
+            exit;
+            
+        } catch (Exception $e) {
+            error_log('Orders Jet: Error downloading invoice: ' . $e->getMessage());
+            wp_die(__('Error downloading invoice: ', 'orders-jet') . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Generate HTML for single order invoice
+     */
+    private function generate_single_order_invoice_html($order, $print_mode = false) {
+        $order_id = $order->get_id();
+        $table_number = $order->get_meta('_oj_table_number');
+        $order_type = !empty($table_number) ? 'Table' : 'Pickup';
+        
+        // Get order items
+        $items_html = '';
+        foreach ($order->get_items() as $item_id => $item) {
+            $product = $item->get_product();
+            if (!$product) continue;
+            
+            $notes = $item->get_meta('_oj_item_notes');
+            $addons_text = '';
+            
+            // Get addons if available
+            if (function_exists('wc_pb_get_bundled_order_items')) {
+                $addon_names = array();
+                $addons = $item->get_meta('_wc_pao_addon_value');
+                if (!empty($addons)) {
+                    foreach ($addons as $addon) {
+                        if (!empty($addon['name'])) {
+                            $addon_names[] = $addon['name'] . ': ' . $addon['value'];
+                        }
+                    }
+                    $addons_text = implode(', ', $addon_names);
+                }
+            }
+            
+            $items_html .= '<tr>';
+            $items_html .= '<td>' . $item->get_name();
+            if ($notes) {
+                $items_html .= '<br><small style="color: #666;">Note: ' . esc_html($notes) . '</small>';
+            }
+            if ($addons_text) {
+                $items_html .= '<br><small style="color: #666;">Addons: ' . esc_html($addons_text) . '</small>';
+            }
+            $items_html .= '</td>';
+            $items_html .= '<td style="text-align: center;">' . $item->get_quantity() . '</td>';
+            $items_html .= '<td style="text-align: right;">' . wc_price($product->get_price()) . '</td>';
+            $items_html .= '<td style="text-align: right;">' . wc_price($item->get_total()) . '</td>';
+            $items_html .= '</tr>';
+        }
+        
+        $print_button = $print_mode ? '
+            <div style="text-align: center; margin: 20px; print:none;">
+                <button onclick="window.print()" style="background: #c41e3a; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">🖨️ Print Invoice</button>
+            </div>' : '';
+        
+        $html = '<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice - Order #' . $order->get_order_number() . '</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+        .invoice-container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .invoice-header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #c41e3a; padding-bottom: 20px; }
+        .invoice-header h1 { color: #c41e3a; margin: 0; font-size: 28px; }
+        .invoice-header p { margin: 5px 0; color: #666; }
+        .order-info { display: flex; justify-content: space-between; margin-bottom: 30px; }
+        .order-info div { flex: 1; }
+        .order-info h3 { color: #333; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        .items-table th, .items-table td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
+        .items-table th { background: #f8f9fa; font-weight: 600; color: #333; }
+        .totals { text-align: right; margin-top: 20px; }
+        .totals div { margin: 8px 0; }
+        .grand-total { font-size: 18px; font-weight: bold; color: #c41e3a; border-top: 2px solid #c41e3a; padding-top: 10px; margin-top: 15px; }
+        @media print {
+            body { background: white; }
+            .invoice-container { box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+    ' . $print_button . '
+    <div class="invoice-container">
+        <div class="invoice-header">
+            <h1>INVOICE</h1>
+            <p>' . get_bloginfo('name') . '</p>
+            <p>Order #' . $order->get_order_number() . ' - ' . $order_type . ' Order</p>
+        </div>
+        
+        <div class="order-info">
+            <div>
+                <h3>Order Details</h3>
+                <p><strong>Order ID:</strong> #' . $order->get_id() . '</p>
+                <p><strong>Type:</strong> ' . $order_type . '</p>
+                ' . (!empty($table_number) ? '<p><strong>Table:</strong> ' . $table_number . '</p>' : '') . '
+                <p><strong>Status:</strong> ' . ucfirst($order->get_status()) . '</p>
+            </div>
+            <div>
+                <h3>Date & Time</h3>
+                <p><strong>Order Date:</strong> ' . $order->get_date_created()->format('Y-m-d') . '</p>
+                <p><strong>Order Time:</strong> ' . $order->get_date_created()->format('H:i:s') . '</p>
+                <p><strong>Generated:</strong> ' . current_time('Y-m-d H:i:s') . '</p>
+            </div>
+        </div>
+        
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th style="text-align: center;">Qty</th>
+                    <th style="text-align: right;">Price</th>
+                    <th style="text-align: right;">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                ' . $items_html . '
+            </tbody>
+        </table>
+        
+        <div class="totals">
+            <div>Subtotal: ' . wc_price($order->get_subtotal()) . '</div>
+            ' . ($order->get_total_tax() > 0 ? '<div>Tax: ' . wc_price($order->get_total_tax()) . '</div>' : '') . '
+            <div class="grand-total">Total: ' . wc_price($order->get_total()) . '</div>
+        </div>
+    </div>
+</body>
+</html>';
+        
+        return $html;
     }
     
 }
