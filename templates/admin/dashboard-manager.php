@@ -489,11 +489,26 @@ $pickup_orders_all = array_merge($pickup_orders,
                                             <?php _e('Complete', 'orders-jet'); ?>
                                         </button>
                                     <?php elseif ($item['status'] === 'completed') : ?>
-                                        <button class="button-link oj-quick-invoice" 
-                                                data-order-id="<?php echo $item['id']; ?>" 
-                                                data-type="pickup">
-                                            📄 <?php _e('Invoice', 'orders-jet'); ?>
-                                        </button>
+                                        <div class="oj-invoice-actions">
+                                            <button class="button-link oj-invoice-view" 
+                                                    data-order-id="<?php echo $item['id']; ?>" 
+                                                    data-type="pickup"
+                                                    title="<?php _e('View Invoice', 'orders-jet'); ?>">
+                                                👁️
+                                            </button>
+                                            <button class="button-link oj-invoice-print" 
+                                                    data-order-id="<?php echo $item['id']; ?>" 
+                                                    data-type="pickup"
+                                                    title="<?php _e('Print Invoice', 'orders-jet'); ?>">
+                                                🖨️
+                                            </button>
+                                            <button class="button-link oj-invoice-download" 
+                                                    data-order-id="<?php echo $item['id']; ?>" 
+                                                    data-type="pickup"
+                                                    title="<?php _e('Download Invoice', 'orders-jet'); ?>">
+                                                📥
+                                            </button>
+                                        </div>
                                     <?php endif; ?>
                                 </td>
                                 <td class="oj-view-action">
@@ -541,11 +556,26 @@ $pickup_orders_all = array_merge($pickup_orders,
                                 <td><?php echo $completed_order['date']; ?></td>
                                 
                                 <td>
-                                    <button class="button-link oj-quick-invoice" 
-                                            data-order-id="<?php echo $completed_order['id']; ?>" 
-                                            data-type="<?php echo $completed_order['type']; ?>">
-                                        📄 <?php _e('Invoice', 'orders-jet'); ?>
-                                    </button>
+                                    <div class="oj-invoice-actions">
+                                        <button class="button-link oj-invoice-view" 
+                                                data-order-id="<?php echo $completed_order['id']; ?>" 
+                                                data-type="<?php echo $completed_order['type']; ?>"
+                                                title="<?php _e('View Invoice', 'orders-jet'); ?>">
+                                            👁️
+                                        </button>
+                                        <button class="button-link oj-invoice-print" 
+                                                data-order-id="<?php echo $completed_order['id']; ?>" 
+                                                data-type="<?php echo $completed_order['type']; ?>"
+                                                title="<?php _e('Print Invoice', 'orders-jet'); ?>">
+                                            🖨️
+                                        </button>
+                                        <button class="button-link oj-invoice-download" 
+                                                data-order-id="<?php echo $completed_order['id']; ?>" 
+                                                data-type="<?php echo $completed_order['type']; ?>"
+                                                title="<?php _e('Download Invoice', 'orders-jet'); ?>">
+                                            📥
+                                        </button>
+                                    </div>
                                 </td>
                                 
                                 <td class="oj-view-action">
@@ -1491,6 +1521,54 @@ html, body {
         border-left: 4px solid #007cba !important;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
     }
+    
+    /* Invoice actions styling */
+    .oj-invoice-actions {
+        display: flex !important;
+        gap: 8px !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    
+    .oj-invoice-actions .button-link {
+        min-height: 32px !important;
+        min-width: 32px !important;
+        padding: 6px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border-radius: 4px !important;
+        background: #f8f9fa !important;
+        border: 1px solid #ddd !important;
+        font-size: 16px !important;
+        text-decoration: none !important;
+    }
+    
+    .oj-invoice-actions .button-link:hover {
+        background: #e9ecef !important;
+        border-color: #007cba !important;
+    }
+    
+    /* Modal invoice actions styling */
+    .oj-modal-invoice-actions {
+        margin-top: 20px !important;
+        padding-top: 20px !important;
+        border-top: 1px solid #e1e5e9 !important;
+    }
+    
+    .oj-modal-invoice-actions h4 {
+        margin-bottom: 15px !important;
+        color: #333 !important;
+        font-size: 16px !important;
+    }
+    
+    .oj-modal-invoice-actions .oj-invoice-actions .button-link {
+        padding: 8px 12px !important;
+        font-size: 14px !important;
+        gap: 6px !important;
+        min-width: auto !important;
+        display: inline-flex !important;
+    }
 }
 
 /* Add horizontal scroll indicator */
@@ -2426,13 +2504,31 @@ jQuery(document).ready(function($) {
         }
     });
     
-    // Quick invoice for recent completed orders
-    $(document).on('click', '.oj-quick-invoice', function() {
+    // Invoice actions for completed orders
+    $(document).on('click', '.oj-invoice-view', function() {
         const orderId = $(this).data('order-id');
         const orderType = $(this).data('type');
         const table = $(this).data('table');
         
         openOrderInvoice(orderId, orderType, table);
+    });
+    
+    $(document).on('click', '.oj-invoice-print', function() {
+        const orderId = $(this).data('order-id');
+        const orderType = $(this).data('type');
+        
+        // Open invoice in new window for printing
+        const invoiceUrl = `${ajaxurl}?action=oj_get_order_invoice&order_id=${orderId}&type=${orderType}&print=1`;
+        window.open(invoiceUrl, '_blank');
+    });
+    
+    $(document).on('click', '.oj-invoice-download', function() {
+        const orderId = $(this).data('order-id');
+        const orderType = $(this).data('type');
+        
+        // Download invoice as PDF
+        const downloadUrl = `${ajaxurl}?action=oj_download_order_invoice&order_id=${orderId}&type=${orderType}`;
+        window.location.href = downloadUrl;
     });
     
     // Search order and open invoice
@@ -2599,6 +2695,32 @@ jQuery(document).ready(function($) {
                         <span><strong>${order.formatted_total}</strong></span>
                     </div>
                 </div>
+                
+                ${order.status === 'completed' ? `
+                <div class="oj-modal-invoice-actions">
+                    <h4>Invoice Actions</h4>
+                    <div class="oj-invoice-actions">
+                        <button class="button-link oj-invoice-view" 
+                                data-order-id="${order.id}" 
+                                data-type="${order.type}"
+                                title="View Invoice">
+                            👁️ View
+                        </button>
+                        <button class="button-link oj-invoice-print" 
+                                data-order-id="${order.id}" 
+                                data-type="${order.type}"
+                                title="Print Invoice">
+                            🖨️ Print
+                        </button>
+                        <button class="button-link oj-invoice-download" 
+                                data-order-id="${order.id}" 
+                                data-type="${order.type}"
+                                title="Download Invoice">
+                            📥 Download
+                        </button>
+                    </div>
+                </div>
+                ` : ''}
             </div>
         `;
         
