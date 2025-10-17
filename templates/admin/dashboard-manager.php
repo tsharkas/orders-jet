@@ -1315,19 +1315,48 @@ html, body {
 
 @media (max-width: 480px) {
     .oj-filters {
-        padding: 8px;
-        gap: 6px;
-        top: 46px;
+        padding: 8px 12px !important;
+        gap: 8px !important;
+        top: 46px !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        display: flex !important;
+        white-space: nowrap !important;
+        background: #f8f9fa !important;
+        border-bottom: 1px solid #e1e5e9 !important;
+        position: sticky !important;
     }
     
     .oj-filter-btn {
-        padding: 8px 12px;
-        font-size: 12px;
-        border-radius: 18px;
+        padding: 8px 12px !important;
+        font-size: 12px !important;
+        border-radius: 20px !important;
+        border: 1px solid #ddd !important;
+        background: white !important;
+        color: #666 !important;
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
+        min-width: auto !important;
+        text-decoration: none !important;
+    }
+    
+    .oj-filter-btn.active {
+        background: #0073aa !important;
+        color: white !important;
+        border-color: #0073aa !important;
+    }
+    
+    .oj-filter-btn:hover {
+        background: #f0f0f0 !important;
+    }
+    
+    .oj-filter-btn.active:hover {
+        background: #005a87 !important;
     }
     
     .oj-filter-icon {
-        font-size: 12px;
+        font-size: 12px !important;
+        margin-right: 4px !important;
     }
 }
 
@@ -1675,6 +1704,13 @@ jQuery(document).ready(function($) {
     // Apply default filter on page load (Active Orders)
     applyFilter('all');
     
+    // Handle window resize for responsive filtering
+    $(window).on('resize', function() {
+        // Reapply current filter when switching between mobile/desktop
+        const currentFilter = $('.oj-filter-btn.active').data('filter') || 'all';
+        applyFilter(currentFilter);
+    });
+    
     // Filter functionality
     $('.oj-filter-btn').on('click', function() {
         const filter = $(this).data('filter');
@@ -1687,58 +1723,98 @@ jQuery(document).ready(function($) {
         applyFilter(filter);
     });
     
-    // Reusable filter function (Updated for table groups)
+    // Reusable filter function (Updated for table groups and mobile)
     function applyFilter(filter) {
-        // Handle table groups
-        $('.oj-table-group-row').each(function() {
-            const $groupRow = $(this);
-            const tableNumber = $groupRow.data('table');
-            const $childRows = $(`.oj-child-order-row[data-table="${tableNumber}"]`);
-            
-            let showGroup = false;
-            
-            switch(filter) {
-                case 'all':
-                    showGroup = true; // Show all table groups
-                    break;
-                case 'table':
-                    showGroup = true; // Show table groups when filtering by table
-                    break;
-                case 'processing':
-                    // Show if any child order is processing
-                    $childRows.each(function() {
-                        if ($(this).data('status') === 'processing') {
-                            showGroup = true;
-                            return false;
-                        }
-                    });
-                    break;
-                case 'ready':
-                    // Show if any child order is ready (pending)
-                    $childRows.each(function() {
-                        if ($(this).data('status') === 'pending') {
-                            showGroup = true;
-                            return false;
-                        }
-                    });
-                    break;
-                case 'pickup':
-                case 'completed':
-                    showGroup = false; // Don't show table groups for pickup/completed filters
-                    break;
-            }
-            
-            if (showGroup) {
-                $groupRow.removeClass('hidden');
-                // Also show child rows if expanded
-                if ($groupRow.hasClass('expanded')) {
-                    $childRows.show();
+        const isMobile = window.innerWidth <= 480;
+        
+        if (!isMobile) {
+            // Desktop/Tablet: Handle table groups
+            $('.oj-table-group-row').each(function() {
+                const $groupRow = $(this);
+                const tableNumber = $groupRow.data('table');
+                const $childRows = $(`.oj-child-order-row[data-table="${tableNumber}"]`);
+                
+                let showGroup = false;
+                
+                switch(filter) {
+                    case 'all':
+                        showGroup = true; // Show all table groups
+                        break;
+                    case 'table':
+                        showGroup = true; // Show table groups when filtering by table
+                        break;
+                    case 'processing':
+                        // Show if any child order is processing
+                        $childRows.each(function() {
+                            if ($(this).data('status') === 'processing') {
+                                showGroup = true;
+                                return false;
+                            }
+                        });
+                        break;
+                    case 'ready':
+                        // Show if any child order is ready (pending)
+                        $childRows.each(function() {
+                            if ($(this).data('status') === 'pending') {
+                                showGroup = true;
+                                return false;
+                            }
+                        });
+                        break;
+                    case 'pickup':
+                    case 'completed':
+                        showGroup = false; // Don't show table groups for pickup/completed filters
+                        break;
                 }
-            } else {
-                $groupRow.addClass('hidden');
-                $childRows.hide();
-            }
-        });
+                
+                if (showGroup) {
+                    $groupRow.removeClass('hidden');
+                    // Also show child rows if expanded
+                    if ($groupRow.hasClass('expanded')) {
+                        $childRows.show();
+                    }
+                } else {
+                    $groupRow.addClass('hidden');
+                    $childRows.hide();
+                }
+            });
+        } else {
+            // Mobile: Direct card filtering (table groups are hidden)
+            $('.oj-child-order-row').each(function() {
+                const $row = $(this);
+                const status = $row.data('status');
+                const type = $row.data('type');
+                
+                let show = false;
+                
+                switch(filter) {
+                    case 'all':
+                        show = status !== 'completed';
+                        break;
+                    case 'processing':
+                        show = status === 'processing';
+                        break;
+                    case 'ready':
+                        show = status === 'pending';
+                        break;
+                    case 'table':
+                        show = type === 'table' && status !== 'completed';
+                        break;
+                    case 'pickup':
+                        show = false; // Table orders don't show in pickup filter
+                        break;
+                    case 'completed':
+                        show = status === 'completed';
+                        break;
+                }
+                
+                if (show) {
+                    $row.removeClass('hidden');
+                } else {
+                    $row.addClass('hidden');
+                }
+            });
+        }
         
         // Handle pickup orders
         $('.pickup-order').each(function() {
@@ -1778,13 +1854,13 @@ jQuery(document).ready(function($) {
             }
         });
         
-        // Handle completed orders (if any)
+        // Handle completed orders (if any) - Only show when explicitly filtering for completed
         $('.oj-order-row:not(.pickup-order)').each(function() {
             const $row = $(this);
             const status = $row.data('status');
             
             if (status === 'completed') {
-                if (filter === 'completed' || filter === 'all') {
+                if (filter === 'completed') {
                     $row.removeClass('hidden');
                 } else {
                     $row.addClass('hidden');
