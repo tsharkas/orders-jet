@@ -1442,30 +1442,39 @@ html, body {
         padding: 8px 12px !important;
     }
     
-    /* Make collapse button more touch-friendly on mobile */
+    /* Make collapse button smaller and cleaner on mobile */
     .oj-expand-table {
-        min-height: 44px !important;
-        min-width: 44px !important;
-        padding: 12px !important;
+        min-height: 36px !important;
+        min-width: 36px !important;
+        padding: 8px !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
         flex-shrink: 0 !important;
+        border-radius: 6px !important;
     }
     
     .oj-expand-table .dashicons {
-        font-size: 20px !important;
-        width: 20px !important;
-        height: 20px !important;
+        font-size: 16px !important;
+        width: 16px !important;
+        height: 16px !important;
     }
     
-    /* Make Close Table button larger with more space available */
+    /* Make Close Table button smaller and cleaner */
     .oj-close-table-group {
-        padding: 12px 16px !important;
-        font-size: 14px !important;
+        padding: 8px 12px !important;
+        font-size: 13px !important;
         white-space: nowrap !important;
         flex-shrink: 0 !important;
-        min-height: 44px !important;
+        min-height: 36px !important;
+        border-radius: 6px !important;
+    }
+    
+    /* Add gradient background to table group row for highlighting */
+    .oj-table-group-row {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+        border-left: 4px solid #007cba !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
     }
 }
 
