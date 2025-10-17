@@ -403,6 +403,7 @@ $pickup_orders_all = array_merge($pickup_orders,
                                     data-table="<?php echo esc_attr($item['table_number']); ?>"
                                     data-order-id="<?php echo esc_attr($child_order['id']); ?>"
                                     data-status="<?php echo esc_attr($child_order['status']); ?>"
+                                    data-type="table"
                                     style="display: table-row;">
                                     
                                     <td></td>
@@ -1704,13 +1705,6 @@ jQuery(document).ready(function($) {
     // Apply default filter on page load (Active Orders)
     applyFilter('all');
     
-    // Handle window resize for responsive filtering
-    $(window).on('resize', function() {
-        // Reapply current filter when switching between mobile/desktop
-        const currentFilter = $('.oj-filter-btn.active').data('filter') || 'all';
-        applyFilter(currentFilter);
-    });
-    
     // Filter functionality
     $('.oj-filter-btn').on('click', function() {
         const filter = $(this).data('filter');
@@ -1723,98 +1717,95 @@ jQuery(document).ready(function($) {
         applyFilter(filter);
     });
     
-    // Reusable filter function (Updated for table groups and mobile)
+    // Reusable filter function (Simplified - works for both desktop and mobile)
     function applyFilter(filter) {
-        const isMobile = window.innerWidth <= 480;
+        console.log('Applying filter:', filter);
+        // Handle table groups (desktop/tablet)
+        $('.oj-table-group-row').each(function() {
+            const $groupRow = $(this);
+            const tableNumber = $groupRow.data('table');
+            const $childRows = $(`.oj-child-order-row[data-table="${tableNumber}"]`);
+            
+            let showGroup = false;
+            
+            switch(filter) {
+                case 'all':
+                    showGroup = true; // Show all table groups
+                    break;
+                case 'table':
+                    showGroup = true; // Show table groups when filtering by table
+                    break;
+                case 'processing':
+                    // Show if any child order is processing
+                    $childRows.each(function() {
+                        if ($(this).data('status') === 'processing') {
+                            showGroup = true;
+                            return false;
+                        }
+                    });
+                    break;
+                case 'ready':
+                    // Show if any child order is ready (pending)
+                    $childRows.each(function() {
+                        if ($(this).data('status') === 'pending') {
+                            showGroup = true;
+                            return false;
+                        }
+                    });
+                    break;
+                case 'pickup':
+                case 'completed':
+                    showGroup = false; // Don't show table groups for pickup/completed filters
+                    break;
+            }
+            
+            if (showGroup) {
+                $groupRow.removeClass('hidden');
+                // Also show child rows if expanded
+                if ($groupRow.hasClass('expanded')) {
+                    $childRows.show();
+                }
+            } else {
+                $groupRow.addClass('hidden');
+                $childRows.hide();
+            }
+        });
         
-        if (!isMobile) {
-            // Desktop/Tablet: Handle table groups
-            $('.oj-table-group-row').each(function() {
-                const $groupRow = $(this);
-                const tableNumber = $groupRow.data('table');
-                const $childRows = $(`.oj-child-order-row[data-table="${tableNumber}"]`);
-                
-                let showGroup = false;
-                
-                switch(filter) {
-                    case 'all':
-                        showGroup = true; // Show all table groups
-                        break;
-                    case 'table':
-                        showGroup = true; // Show table groups when filtering by table
-                        break;
-                    case 'processing':
-                        // Show if any child order is processing
-                        $childRows.each(function() {
-                            if ($(this).data('status') === 'processing') {
-                                showGroup = true;
-                                return false;
-                            }
-                        });
-                        break;
-                    case 'ready':
-                        // Show if any child order is ready (pending)
-                        $childRows.each(function() {
-                            if ($(this).data('status') === 'pending') {
-                                showGroup = true;
-                                return false;
-                            }
-                        });
-                        break;
-                    case 'pickup':
-                    case 'completed':
-                        showGroup = false; // Don't show table groups for pickup/completed filters
-                        break;
-                }
-                
-                if (showGroup) {
-                    $groupRow.removeClass('hidden');
-                    // Also show child rows if expanded
-                    if ($groupRow.hasClass('expanded')) {
-                        $childRows.show();
-                    }
-                } else {
-                    $groupRow.addClass('hidden');
-                    $childRows.hide();
-                }
-            });
-        } else {
-            // Mobile: Direct card filtering (table groups are hidden)
-            $('.oj-child-order-row').each(function() {
-                const $row = $(this);
-                const status = $row.data('status');
-                const type = $row.data('type');
-                
-                let show = false;
-                
-                switch(filter) {
-                    case 'all':
-                        show = status !== 'completed';
-                        break;
-                    case 'processing':
-                        show = status === 'processing';
-                        break;
-                    case 'ready':
-                        show = status === 'pending';
-                        break;
-                    case 'table':
-                        show = type === 'table' && status !== 'completed';
-                        break;
-                    case 'pickup':
-                        show = false; // Table orders don't show in pickup filter
-                        break;
-                    case 'completed':
-                        show = status === 'completed';
-                        break;
-                }
-                
-                if (show) {
-                    $row.removeClass('hidden');
-                } else {
-                    $row.addClass('hidden');
-                }
-            });
-        }
+        // Handle individual table order rows (mobile cards)
+        $('.oj-child-order-row').each(function() {
+            const $row = $(this);
+            const status = $row.data('status');
+            const type = $row.data('type');
+            
+            let show = false;
+            
+            switch(filter) {
+                case 'all':
+                    show = status !== 'completed';
+                    break;
+                case 'processing':
+                    show = status === 'processing';
+                    break;
+                case 'ready':
+                    show = status === 'pending';
+                    break;
+                case 'table':
+                    show = type === 'table' && status !== 'completed';
+                    break;
+                case 'pickup':
+                    show = false; // Table orders don't show in pickup filter
+                    break;
+                case 'completed':
+                    show = status === 'completed';
+                    break;
+            }
+            
+            if (show) {
+                $row.removeClass('hidden');
+            } else {
+                $row.addClass('hidden');
+            }
+        });
         
         // Handle pickup orders
         $('.pickup-order').each(function() {
