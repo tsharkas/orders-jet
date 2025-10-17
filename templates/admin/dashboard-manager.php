@@ -1717,62 +1717,12 @@ jQuery(document).ready(function($) {
         applyFilter(filter);
     });
     
-    // Reusable filter function (Simplified - works for both desktop and mobile)
+    // UNIFIED filter function - Works for both desktop groups and mobile cards
     function applyFilter(filter) {
         console.log('Applying filter:', filter);
-        // Handle table groups (desktop/tablet)
-        $('.oj-table-group-row').each(function() {
-            const $groupRow = $(this);
-            const tableNumber = $groupRow.data('table');
-            const $childRows = $(`.oj-child-order-row[data-table="${tableNumber}"]`);
-            
-            let showGroup = false;
-            
-            switch(filter) {
-                case 'all':
-                    showGroup = true; // Show all table groups
-                    break;
-                case 'table':
-                    showGroup = true; // Show table groups when filtering by table
-                    break;
-                case 'processing':
-                    // Show if any child order is processing
-                    $childRows.each(function() {
-                        if ($(this).data('status') === 'processing') {
-                            showGroup = true;
-                            return false;
-                        }
-                    });
-                    break;
-                case 'ready':
-                    // Show if any child order is ready (pending)
-                    $childRows.each(function() {
-                        if ($(this).data('status') === 'pending') {
-                            showGroup = true;
-                            return false;
-                        }
-                    });
-                    break;
-                case 'pickup':
-                case 'completed':
-                    showGroup = false; // Don't show table groups for pickup/completed filters
-                    break;
-            }
-            
-            if (showGroup) {
-                $groupRow.removeClass('hidden');
-                // Also show child rows if expanded
-                if ($groupRow.hasClass('expanded')) {
-                    $childRows.show();
-                }
-            } else {
-                $groupRow.addClass('hidden');
-                $childRows.hide();
-            }
-        });
         
-        // Handle individual table order rows (mobile cards)
-        $('.oj-child-order-row').each(function() {
+        // STEP 1: Filter all individual order rows directly (works for both desktop and mobile)
+        $('.oj-child-order-row, .pickup-order').each(function() {
             const $row = $(this);
             const status = $row.data('status');
             const type = $row.data('type');
@@ -1793,70 +1743,26 @@ jQuery(document).ready(function($) {
                     show = type === 'table' && status !== 'completed';
                     break;
                 case 'pickup':
-                    show = false; // Table orders don't show in pickup filter
+                    show = type === 'pickup' && status !== 'completed';
                     break;
                 case 'completed':
                     show = status === 'completed';
                     break;
             }
             
-            if (show) {
-                $row.removeClass('hidden');
-            } else {
-                $row.addClass('hidden');
-            }
+            // Use jQuery toggle for cleaner show/hide
+            $row.toggle(show);
         });
         
-        // Handle pickup orders
-        $('.pickup-order').each(function() {
-            const $row = $(this);
-            const status = $row.data('status');
-            const type = $row.data('type');
+        // STEP 2: Update table group visibility based on visible children (desktop only)
+        $('.oj-table-group-row').each(function() {
+            const $group = $(this);
+            const tableNumber = $group.data('table');
+            const $children = $(`.oj-child-order-row[data-table="${tableNumber}"]`);
+            const hasVisibleChildren = $children.filter(':visible').length > 0;
             
-            let show = false;
-            
-            switch(filter) {
-                case 'all':
-                    // Show only active pickup orders (exclude completed)
-                    show = status !== 'completed';
-                    break;
-                case 'processing':
-                    show = status === 'processing';
-                    break;
-                case 'ready':
-                    show = status === 'pending';
-                    break;
-                case 'pickup':
-                    // Show only active pickup orders (exclude completed)
-                    show = status !== 'completed';
-                    break;
-                case 'completed':
-                    show = status === 'completed';
-                    break;
-                case 'table':
-                    show = false; // Don't show pickup orders when filtering by table
-                    break;
-            }
-            
-            if (show) {
-                $row.removeClass('hidden');
-            } else {
-                $row.addClass('hidden');
-            }
-        });
-        
-        // Handle completed orders (if any) - Only show when explicitly filtering for completed
-        $('.oj-order-row:not(.pickup-order)').each(function() {
-            const $row = $(this);
-            const status = $row.data('status');
-            
-            if (status === 'completed') {
-                if (filter === 'completed') {
-                    $row.removeClass('hidden');
-                } else {
-                    $row.addClass('hidden');
-                }
-            }
+            // Show group only if it has visible children
+            $group.toggle(hasVisibleChildren);
         });
     }
     
