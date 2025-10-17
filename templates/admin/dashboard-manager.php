@@ -1351,50 +1351,38 @@ html, body {
 
 @media (max-width: 480px) {
     .oj-filters {
-        padding: 8px 12px !important;
+        padding: 10px !important;
         gap: 8px !important;
         margin-bottom: 20px !important;
         overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch !important;
         display: flex !important;
-        white-space: nowrap !important;
-        background: #f8f9fa !important;
-        border-bottom: 1px solid #e1e5e9 !important;
-        /* Enhanced scrolling indicators */
-        scrollbar-width: thin !important;
-        scrollbar-color: #007cba transparent !important;
+        background: white !important;
+        border-radius: 15px !important;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1) !important;
+        /* Copy kitchen dashboard approach - hidden scrollbar */
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
     }
     
-    /* Show scrollbar on mobile for better UX */
+    /* Hide scrollbar like kitchen dashboard */
     .oj-filters::-webkit-scrollbar {
-        height: 4px !important;
-        display: block !important;
-    }
-    
-    .oj-filters::-webkit-scrollbar-track {
-        background: transparent !important;
-    }
-    
-    .oj-filters::-webkit-scrollbar-thumb {
-        background: #007cba !important;
-        border-radius: 2px !important;
-    }
-    
-    .oj-filters::-webkit-scrollbar-thumb:hover {
-        background: #005a87 !important;
+        display: none !important;
     }
     
     .oj-filter-btn {
-        padding: 8px 12px !important;
-        font-size: 12px !important;
-        border-radius: 20px !important;
-        border: 1px solid #ddd !important;
+        padding: 10px 14px !important;
+        font-size: 13px !important;
+        border-radius: 25px !important;
+        border: 2px solid #e9ecef !important;
         background: white !important;
         color: #666 !important;
         white-space: nowrap !important;
         flex-shrink: 0 !important;
         min-width: auto !important;
         text-decoration: none !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 8px !important;
     }
     
     .oj-filter-btn.active {
