@@ -842,10 +842,22 @@ html, body {
     vertical-align: middle;
 }
 
-/* Child Order Styles */
-.oj-child-order-row {
-    background: #fafafa;
-    border-left: 2px solid #c3c4c7;
+/* Child Order Styles - Desktop only (mobile uses card styling) */
+@media (min-width: 481px) {
+    .oj-child-order-row {
+        background: #fafafa;
+        border-left: 2px solid #c3c4c7;
+    }
+
+    .oj-child-order-row td {
+        padding-top: 6px;
+        padding-bottom: 6px;
+    }
+
+    .oj-child-order-row .oj-status-note.ready {
+        color: #0f5132;
+        font-weight: 500;
+    }
 }
 
 .oj-child-order {
@@ -856,16 +868,6 @@ html, body {
     color: #8c8f94;
     margin-right: 8px;
     font-family: monospace;
-}
-
-.oj-child-order-row td {
-    padding-top: 6px;
-    padding-bottom: 6px;
-}
-
-.oj-child-order-row .oj-status-note.ready {
-    color: #0f5132;
-    font-weight: 500;
 }
 
 /* Pickup Order Styles */
@@ -1533,9 +1535,27 @@ html, body {
         display: none !important;
     }
     
-    /* Table orders - blue left border only (inherits all other styling from general rule above) */
-    .oj-orders-table .oj-child-order-row {
+    /* Table orders - force proper card styling with higher specificity */
+    .oj-orders-table .wp-list-table .oj-child-order-row {
         border-left: 4px solid #0073aa !important;
+        /* Force card styling to override WordPress defaults */
+        background: white !important;
+        border: 2px solid #e1e5e9 !important;
+        border-left: 4px solid #0073aa !important;
+        border-radius: 12px !important;
+        padding: 20px !important;
+        margin-bottom: 16px !important;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
+        display: grid !important;
+        grid-template-areas: 
+            "order-num status total"
+            "customer time type"
+            "actions actions view" !important;
+        grid-template-columns: 1fr auto auto !important;
+        gap: 12px 16px !important;
+        position: relative !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
     }
     
     /* Pickup orders - red left border */
