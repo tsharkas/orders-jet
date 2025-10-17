@@ -1945,8 +1945,12 @@ jQuery(document).ready(function($) {
                     // Show pickup orders only - HIDE all table groups
                     if (type === 'table_group') {
                         show = false; // HIDE table groups in pickup filter
+                        console.log('PICKUP FILTER: Hiding table group', $row[0]);
                     } else {
                         show = type === 'pickup' && status !== 'completed';
+                        if (type === 'pickup') {
+                            console.log('PICKUP FILTER: Pickup order', {show, type, status});
+                        }
                     }
                     break;
                 case 'completed':
@@ -1961,6 +1965,16 @@ jQuery(document).ready(function($) {
             
             // Use jQuery toggle for cleaner show/hide
             $row.toggle(show);
+            
+            // DEBUG: Log the toggle result for table groups
+            if ($row.hasClass('oj-table-group-row')) {
+                console.log('Table group after toggle:', {
+                    element: $row[0],
+                    show: show,
+                    isVisible: $row.is(':visible'),
+                    displayStyle: $row[0].style.display
+                });
+            }
         });
         
         // STEP 2: Update table group visibility based on visible children (desktop only)
