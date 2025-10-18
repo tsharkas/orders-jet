@@ -26,7 +26,7 @@
     
     /* Base Colors */
     --primary-color: #2271b1;
-    --success-color: #00a32a;
+    --success-color: #288a1c;
     --warning-color: #dba617;
     --danger-color: #d63638;
     --text-color: #1d2327;
@@ -358,7 +358,7 @@
 }
 
 .oj-action-btn.success:hover {
-    background: #008a00;
+    background: #1f6e15;
     transform: translateY(-1px);
 }
 
