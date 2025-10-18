@@ -106,22 +106,15 @@ class Orders_Jet_Integration {
      * Include required files
      */
     private function includes() {
-        // Core classes
-        include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-universal-time-manager.php';
-        include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-time-helper.php';
+        // Core classes - only include what's actually used
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-delivery-time-manager.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-user-roles.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-admin-dashboard.php';
-        include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-rest-api.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-table-management.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-ajax-handlers.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-shortcodes.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-helpers.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-assets.php';
-        include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-woofood-analyzer.php';
-        include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-woofood-integration.php';
-        include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-menu-analyzer.php';
-        include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-menu-integration.php';
         
         // Debug includes removed for production
     }
