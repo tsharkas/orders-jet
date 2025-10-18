@@ -1,7 +1,7 @@
 <?php
 /**
  * Orders Jet - REST API Class
- * Handles API endpoints for React dashboard
+ * Handles API endpoints (currently unused - React dashboard removed)
  */
 
 if (!defined('ABSPATH')) {

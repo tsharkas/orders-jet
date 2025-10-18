@@ -407,24 +407,7 @@ class Orders_Jet_Admin_Dashboard {
         }
     }
     
-    /**
-     * Render React dashboard
-     */
-    private function render_react_dashboard($dashboard_type) {
-        ?>
-        <div class="wrap">
-            <div id="orders-jet-<?php echo esc_attr($dashboard_type); ?>-dashboard"></div>
-        </div>
-        
-        <script>
-        // Initialize React app when DOM is ready
-        document.addEventListener('DOMContentLoaded', function() {
-            // The React app will automatically detect the dashboard type from the container ID
-            console.log('Orders Jet Dashboard initialized for:', '<?php echo esc_js($dashboard_type); ?>');
-        });
-        </script>
-        <?php
-    }
+    // React dashboard function removed - using PHP templates instead
     
     /**
      * Get dashboard data (AJAX)
