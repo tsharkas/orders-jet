@@ -93,6 +93,14 @@ foreach ($active_orders_for_count as $order) {
 ?>
 
 <div class="wrap oj-manager-orders">
+    <!-- Full Page Preloader -->
+    <div class="oj-page-preloader" id="ojPagePreloader">
+        <div class="oj-preloader-content">
+            <div class="oj-preloader-spinner"></div>
+            <div class="oj-preloader-text"><?php _e('Loading orders...', 'orders-jet'); ?></div>
+        </div>
+    </div>
+
     <!-- Page Header -->
     <div class="oj-page-header">
         <h1 class="oj-page-title"><?php _e('Orders Management', 'orders-jet'); ?></h1>
@@ -333,6 +341,34 @@ foreach ($active_orders_for_count as $order) {
 <script>
 jQuery(document).ready(function($) {
     
+    // Preloader Functions
+    function showPreloader(text = '<?php _e('Loading...', 'orders-jet'); ?>') {
+        const preloader = $('#ojPagePreloader');
+        preloader.find('.oj-preloader-text').text(text);
+        preloader.removeClass('hiding').show();
+    }
+    
+    function hidePreloader() {
+        const preloader = $('#ojPagePreloader');
+        preloader.addClass('hiding');
+        setTimeout(function() {
+            preloader.hide();
+        }, 400);
+    }
+    
+    // Show preloader immediately on page load
+    showPreloader('<?php _e('Loading orders...', 'orders-jet'); ?>');
+    
+    // Hide preloader when everything is ready
+    $(window).on('load', function() {
+        setTimeout(hidePreloader, 500); // Small delay for smooth transition
+    });
+    
+    // Backup: Hide preloader after reasonable time
+    setTimeout(function() {
+        hidePreloader();
+    }, 2000);
+    
     // Restore active filter from URL on page load
     const urlParams = new URLSearchParams(window.location.search);
     const activeFilter = urlParams.get('filter') || 'all';
@@ -420,6 +456,7 @@ jQuery(document).ready(function($) {
         
         if (confirm('<?php _e('Mark this order as ready?', 'orders-jet'); ?>')) {
             $btn.prop('disabled', true).text('<?php _e('Processing...', 'orders-jet'); ?>');
+            showPreloader('<?php _e('Marking order as ready...', 'orders-jet'); ?>');
             
             $.post(ajaxurl, {
                 action: 'oj_mark_order_ready',
@@ -482,6 +519,8 @@ jQuery(document).ready(function($) {
         // Confirm completion
         modal.find('.oj-confirm-complete').on('click', function() {
             const paymentMethod = modal.find('.oj-payment-method').val();
+            modal.remove();
+            showPreloader('<?php _e('Completing order...', 'orders-jet'); ?>');
             
             $.post(ajaxurl, {
                 action: 'oj_complete_individual_order',
@@ -489,7 +528,6 @@ jQuery(document).ready(function($) {
                 payment_method: paymentMethod,
                 nonce: '<?php echo wp_create_nonce('oj_dashboard_nonce'); ?>'
             }, function(response) {
-                modal.remove();
                 if (response.success) {
                     showSuccessModal(orderId);
                 } else {
@@ -547,6 +585,8 @@ jQuery(document).ready(function($) {
             // Confirm closure
             modal.find('.oj-confirm-close').on('click', function() {
                 const paymentMethod = modal.find('.oj-payment-method').val();
+                modal.remove();
+                showPreloader('<?php _e('Closing table...', 'orders-jet'); ?>');
                 
                 $.post(ajaxurl, {
                     action: 'oj_close_table',
@@ -554,7 +594,6 @@ jQuery(document).ready(function($) {
                     payment_method: paymentMethod,
                     nonce: '<?php echo wp_create_nonce('oj_table_order'); ?>'
                 }, function(response) {
-                    modal.remove();
                     if (response.success) {
                         showTableSuccessModal(tableNumber, response.data);
                     } else {
@@ -613,6 +652,7 @@ jQuery(document).ready(function($) {
     
     // Success Modal (after order completion)
     function showSuccessModal(orderId) {
+        hidePreloader(); // Hide preloader when showing success modal
         const modal = $(`
             <div class="oj-success-modal-overlay">
                 <div class="oj-success-modal">
@@ -660,6 +700,7 @@ jQuery(document).ready(function($) {
     
     // Table Success Modal (after table closure)
     function showTableSuccessModal(tableNumber, responseData) {
+        hidePreloader(); // Hide preloader when showing success modal
         const consolidatedOrderId = responseData.consolidated_order_id;
         
         const modal = $(`
@@ -713,6 +754,71 @@ jQuery(document).ready(function($) {
 </script>
 
 <style>
+/* Full Page Preloader */
+.oj-page-preloader {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.4s ease-out, visibility 0.4s ease-out;
+}
+
+.oj-page-preloader.hiding {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.oj-preloader-content {
+    text-align: center;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.oj-preloader-spinner {
+    width: 45px;
+    height: 45px;
+    border: 4px solid #f0f0f1;
+    border-top: 4px solid #2271b1;
+    border-radius: 50%;
+    animation: oj-spin 1.2s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes oj-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.oj-preloader-text {
+    margin-top: 20px;
+    color: #50575e;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+}
+
+/* Fade-in animation for content when preloader hides */
+.oj-manager-orders > *:not(.oj-page-preloader) {
+    animation: oj-fadeIn 0.5s ease-out;
+}
+
+@keyframes oj-fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 /* Simple Modal Styles */
 .oj-payment-modal-overlay,
 .oj-success-modal-overlay {
