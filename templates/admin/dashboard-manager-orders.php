@@ -411,7 +411,7 @@ jQuery(document).ready(function($) {
             $.post(ajaxurl, {
                 action: 'oj_mark_order_ready',
                 order_id: orderId,
-                nonce: '<?php echo wp_create_nonce('oj_mark_ready'); ?>'
+                nonce: '<?php echo wp_create_nonce('oj_dashboard_nonce'); ?>'
             }, function(response) {
                 if (response.success) {
                     location.reload();
@@ -467,10 +467,10 @@ jQuery(document).ready(function($) {
             const paymentMethod = modal.find('.oj-payment-method').val();
             
             $.post(ajaxurl, {
-                action: 'oj_complete_order',
+                action: 'oj_complete_individual_order',
                 order_id: orderId,
                 payment_method: paymentMethod,
-                nonce: '<?php echo wp_create_nonce('oj_complete_order'); ?>'
+                nonce: '<?php echo wp_create_nonce('oj_dashboard_nonce'); ?>'
             }, function(response) {
                 modal.remove();
                 if (response.success) {
@@ -535,7 +535,7 @@ jQuery(document).ready(function($) {
                     action: 'oj_close_table',
                     table_number: tableNumber,
                     payment_method: paymentMethod,
-                    nonce: '<?php echo wp_create_nonce('oj_close_table'); ?>'
+                    nonce: '<?php echo wp_create_nonce('oj_table_order'); ?>'
                 }, function(response) {
                     modal.remove();
                     if (response.success) {
