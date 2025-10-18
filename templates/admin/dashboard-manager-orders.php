@@ -14,30 +14,6 @@ if (!defined('ABSPATH')) {
 // Enqueue beautiful card CSS
 wp_enqueue_style('oj-manager-orders-cards', ORDERS_JET_PLUGIN_URL . 'assets/css/manager-orders-cards.css', array(), ORDERS_JET_VERSION);
 
-// One-time fix for test orders (runs automatically once)
-$fix_flag = get_option('oj_test_orders_fixed', false);
-if (!$fix_flag) {
-    $delivery_orders = [287, 293, 294];
-    foreach ($delivery_orders as $order_id) {
-        $order = wc_get_order($order_id);
-        if ($order) {
-            $order->update_meta_data('exwf_odmethod', 'delivery');
-            $order->save();
-        }
-    }
-    
-    $takeaway_orders = [288, 289, 292];
-    foreach ($takeaway_orders as $order_id) {
-        $order = wc_get_order($order_id);
-        if ($order) {
-            $order->update_meta_data('exwf_odmethod', 'takeaway');
-            $order->save();
-        }
-    }
-    
-    // Set flag to prevent running again
-    update_option('oj_test_orders_fixed', true);
-}
 
 // Single query for all orders with WooFood order types
 $offset = isset($_GET['offset']) ? intval($_GET['offset']) : 0;
@@ -75,13 +51,7 @@ $dinein_count = 0;
 $takeaway_count = 0;
 $delivery_count = 0;
 
-// Get all orders for All Orders and Completed counts
-$all_orders_for_count = wc_get_orders(array(
-    'status' => array('wc-processing', 'wc-pending', 'wc-completed'),
-    'limit' => -1
-));
-
-// Get active orders only for operational filter counts
+// Get active orders only for operational filter counts (dinein, takeaway, delivery)
 $active_orders_for_count = wc_get_orders(array(
     'status' => array('wc-processing', 'wc-pending'),
     'limit' => -1
@@ -201,7 +171,7 @@ foreach ($active_orders_for_count as $order) {
                 $customer_name = $order->get_meta('_oj_customer_name') ?: $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
                 $status = $order->get_status();
                 $total = $order->get_total();
-                $date_modified = $order->get_date_modified();
+                $date_created = $order->get_date_created();
                 $items_count = $order->get_item_count();
                 
                 // Status mapping for display
@@ -290,7 +260,7 @@ foreach ($active_orders_for_count as $order) {
                         
                         <div class="oj-order-meta">
                             <div class="oj-order-time">
-                                🕐 <?php echo $date_modified ? $date_modified->format('g:i A') : ''; ?>
+                                🕐 <?php echo $date_created ? $date_created->format('g:i A') : ''; ?>
                             </div>
                             <div class="oj-order-total">
                                 <?php echo wc_price($total); ?>
@@ -388,7 +358,7 @@ jQuery(document).ready(function($) {
                     show = true;
                     break;
                 case 'active':
-                    show = (status === 'processing' || status === 'pending') && status !== 'completed';
+                    show = (status === 'processing' || status === 'pending');
                     break;
                 case 'processing':
                     show = (status === 'processing');
