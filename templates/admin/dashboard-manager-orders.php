@@ -23,55 +23,55 @@ $all_orders = wc_get_orders(array(
     'limit' => $limit,
     'offset' => $offset,
     'orderby' => 'date_modified',
-    'order' => 'DESC',
-    'meta_query' => array(
-        array(
-            'key' => 'exwf_odmethod',
-            'compare' => 'EXISTS'
-        )
-    )
+    'order' => 'DESC'
 ));
 
-// Count orders for filter tabs using WooFood order types
+// Count orders for filter tabs - all WooCommerce orders
 $processing_count = count(wc_get_orders(array(
     'status' => 'wc-processing',
-    'limit' => -1,
-    'meta_query' => array(array('key' => 'exwf_odmethod', 'compare' => 'EXISTS'))
+    'limit' => -1
 )));
 
 $pending_count = count(wc_get_orders(array(
     'status' => 'wc-pending', 
-    'limit' => -1,
-    'meta_query' => array(array('key' => 'exwf_odmethod', 'compare' => 'EXISTS'))
+    'limit' => -1
 )));
 
 $completed_count = count(wc_get_orders(array(
     'status' => 'wc-completed',
-    'limit' => -1,
-    'meta_query' => array(array('key' => 'exwf_odmethod', 'compare' => 'EXISTS'))
+    'limit' => -1
 )));
 
 $active_count = $processing_count + $pending_count;
 $all_count = $active_count + $completed_count;
 
-// Count by order type (WooFood system)
-$dinein_count = count(wc_get_orders(array(
-    'status' => array('wc-processing', 'wc-pending', 'wc-completed'),
-    'limit' => -1,
-    'meta_query' => array(array('key' => 'exwf_odmethod', 'value' => 'dinein'))
-)));
+// Count by order type - check all orders and determine type
+$dinein_count = 0;
+$takeaway_count = 0;
+$delivery_count = 0;
 
-$takeaway_count = count(wc_get_orders(array(
+$all_orders_for_count = wc_get_orders(array(
     'status' => array('wc-processing', 'wc-pending', 'wc-completed'),
-    'limit' => -1,
-    'meta_query' => array(array('key' => 'exwf_odmethod', 'value' => 'takeaway'))
-)));
+    'limit' => -1
+));
 
-$delivery_count = count(wc_get_orders(array(
-    'status' => array('wc-processing', 'wc-pending', 'wc-completed'),
-    'limit' => -1,
-    'meta_query' => array(array('key' => 'exwf_odmethod', 'value' => 'delivery'))
-)));
+foreach ($all_orders_for_count as $order) {
+    $order_method = $order->get_meta('exwf_odmethod');
+    
+    // If no exwf_odmethod, determine from other meta
+    if (empty($order_method)) {
+        $table_number = $order->get_meta('_oj_table_number');
+        $order_method = !empty($table_number) ? 'dinein' : 'takeaway';
+    }
+    
+    if ($order_method === 'dinein') {
+        $dinein_count++;
+    } elseif ($order_method === 'takeaway') {
+        $takeaway_count++;
+    } elseif ($order_method === 'delivery') {
+        $delivery_count++;
+    }
+}
 ?>
 
 <div class="wrap oj-manager-orders">
@@ -123,7 +123,13 @@ $delivery_count = count(wc_get_orders(array(
         <?php else : ?>
             <?php foreach ($all_orders as $order) : 
                 $order_id = $order->get_id();
-                $order_method = $order->get_meta('exwf_odmethod'); // WooFood order method: 'dinein', 'takeaway', 'delivery'
+                $order_method = $order->get_meta('exwf_odmethod');
+                
+                // If no exwf_odmethod, determine from other meta
+                if (empty($order_method)) {
+                    $table_number_check = $order->get_meta('_oj_table_number');
+                    $order_method = !empty($table_number_check) ? 'dinein' : 'takeaway';
+                }
                 $table_number = $order->get_meta('_oj_table_number');
                 $customer_name = $order->get_meta('_oj_customer_name') ?: $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
                 $status = $order->get_status();
@@ -307,7 +313,7 @@ jQuery(document).ready(function($) {
             
             switch(filter) {
                 case 'active':
-                    show = (status === 'processing' || status === 'pending');
+                    show = (status === 'processing' || status === 'pending') && status !== 'completed';
                     break;
                 case 'processing':
                     show = (status === 'processing');
