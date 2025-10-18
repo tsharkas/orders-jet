@@ -17,23 +17,11 @@ class Orders_Jet_AJAX_Handlers {
         add_action('wp_ajax_oj_get_table_id_by_number', array($this, 'get_table_id_by_number_ajax'));
         add_action('wp_ajax_oj_get_product_details', array($this, 'get_product_details'));
         add_action('wp_ajax_oj_get_table_orders', array($this, 'get_table_orders'));
-        add_action('wp_ajax_oj_close_table', array($this, 'close_table'));
+        // CORE FUNCTIONALITY - Currently Used
         add_action('wp_ajax_oj_mark_order_ready', array($this, 'mark_order_ready'));
-        add_action('wp_ajax_oj_mark_order_delivered', array($this, 'mark_order_delivered'));
-        add_action('wp_ajax_oj_confirm_pickup_payment', array($this, 'confirm_pickup_payment'));
-        add_action('wp_ajax_oj_get_table_summary', array($this, 'get_table_summary'));
-        add_action('wp_ajax_oj_complete_table_cash', array($this, 'complete_table_cash'));
         add_action('wp_ajax_oj_complete_individual_order', array($this, 'complete_individual_order'));
-        add_action('wp_ajax_oj_get_completed_orders_for_pdf', array($this, 'get_completed_orders_for_pdf'));
-        add_action('wp_ajax_oj_generate_guest_pdf', array($this, 'generate_guest_pdf'));
-        add_action('wp_ajax_oj_generate_admin_pdf', array($this, 'generate_admin_pdf'));
-        add_action('wp_ajax_oj_generate_table_pdf', array($this, 'generate_table_pdf'));
-        add_action('wp_ajax_oj_bulk_action', array($this, 'bulk_action'));
-        add_action('wp_ajax_oj_search_order_invoice', array($this, 'search_order_invoice'));
-        add_action('wp_ajax_oj_get_order_invoice', array($this, 'get_order_invoice'));
-        add_action('wp_ajax_oj_download_order_invoice', array($this, 'download_order_invoice'));
         add_action('wp_ajax_oj_close_table_group', array($this, 'close_table_group'));
-        add_action('wp_ajax_oj_get_order_details', array($this, 'get_order_details'));
+        add_action('wp_ajax_oj_get_order_invoice', array($this, 'get_order_invoice'));
         add_action('wp_ajax_oj_load_more_orders', array($this, 'load_more_orders'));
         
         // AJAX handlers for non-logged in users (guests)
@@ -42,9 +30,7 @@ class Orders_Jet_AJAX_Handlers {
         add_action('wp_ajax_nopriv_oj_get_table_id_by_number', array($this, 'get_table_id_by_number_ajax'));
         add_action('wp_ajax_nopriv_oj_get_product_details', array($this, 'get_product_details'));
         add_action('wp_ajax_nopriv_oj_get_table_orders', array($this, 'get_table_orders'));
-        add_action('wp_ajax_nopriv_oj_close_table', array($this, 'close_table'));
-        add_action('wp_ajax_nopriv_oj_get_completed_orders_for_pdf', array($this, 'get_completed_orders_for_pdf'));
-        add_action('wp_ajax_nopriv_oj_generate_guest_pdf', array($this, 'generate_guest_pdf'));
+        // Guest handlers kept minimal for security
     }
     
     /**
