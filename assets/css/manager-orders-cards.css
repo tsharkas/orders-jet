@@ -364,7 +364,7 @@
 
 /* Warning Action Button */
 .oj-action-btn.warning {
-    background: var(--warning-color);
+    background: #288a1c;
     color: white;
 }
 
