@@ -270,6 +270,9 @@ class Orders_Jet_AJAX_Handlers {
         $order->update_meta_data('_oj_order_timestamp', current_time('mysql'));
         $order->update_meta_data('_oj_session_id', $session_id);
         $order->update_meta_data('_oj_session_start', $is_new_session ? 'yes' : 'no');
+        
+        // Set WooFood compatible order type meta
+        $order->update_meta_data('_exwf_order_type', 'dine_in');
         $order->update_meta_data('_oj_order_type', 'dine_in');
         
         // Set order status
@@ -278,6 +281,11 @@ class Orders_Jet_AJAX_Handlers {
         // Save order first to ensure all items are saved
         $order_id = $order->save();
         error_log('Orders Jet: Order saved with ID: ' . $order_id);
+        
+        // Trigger WooFood integration for dine-in order
+        if (class_exists('Orders_Jet_WooFood_Integration')) {
+            do_action('exwf_order_created', $order_id, 'dine_in');
+        }
         
         // Verify the meta data was saved
         $saved_table_number = $order->get_meta('_oj_table_number');
