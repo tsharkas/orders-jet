@@ -438,8 +438,8 @@ jQuery(document).ready(function($) {
         window.location.href = url.toString();
     });
     
-    // Mark Ready
-    $('.oj-mark-ready').on('click', function() {
+    // Mark Ready - Use event delegation for dynamic buttons
+    $(document).on('click', '.oj-mark-ready', function() {
         const orderId = $(this).data('order-id');
         const $btn = $(this);
         
@@ -466,8 +466,8 @@ jQuery(document).ready(function($) {
         }
     });
     
-    // Complete Order
-    $('.oj-complete-order').on('click', function() {
+    // Complete Order - Use event delegation for dynamic buttons
+    $(document).on('click', '.oj-complete-order', function() {
         const orderId = $(this).data('order-id');
         const orderType = $(this).data('type');
         
@@ -665,15 +665,24 @@ jQuery(document).ready(function($) {
             $statusBadge.removeClass('processing pending completed ready');
             $statusBadge.addClass(cardUpdates.status_badge_class);
             
-            // Update action button
-            const $actionBtn = $card.find('.oj-action-btn');
+            // ✅ FIX: Update ONLY the first button (action button)
+            const $actionBtn = $card.find('.oj-action-btn:first');
             $actionBtn.text(cardUpdates.button_text);
             $actionBtn.removeClass('oj-mark-ready oj-complete-order oj-thermal-print');
             $actionBtn.addClass(cardUpdates.button_class);
             
-            // Add thermal print functionality if needed
-            if (cardUpdates.button_action === 'thermal_print') {
-                // Set the invoice URL data attribute
+            // ✅ FIX: Make the updated button functional based on its new class
+            if (cardUpdates.button_class === 'oj-complete-order') {
+                // Bind Complete Order functionality
+                $actionBtn.off('click').on('click', function() {
+                    const orderId = $(this).data('order-id');
+                    const orderType = $(this).data('type');
+                    
+                    // Show payment method selection modal
+                    showCompleteOrderModal(orderId, orderType);
+                });
+            } else if (cardUpdates.button_class === 'oj-thermal-print') {
+                // Bind Thermal Print functionality
                 $actionBtn.attr('data-invoice-url', cardUpdates.invoice_url || '');
                 $actionBtn.off('click').on('click', function() {
                     const invoiceUrl = $(this).data('invoice-url');
@@ -687,6 +696,74 @@ jQuery(document).ready(function($) {
             $card.addClass('oj-card-updated');
             setTimeout(() => $card.removeClass('oj-card-updated'), 1000);
         }
+    }
+    
+    /**
+     * Show Complete Order Modal (for dynamically updated buttons)
+     */
+    function showCompleteOrderModal(orderId, orderType) {
+        // Show payment method selection
+        const paymentMethods = [
+            {value: 'cash', text: '<?php _e('Cash', 'orders-jet'); ?>'},
+            {value: 'card', text: '<?php _e('Card', 'orders-jet'); ?>'},
+            {value: 'online', text: '<?php _e('Online Payment', 'orders-jet'); ?>'}
+        ];
+        
+        let paymentOptions = '';
+        paymentMethods.forEach(method => {
+            paymentOptions += `<option value="${method.value}">${method.text}</option>`;
+        });
+        
+        const modal = $(`
+            <div class="oj-payment-modal-overlay">
+                <div class="oj-payment-modal">
+                    <h3><?php _e('Complete Order', 'orders-jet'); ?> #${orderId}</h3>
+                    <p><?php _e('Select payment method:', 'orders-jet'); ?></p>
+                    <select class="oj-payment-method">
+                        ${paymentOptions}
+                    </select>
+                    <div class="oj-modal-actions">
+                        <button class="button button-primary oj-confirm-complete">
+                            <?php _e('Complete Order', 'orders-jet'); ?>
+                        </button>
+                        <button class="button oj-cancel-complete">
+                            <?php _e('Cancel', 'orders-jet'); ?>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `);
+        
+        $('body').append(modal);
+        
+        // Confirm completion
+        modal.find('.oj-confirm-complete').on('click', function() {
+            const paymentMethod = modal.find('.oj-payment-method').val();
+            modal.remove();
+            
+            $.post(ajaxurl, {
+                action: 'oj_complete_individual_order',
+                order_id: orderId,
+                payment_method: paymentMethod,
+                nonce: '<?php echo wp_create_nonce('oj_dashboard_nonce'); ?>'
+            }, function(response) {
+                if (response.success) {
+                    // Update card without page reload
+                    updateOrderCard(response.data.card_updates);
+                    // Show success modal with thermal print option
+                    showSuccessModalWithThermalPrint(orderId, response.data.thermal_invoice_url);
+                } else {
+                    alert(response.data.message || '<?php _e('Error occurred', 'orders-jet'); ?>');
+                }
+            }).fail(function() {
+                alert('<?php _e('Network error occurred', 'orders-jet'); ?>');
+            });
+        });
+        
+        // Cancel
+        modal.find('.oj-cancel-complete').on('click', function() {
+            modal.remove();
+        });
     }
     
     /**
@@ -794,7 +871,7 @@ jQuery(document).ready(function($) {
         });
     }
     
-    // Handle thermal print button clicks (for existing completed orders)
+    // Handle thermal print button clicks (for existing and dynamically updated completed orders)
     $(document).on('click', '.oj-thermal-print', function() {
         const invoiceUrl = $(this).data('invoice-url');
         if (invoiceUrl) {

@@ -3643,9 +3643,15 @@ class Orders_Jet_AJAX_Handlers {
             $order_id = intval($_GET['order_id'] ?? 0);
             $order_type = sanitize_text_field($_GET['type'] ?? '');
             $print_mode = isset($_GET['print']);
+            $nonce = sanitize_text_field($_GET['nonce'] ?? '');
             
             if (!$order_id) {
                 wp_die(__('Invalid order ID', 'orders-jet'));
+            }
+            
+            // Verify nonce
+            if (!wp_verify_nonce($nonce, 'oj_get_invoice')) {
+                wp_die(__('Security check failed', 'orders-jet'));
             }
             
             // Check permissions
@@ -3659,7 +3665,15 @@ class Orders_Jet_AJAX_Handlers {
             }
             
             // Generate invoice HTML
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Orders Jet: Generating invoice for order #' . $order_id);
+            }
+            
             $invoice_html = $this->generate_single_order_invoice_html($order, $print_mode);
+            
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Orders Jet: Invoice HTML generated successfully for order #' . $order_id);
+            }
             
             // Set proper headers
             header('Content-Type: text/html; charset=utf-8');
@@ -3668,7 +3682,10 @@ class Orders_Jet_AJAX_Handlers {
             exit;
             
         } catch (Exception $e) {
-            error_log('Orders Jet: Error generating invoice: ' . $e->getMessage());
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Orders Jet: Error generating invoice: ' . $e->getMessage());
+                error_log('Orders Jet: Stack trace: ' . $e->getTraceAsString());
+            }
             wp_die(__('Error generating invoice: ', 'orders-jet') . $e->getMessage());
         }
     }
