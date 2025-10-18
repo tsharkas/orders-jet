@@ -473,17 +473,18 @@ jQuery(document).ready(function($) {
         e.preventDefault();
         e.stopPropagation();
         
-        console.log('Complete Order clicked!', e.target);
+        console.log('🎯 EVENT DELEGATION Complete Order clicked!', e.target);
         console.log('Button data:', $(this).data());
         console.log('Button classes:', $(this).attr('class'));
+        console.log('Event target classes:', $(e.target).attr('class'));
         
         const orderId = $(this).data('order-id');
         const orderType = $(this).data('type');
         
-        console.log('Order ID:', orderId, 'Order Type:', orderType);
+        console.log('Order ID from delegation:', orderId, 'Order Type:', orderType);
         
         if (!orderId) {
-            console.error('No order ID found on Complete Order button');
+            console.error('❌ No order ID found on Complete Order button in delegation');
             return;
         }
         
@@ -704,17 +705,42 @@ jQuery(document).ready(function($) {
                     e.preventDefault();
                     e.stopPropagation();
                     
-                    console.log('Direct Complete Order click handler triggered');
+                    console.log('🔥 DIRECT Complete Order click handler triggered!');
+                    console.log('Button element:', this);
+                    console.log('Button classes:', $(this).attr('class'));
+                    console.log('Button data:', $(this).data());
+                    
                     const orderId = $(this).data('order-id');
                     const orderType = $(this).data('type');
                     
+                    console.log('Order ID from direct handler:', orderId);
+                    console.log('Order Type from direct handler:', orderType);
+                    
                     if (!orderId) {
-                        console.error('No order ID found in direct handler');
+                        console.error('❌ No order ID found in direct handler');
                         return;
                     }
                     
+                    console.log('✅ Calling showCompleteOrderModalDirect...');
                     // Trigger the payment modal
                     showCompleteOrderModalDirect(orderId, orderType);
+                });
+                
+                // Also test if the button is clickable
+                console.log('🔍 Button after binding:', $actionBtn[0]);
+                console.log('🔍 Button clickable test:', $actionBtn.is(':visible'), $actionBtn.prop('disabled'));
+                
+                // Add a simple test click handler to verify the button works
+                $actionBtn.on('click.test', function() {
+                    console.log('🧪 TEST CLICK HANDLER TRIGGERED!');
+                    alert('Test click works!');
+                });
+                
+                // Test if there are any CSS issues preventing clicks
+                $actionBtn.css({
+                    'pointer-events': 'auto',
+                    'cursor': 'pointer',
+                    'z-index': '9999'
                 });
                 
                 console.log('Complete Order button updated:', {
