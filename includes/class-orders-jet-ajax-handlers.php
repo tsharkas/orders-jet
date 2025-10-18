@@ -55,13 +55,15 @@ class Orders_Jet_AJAX_Handlers {
         error_reporting(E_ALL);
         ini_set('display_errors', 0); // Don't display errors, log them instead
         
-        // Log the incoming request
-        error_log('Orders Jet: ========== ORDER SUBMISSION START ==========');
-        error_log('Orders Jet: Order submission request received');
-        error_log('Orders Jet: POST data: ' . print_r($_POST, true));
-        error_log('Orders Jet: REQUEST data: ' . print_r($_REQUEST, true));
-        error_log('Orders Jet: User logged in: ' . (is_user_logged_in() ? 'Yes' : 'No'));
-        error_log('Orders Jet: Current user ID: ' . get_current_user_id());
+        // Log the incoming request (debug mode only)
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Orders Jet: ========== ORDER SUBMISSION START ==========');
+            error_log('Orders Jet: Order submission request received');
+            error_log('Orders Jet: POST data: ' . print_r($_POST, true));
+            error_log('Orders Jet: REQUEST data: ' . print_r($_REQUEST, true));
+            error_log('Orders Jet: User logged in: ' . (is_user_logged_in() ? 'Yes' : 'No'));
+            error_log('Orders Jet: Current user ID: ' . get_current_user_id());
+        }
         
         try {
             check_ajax_referer('oj_table_order', 'nonce');
@@ -210,7 +212,9 @@ class Orders_Jet_AJAX_Handlers {
                 // Get the order item that was just added
                 $order_item = $order->get_item($item_id);
                 
-                error_log('Orders Jet: Added item using WooCommerce native method - Product: ' . $product->get_name() . ', Total: ' . ($total_price * $quantity));
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('Orders Jet: Added item using WooCommerce native method - Product: ' . $product->get_name() . ', Total: ' . ($total_price * $quantity));
+                }
                 
                 // Add item notes if any
                 if (!empty($notes)) {
@@ -1463,20 +1467,28 @@ class Orders_Jet_AJAX_Handlers {
         
         try {
             // Mark order as ready (pending status means ready for pickup/payment)
-            $order->set_status('pending');
-            
-            // Add order note with order type context
+            // OPTIMIZED: Use direct post status update for performance
             $order_type = !empty($table_number) ? 'table' : 'pickup';
+            
+            // Use direct post status update to skip heavy WooCommerce operations
+            wp_update_post(array(
+                'ID' => $order_id,
+                'post_status' => 'wc-pending'
+            ));
+            
+            // Add order note efficiently
             $order->add_order_note(sprintf(
                 __('Order marked as ready by kitchen staff (%s) - %s order', 'orders-jet'), 
                 wp_get_current_user()->display_name,
                 ucfirst($order_type)
             ));
             
-            // Save the order
-            $order->save();
+            // Save only meta data (skip calculate_totals for performance)
+            $order->save_meta_data();
             
-            error_log('Orders Jet Kitchen: Order #' . $order_id . ' (' . $order_type . ') marked as ready (pending) by user #' . get_current_user_id());
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Orders Jet Kitchen: Order #' . $order_id . ' (' . $order_type . ') marked as ready (pending) by user #' . get_current_user_id());
+            }
             
             // Send notifications to manager and waiter dashboards
             $this->send_ready_notifications($order, $table_number);
@@ -1787,15 +1799,23 @@ class Orders_Jet_AJAX_Handlers {
         $original_subtotal = $order->get_subtotal();
         $original_total = $order->get_total();
         
-        // INDIVIDUAL ORDER: Calculate tax per order
-        $this->calculate_individual_order_taxes($order);
-        
+        // OPTIMIZED: Streamlined order completion
         // Store payment method and tax calculation method
         $order->update_meta_data('_oj_payment_method', $payment_method);
         $order->update_meta_data('_oj_tax_method', 'individual_order');
         
-        // Mark order as completed
-        $order->set_status('completed');
+        // Calculate tax efficiently (only if needed)
+        if (wc_tax_enabled()) {
+            $this->calculate_individual_order_taxes($order);
+        }
+        
+        // Mark order as completed using direct update for performance
+        wp_update_post(array(
+            'ID' => $order_id,
+            'post_status' => 'wc-completed'
+        ));
+        
+        // Add completion note
         $order->add_order_note(sprintf(
             __('Individual order completed by manager (%s) - Payment: %s - Tax calculated per order (Subtotal: %s, Tax: %s, Total: %s)', 'orders-jet'),
             wp_get_current_user()->display_name,
@@ -1804,9 +1824,13 @@ class Orders_Jet_AJAX_Handlers {
             wc_price($order->get_total_tax()),
             wc_price($order->get_total())
         ));
-        $order->save();
         
-        error_log('Orders Jet: Individual order #' . $order_id . ' completed - Original Total: ' . $original_total . ', New Total with Tax: ' . $order->get_total());
+        // Save only meta data (skip heavy calculate_totals)
+        $order->save_meta_data();
+        
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Orders Jet: Individual order #' . $order_id . ' completed - Original Total: ' . $original_total . ', New Total with Tax: ' . $order->get_total());
+        }
         
         wp_send_json_success(array(
             'message' => sprintf(__('Order #%d completed successfully!', 'orders-jet'), $order_id),
@@ -3150,8 +3174,10 @@ class Orders_Jet_AJAX_Handlers {
             wp_send_json_error(array('message' => __('Table number is required', 'orders-jet')));
         }
         
-        error_log('Orders Jet: ========== TABLE GROUP CLOSURE START ==========');
-        error_log('Orders Jet: Closing table group: ' . $table_number . ' with payment method: ' . $payment_method);
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Orders Jet: ========== TABLE GROUP CLOSURE START ==========');
+            error_log('Orders Jet: Closing table group: ' . $table_number . ' with payment method: ' . $payment_method);
+        }
         
         try {
             // 1. Get all table orders for this table
@@ -3168,7 +3194,9 @@ class Orders_Jet_AJAX_Handlers {
                 wp_send_json_error(array('message' => __('No active orders found for this table', 'orders-jet')));
             }
             
-            error_log('Orders Jet: Found ' . count($table_orders) . ' orders for table ' . $table_number);
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Orders Jet: Found ' . count($table_orders) . ' orders for table ' . $table_number);
+            }
             
             // 2. Analyze order statuses and handle processing orders
             $processing_orders = array();
@@ -3186,7 +3214,9 @@ class Orders_Jet_AJAX_Handlers {
                 }
             }
             
-            error_log('Orders Jet: Order status analysis - Processing: ' . count($processing_orders) . ', Pending: ' . count($pending_orders) . ', Other: ' . count($other_orders));
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Orders Jet: Order status analysis - Processing: ' . count($processing_orders) . ', Pending: ' . count($pending_orders) . ', Other: ' . count($other_orders));
+            }
             
             // Handle processing orders with confirmation
             if (!empty($processing_orders)) {
@@ -3323,11 +3353,19 @@ class Orders_Jet_AJAX_Handlers {
             $consolidated_order->update_meta_data('_oj_order_method', 'dinein');
             $consolidated_order->update_meta_data('_oj_table_closed', current_time('mysql'));
             
-            // 6. Calculate totals (this will calculate taxes using WooCommerce native system)
-            $consolidated_order->calculate_totals();
+            // 6. OPTIMIZED: Calculate totals efficiently
+            if (wc_tax_enabled()) {
+                $consolidated_order->calculate_totals();
+            } else {
+                // Skip tax calculation if taxes disabled
+                $consolidated_order->set_total($consolidated_order->get_subtotal());
+            }
             
-            // 7. Complete consolidated order
-            $consolidated_order->set_status('completed');
+            // 7. Complete consolidated order using direct update for performance
+            wp_update_post(array(
+                'ID' => $consolidated_order->get_id(),
+                'post_status' => 'wc-completed'
+            ));
             
             // Add completion note
             $consolidated_order->add_order_note(sprintf(
@@ -3342,18 +3380,24 @@ class Orders_Jet_AJAX_Handlers {
             
             $consolidated_order->save();
             
-            error_log('Orders Jet: Consolidated order #' . $consolidated_order->get_id() . ' created and completed');
-            error_log('Orders Jet: Consolidated order totals - Subtotal: ' . $consolidated_order->get_subtotal() . ', Tax: ' . $consolidated_order->get_total_tax() . ', Total: ' . $consolidated_order->get_total());
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Orders Jet: Consolidated order #' . $consolidated_order->get_id() . ' created and completed');
+                error_log('Orders Jet: Consolidated order totals - Subtotal: ' . $consolidated_order->get_subtotal() . ', Tax: ' . $consolidated_order->get_total_tax() . ', Total: ' . $consolidated_order->get_total());
+                error_log('Orders Jet: Starting deletion of ' . count($table_orders) . ' child orders');
+            }
             
-            // SAFEGUARD: Validate consolidated order tax calculation
-            $this->validate_tax_isolation($consolidated_order, 'consolidated');
+            // SAFEGUARD: Validate consolidated order tax calculation (debug only)
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                $this->validate_tax_isolation($consolidated_order, 'consolidated');
+            }
             
-            // 8. Permanently delete child orders
-            error_log('Orders Jet: Starting deletion of ' . count($table_orders) . ' child orders');
+            // 8. OPTIMIZED: Permanently delete child orders efficiently
             
             foreach ($table_orders as $child_order) {
                 $child_order_id = $child_order->get_id();
-                error_log('Orders Jet: Attempting to delete child order #' . $child_order_id);
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('Orders Jet: Attempting to delete child order #' . $child_order_id);
+                }
                 
                 try {
                     // Check if order exists before deletion
