@@ -333,14 +333,27 @@ foreach ($active_orders_for_count as $order) {
 <script>
 jQuery(document).ready(function($) {
     
-    // Auto-apply active filter on page load
+    // Restore active filter from URL on page load
+    const urlParams = new URLSearchParams(window.location.search);
+    const activeFilter = urlParams.get('filter') || 'all';
+    
+    // Set the active filter button based on URL
+    $('.oj-filter-btn').removeClass('active');
+    $(`.oj-filter-btn[data-filter="${activeFilter}"]`).addClass('active');
+    
+    // Auto-apply the restored filter
     setTimeout(function() {
-        $('.oj-filter-btn.active').trigger('click');
+        $(`.oj-filter-btn[data-filter="${activeFilter}"]`).trigger('click');
     }, 100);
     
     // Filter Logic
     $('.oj-filter-btn').on('click', function() {
         const filter = $(this).data('filter');
+        
+        // Store filter in URL for persistence
+        const url = new URL(window.location);
+        url.searchParams.set('filter', filter);
+        window.history.replaceState({}, '', url);
         
         // Update active filter
         $('.oj-filter-btn').removeClass('active');
@@ -414,7 +427,11 @@ jQuery(document).ready(function($) {
                 nonce: '<?php echo wp_create_nonce('oj_dashboard_nonce'); ?>'
             }, function(response) {
                 if (response.success) {
-                    location.reload();
+                    // Preserve current filter in reload
+                    const currentFilter = $('.oj-filter-btn.active').data('filter');
+                    const url = new URL(window.location);
+                    url.searchParams.set('filter', currentFilter);
+                    window.location.href = url.toString();
                 } else {
                     alert(response.data || '<?php _e('Error occurred', 'orders-jet'); ?>');
                     $btn.prop('disabled', false).text('<?php _e('Mark Ready', 'orders-jet'); ?>');
@@ -621,13 +638,23 @@ jQuery(document).ready(function($) {
             const invoiceUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_get_order_invoice&order_id=' + orderId + '&print=1&nonce=<?php echo wp_create_nonce('oj_get_invoice'); ?>';
             window.open(invoiceUrl, '_blank');
             modal.remove();
-            location.reload();
+            
+            // Preserve current filter in reload
+            const currentFilter = $('.oj-filter-btn.active').data('filter');
+            const url = new URL(window.location);
+            url.searchParams.set('filter', currentFilter);
+            window.location.href = url.toString();
         });
         
         // Close
         modal.find('.oj-close-success').on('click', function() {
             modal.remove();
-            location.reload();
+            
+            // Preserve current filter in reload
+            const currentFilter = $('.oj-filter-btn.active').data('filter');
+            const url = new URL(window.location);
+            url.searchParams.set('filter', currentFilter);
+            window.location.href = url.toString();
         });
     }
     
@@ -663,13 +690,23 @@ jQuery(document).ready(function($) {
                 window.open(invoiceUrl, '_blank');
             }
             modal.remove();
-            location.reload();
+            
+            // Preserve current filter in reload
+            const currentFilter = $('.oj-filter-btn.active').data('filter');
+            const url = new URL(window.location);
+            url.searchParams.set('filter', currentFilter);
+            window.location.href = url.toString();
         });
         
         // Close
         modal.find('.oj-close-success').on('click', function() {
             modal.remove();
-            location.reload();
+            
+            // Preserve current filter in reload
+            const currentFilter = $('.oj-filter-btn.active').data('filter');
+            const url = new URL(window.location);
+            url.searchParams.set('filter', currentFilter);
+            window.location.href = url.toString();
         });
     }
 });
