@@ -15,27 +15,78 @@ if (!defined('ABSPATH')) {
 wp_enqueue_style('oj-manager-orders-cards', ORDERS_JET_PLUGIN_URL . 'assets/css/manager-orders-cards.css', array(), ORDERS_JET_VERSION);
 
 
-// Pagination logic for better filter compatibility
+// Server-side filtering with pagination
+$current_filter = isset($_GET['filter']) ? sanitize_text_field($_GET['filter']) : 'all';
 $current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
 $per_page = 20;
 $offset = ($current_page - 1) * $per_page;
 
-// Get total count for pagination
-$total_orders = count(wc_get_orders(array(
-    'status' => array('wc-processing', 'wc-pending', 'wc-completed'),
-    'limit' => -1
-)));
-
-$total_pages = ceil($total_orders / $per_page);
-
-// Single query for all orders with pagination
-$all_orders = wc_get_orders(array(
-    'status' => array('wc-processing', 'wc-pending', 'wc-completed'),
+// Build query based on filter
+$query_args = array(
     'limit' => $per_page,
     'offset' => $offset,
     'orderby' => 'date',
     'order' => 'ASC'
-));
+);
+
+// Apply filter-specific status and meta queries
+switch ($current_filter) {
+    case 'active':
+        $query_args['status'] = array('wc-processing', 'wc-pending');
+        break;
+    case 'processing':
+        $query_args['status'] = 'wc-processing';
+        break;
+    case 'pending':
+        $query_args['status'] = 'wc-pending';
+        break;
+    case 'completed':
+        $query_args['status'] = 'wc-completed';
+        break;
+    case 'dinein':
+        $query_args['status'] = array('wc-processing', 'wc-pending');
+        $query_args['meta_query'] = array(
+            array(
+                'key' => 'exwf_odmethod',
+                'value' => 'dinein',
+                'compare' => '='
+            )
+        );
+        break;
+    case 'takeaway':
+        $query_args['status'] = array('wc-processing', 'wc-pending');
+        $query_args['meta_query'] = array(
+            array(
+                'key' => 'exwf_odmethod',
+                'value' => 'takeaway',
+                'compare' => '='
+            )
+        );
+        break;
+    case 'delivery':
+        $query_args['status'] = array('wc-processing', 'wc-pending');
+        $query_args['meta_query'] = array(
+            array(
+                'key' => 'exwf_odmethod',
+                'value' => 'delivery',
+                'compare' => '='
+            )
+        );
+        break;
+    default: // 'all'
+        $query_args['status'] = array('wc-processing', 'wc-pending', 'wc-completed');
+        break;
+}
+
+// Get filtered orders
+$all_orders = wc_get_orders($query_args);
+
+// Get total count for pagination (same filter)
+$count_args = $query_args;
+$count_args['limit'] = -1;
+$count_args['offset'] = 0;
+$total_orders = count(wc_get_orders($count_args));
+$total_pages = ceil($total_orders / $per_page);
 
 // Count orders for filter tabs - all WooCommerce orders
 $processing_count = count(wc_get_orders(array(
@@ -118,35 +169,35 @@ foreach ($active_orders_for_count as $order) {
     
     <!-- Filter Tabs -->
     <div class="oj-filters">
-        <button class="oj-filter-btn active" data-filter="all">
+        <button class="oj-filter-btn <?php echo $current_filter === 'all' ? 'active' : ''; ?>" data-filter="all">
             <?php _e('All Orders', 'orders-jet'); ?>
             <span class="oj-filter-count"><?php echo $all_count; ?></span>
         </button>
-        <button class="oj-filter-btn" data-filter="active">
+        <button class="oj-filter-btn <?php echo $current_filter === 'active' ? 'active' : ''; ?>" data-filter="active">
             <?php _e('Active Orders', 'orders-jet'); ?>
             <span class="oj-filter-count"><?php echo $active_count; ?></span>
         </button>
-        <button class="oj-filter-btn" data-filter="processing">
+        <button class="oj-filter-btn <?php echo $current_filter === 'processing' ? 'active' : ''; ?>" data-filter="processing">
             🍳 <?php _e('Kitchen', 'orders-jet'); ?>
             <span class="oj-filter-count"><?php echo $processing_count; ?></span>
         </button>
-        <button class="oj-filter-btn" data-filter="pending">
+        <button class="oj-filter-btn <?php echo $current_filter === 'pending' ? 'active' : ''; ?>" data-filter="pending">
             ✅ <?php _e('Ready', 'orders-jet'); ?>
             <span class="oj-filter-count"><?php echo $pending_count; ?></span>
         </button>
-        <button class="oj-filter-btn" data-filter="dinein">
+        <button class="oj-filter-btn <?php echo $current_filter === 'dinein' ? 'active' : ''; ?>" data-filter="dinein">
             🏢 <?php _e('Table', 'orders-jet'); ?>
             <span class="oj-filter-count"><?php echo $dinein_count; ?></span>
         </button>
-        <button class="oj-filter-btn" data-filter="takeaway">
+        <button class="oj-filter-btn <?php echo $current_filter === 'takeaway' ? 'active' : ''; ?>" data-filter="takeaway">
             📦 <?php _e('Pickup', 'orders-jet'); ?>
             <span class="oj-filter-count"><?php echo $takeaway_count; ?></span>
         </button>
-        <button class="oj-filter-btn" data-filter="delivery">
+        <button class="oj-filter-btn <?php echo $current_filter === 'delivery' ? 'active' : ''; ?>" data-filter="delivery">
             🚚 <?php _e('Delivery', 'orders-jet'); ?>
             <span class="oj-filter-count"><?php echo $delivery_count; ?></span>
         </button>
-        <button class="oj-filter-btn" data-filter="completed">
+        <button class="oj-filter-btn <?php echo $current_filter === 'completed' ? 'active' : ''; ?>" data-filter="completed">
             📄 <?php _e('Completed', 'orders-jet'); ?>
             <span class="oj-filter-count"><?php echo $completed_count; ?></span>
         </button>
@@ -397,84 +448,17 @@ jQuery(document).ready(function($) {
         hidePreloader();
     }, 2000);
     
-    // Restore active filter from URL on page load
-    const urlParams = new URLSearchParams(window.location.search);
-    const activeFilter = urlParams.get('filter') || 'all';
+    // Server-side filtering - no need for client-side filter restoration
     
-    // Set the active filter button based on URL
-    $('.oj-filter-btn').removeClass('active');
-    $(`.oj-filter-btn[data-filter="${activeFilter}"]`).addClass('active');
-    
-    // Auto-apply the restored filter
-    setTimeout(function() {
-        $(`.oj-filter-btn[data-filter="${activeFilter}"]`).trigger('click');
-    }, 100);
-    
-    // Filter Logic
+    // Filter Logic - Server-side filtering with page reload
     $('.oj-filter-btn').on('click', function() {
         const filter = $(this).data('filter');
         
-        // Store filter in URL for persistence
+        // Navigate to filtered page (server-side filtering)
         const url = new URL(window.location);
         url.searchParams.set('filter', filter);
-        window.history.replaceState({}, '', url);
-        
-        // Update active filter
-        $('.oj-filter-btn').removeClass('active');
-        $(this).addClass('active');
-        
-        // Show/Hide order cards based on filter
-        $('.oj-order-card').each(function() {
-            const $card = $(this);
-            const status = $card.data('status');
-            const orderType = $card.data('order-type');
-            let show = false;
-            
-            switch(filter) {
-                case 'all':
-                    show = true;
-                    break;
-                case 'active':
-                    show = (status === 'processing' || status === 'pending');
-                    break;
-                case 'processing':
-                    show = (status === 'processing');
-                    break;
-                case 'pending':
-                    show = (status === 'pending');
-                    break;
-                case 'completed':
-                    show = (status === 'completed');
-                    break;
-                case 'dinein':
-                    show = (orderType === 'dinein') && (status === 'processing' || status === 'pending');
-                    break;
-                case 'takeaway':
-                    show = (orderType === 'takeaway') && (status === 'processing' || status === 'pending');
-                    break;
-                case 'delivery':
-                    show = (orderType === 'delivery') && (status === 'processing' || status === 'pending');
-                    break;
-            }
-            
-            $card.toggle(show);
-        });
-        
-        // Show empty state if no cards visible
-        const visibleCards = $('.oj-order-card:visible').length;
-        if (visibleCards === 0) {
-            if ($('.oj-empty-state').length === 0) {
-                $('#oj-orders-grid').append(`
-                    <div class="oj-empty-state">
-                        <div class="oj-empty-icon">📋</div>
-                        <div class="oj-empty-title"><?php _e('No Orders Found', 'orders-jet'); ?></div>
-                        <div class="oj-empty-message"><?php _e('No orders match the selected filter.', 'orders-jet'); ?></div>
-                    </div>
-                `);
-            }
-        } else {
-            $('.oj-empty-state').remove();
-        }
+        url.searchParams.delete('paged'); // Reset to page 1
+        window.location.href = url.toString();
     });
     
     // Mark Ready
@@ -684,18 +668,6 @@ jQuery(document).ready(function($) {
         window.open(orderUrl, '_blank');
     });
     
-    // Pagination: Reset to page 1 when changing filters
-    $('.oj-filter-btn').on('click', function() {
-        const filter = $(this).data('filter');
-        
-        // Update URL to reset pagination when changing filters
-        const url = new URL(window.location);
-        url.searchParams.set('filter', filter);
-        url.searchParams.delete('paged'); // Reset to page 1
-        
-        // Update browser history without reload for better UX
-        window.history.replaceState({}, '', url);
-    });
     
     // Success Modal (after order completion)
     function showSuccessModal(orderId) {
