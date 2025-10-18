@@ -27,6 +27,10 @@ define('ORDERS_JET_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('ORDERS_JET_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('ORDERS_JET_PLUGIN_BASENAME', plugin_basename(__FILE__));
 
+// Performance and batch processing constants
+define('ORDERS_JET_STATUS_UPDATE_INTERVAL', 24 * 60 * 60); // 24 hours in seconds
+define('ORDERS_JET_BATCH_SIZE', 50); // Reduced from 100 for better performance
+
 /**
  * Main Orders Jet Integration Class
  */
@@ -162,7 +166,7 @@ class Orders_Jet_Integration {
      * Handle direct URLs as backup
      */
     public function handle_direct_urls() {
-        $request_uri = $_SERVER['REQUEST_URI'];
+        $request_uri = isset($_SERVER['REQUEST_URI']) ? sanitize_text_field($_SERVER['REQUEST_URI']) : '';
         
         // Check for table-invoice URL
         if (strpos($request_uri, '/table-invoice/') !== false) {
@@ -346,7 +350,11 @@ class Orders_Jet_Integration {
      * Flush rewrite rules
      */
     public function flush_rewrite_rules() {
-        $this->add_rewrite_rules();
+        // Only add rules if not already added to avoid redundancy
+        if (!get_option('oj_rewrite_rules_added')) {
+            $this->add_rewrite_rules();
+            update_option('oj_rewrite_rules_added', true);
+        }
         flush_rewrite_rules();
     }
     
@@ -354,11 +362,16 @@ class Orders_Jet_Integration {
      * Enqueue table menu assets
      */
     private function enqueue_table_menu_assets($table_number) {
-        // Enqueue WordPress and WooCommerce styles
-        wp_enqueue_style('wp-block-library');
-        wp_enqueue_style('woocommerce-general');
-        wp_enqueue_style('woocommerce-layout');
-        wp_enqueue_style('woocommerce-smallscreen');
+        // Only enqueue essential styles for performance
+        if (!wp_style_is('woocommerce-general', 'enqueued')) {
+            wp_enqueue_style('woocommerce-general');
+        }
+        if (!wp_style_is('woocommerce-layout', 'enqueued')) {
+            wp_enqueue_style('woocommerce-layout');
+        }
+        if (!wp_style_is('woocommerce-smallscreen', 'enqueued')) {
+            wp_enqueue_style('woocommerce-smallscreen');
+        }
         
         // Enqueue jQuery
         wp_enqueue_script('jquery');
@@ -445,15 +458,15 @@ class Orders_Jet_Integration {
      * Maybe flush rewrite rules on plugin update
      */
     public function maybe_flush_rewrite_rules($upgrader_object, $options) {
-        if ($options['action'] === 'update' && $options['type'] === 'plugin') {
-            if (isset($options['plugins']) && is_array($options['plugins'])) {
-                foreach ($options['plugins'] as $plugin) {
-                    if ($plugin === ORDERS_JET_PLUGIN_BASENAME) {
-                        flush_rewrite_rules();
-                        break;
-                    }
-                }
-            }
+        // Early return for non-plugin updates
+        if ($options['action'] !== 'update' || $options['type'] !== 'plugin') {
+            return;
+        }
+        
+        // Check if our plugin was updated
+        if (isset($options['plugins']) && is_array($options['plugins']) && 
+            in_array(ORDERS_JET_PLUGIN_BASENAME, $options['plugins'], true)) {
+            flush_rewrite_rules();
         }
     }
     
@@ -504,13 +517,17 @@ function oj_set_default_order_status($order_id) {
         $order_type = oj_get_order_type($order);
         $default_status = 'placed';
         
-        // Log the order status setting for debugging
-        error_log('Orders Jet: Setting default order status for order #' . $order_id . ' - Type: ' . $order_type . ', Status: ' . $default_status);
+        // Log only in debug mode
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Orders Jet: Setting default order status for order #' . $order_id . ' - Type: ' . $order_type . ', Status: ' . $default_status);
+        }
         
         $order->update_meta_data('_oj_order_status', $default_status);
         $order->save();
         
-        error_log('Orders Jet: Successfully set order status for order #' . $order_id);
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Orders Jet: Successfully set order status for order #' . $order_id);
+        }
     }
 }
 
@@ -522,13 +539,13 @@ add_action('wp_loaded', 'oj_set_existing_orders_status');
 function oj_set_existing_orders_status() {
     // Only run this once per day to avoid performance issues
     $last_run = get_option('oj_last_status_update', 0);
-    if (current_time('timestamp') - $last_run < 86400) { // 24 hours
+    if (current_time('timestamp') - $last_run < ORDERS_JET_STATUS_UPDATE_INTERVAL) {
         return;
     }
     
     // Get orders without _oj_order_status meta field
     $orders = wc_get_orders(array(
-        'limit' => 100, // Process in batches
+        'limit' => ORDERS_JET_BATCH_SIZE, // Process in smaller batches for better performance
         'status' => array('pending', 'processing', 'on-hold', 'completed'),
         'meta_query' => array(
             array(
@@ -546,12 +563,16 @@ function oj_set_existing_orders_status() {
             $order->update_meta_data('_oj_order_status', $default_status);
             $order->save();
             
-            error_log('Orders Jet: Retroactively set order status for order #' . $order->get_id() . ' - Type: ' . $order_type . ', Status: ' . $default_status);
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Orders Jet: Retroactively set order status for order #' . $order->get_id() . ' - Type: ' . $order_type . ', Status: ' . $default_status);
+            }
         }
         
         // Update last run time
         update_option('oj_last_status_update', current_time('timestamp'));
         
-        error_log('Orders Jet: Retroactively processed ' . count($orders) . ' orders without _oj_order_status');
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('Orders Jet: Retroactively processed ' . count($orders) . ' orders without _oj_order_status');
+        }
     }
 }
