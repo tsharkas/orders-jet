@@ -1491,7 +1491,15 @@ class Orders_Jet_AJAX_Handlers {
                 'order_id' => $order_id,
                 'table_number' => $table_number,
                 'order_type' => $order_type,
-                'new_status' => 'pending'
+                'new_status' => 'pending',
+                'card_updates' => array(
+                    'order_id' => $order_id,
+                    'new_status' => 'pending',
+                    'status_badge_text' => 'READY',
+                    'status_badge_class' => 'ready',
+                    'button_text' => 'Complete Order',
+                    'button_class' => 'oj-complete-order'
+                )
             ));
             
         } catch (Exception $e) {
@@ -1818,13 +1826,32 @@ class Orders_Jet_AJAX_Handlers {
             error_log('Orders Jet: Individual order #' . $order_id . ' completed - Original Total: ' . $original_total . ', New Total with Tax: ' . $order->get_total());
         }
         
+        // Generate thermal invoice URL
+        $thermal_invoice_url = add_query_arg(array(
+            'action' => 'oj_get_order_invoice',
+            'order_id' => $order_id,
+            'print' => '1',
+            'nonce' => wp_create_nonce('oj_get_invoice')
+        ), admin_url('admin-ajax.php'));
+
         wp_send_json_success(array(
             'message' => sprintf(__('Order #%d completed successfully!', 'orders-jet'), $order_id),
             'subtotal' => $order->get_subtotal(),
             'tax_total' => $order->get_total_tax(),
             'total' => $order->get_total(),
             'payment_method' => $payment_method,
-            'tax_method' => 'individual_order'
+            'tax_method' => 'individual_order',
+            'thermal_invoice_url' => $thermal_invoice_url,
+            'card_updates' => array(
+                'order_id' => $order_id,
+                'new_status' => 'completed',
+                'status_badge_text' => 'COMPLETED',
+                'status_badge_class' => 'completed',
+                'button_text' => '🖨️ Print Invoice',
+                'button_class' => 'oj-thermal-print',
+                'button_action' => 'thermal_print',
+                'invoice_url' => $thermal_invoice_url
+            )
         ));
     }
     
@@ -3448,6 +3475,13 @@ class Orders_Jet_AJAX_Handlers {
             
             error_log('Orders Jet: ========== TABLE GROUP CLOSURE COMPLETE ==========');
             
+            // Generate thermal invoice URL for table
+            $thermal_invoice_url = add_query_arg(array(
+                'table' => $table_number,
+                'payment_method' => $payment_method,
+                'session' => $session_id
+            ), ORDERS_JET_PLUGIN_URL . 'table-invoice.php');
+
             wp_send_json_success(array(
                 'message' => __('Table closed successfully', 'orders-jet'),
                 'consolidated_order_id' => $consolidated_order->get_id(),
@@ -3456,8 +3490,14 @@ class Orders_Jet_AJAX_Handlers {
                 'grand_total' => $consolidated_order->get_total(),
                 'payment_method' => $payment_method,
                 'invoice_url' => $invoice_url,
+                'thermal_invoice_url' => $thermal_invoice_url,
                 'child_order_ids' => $child_order_ids,
-                'tax_method' => 'consolidated_woocommerce'
+                'tax_method' => 'consolidated_woocommerce',
+                'card_updates' => array(
+                    'action' => 'remove_cards',
+                    'order_ids' => $child_order_ids,
+                    'table_number' => $table_number
+                )
             ));
             
         } catch (Exception $e) {

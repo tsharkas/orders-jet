@@ -486,16 +486,19 @@ jQuery(document).ready(function($) {
                 order_id: orderId,
                 nonce: '<?php echo wp_create_nonce('oj_dashboard_nonce'); ?>'
             }, function(response) {
+                hidePreloader();
                 if (response.success) {
-                    // Preserve current filter in reload
-                    const currentFilter = $('.oj-filter-btn.active').data('filter');
-                    const url = new URL(window.location);
-                    url.searchParams.set('filter', currentFilter);
-                    window.location.href = url.toString();
+                    // Update card without page reload
+                    updateOrderCard(response.data.card_updates);
+                    showSuccessNotification(response.data.message);
                 } else {
-                    alert(response.data || '<?php _e('Error occurred', 'orders-jet'); ?>');
+                    alert(response.data.message || '<?php _e('Error occurred', 'orders-jet'); ?>');
                     $btn.prop('disabled', false).text('<?php _e('Mark Ready', 'orders-jet'); ?>');
                 }
+            }).fail(function() {
+                hidePreloader();
+                alert('<?php _e('Network error occurred', 'orders-jet'); ?>');
+                $btn.prop('disabled', false).text('<?php _e('Mark Ready', 'orders-jet'); ?>');
             });
         }
     });
@@ -551,11 +554,18 @@ jQuery(document).ready(function($) {
                 payment_method: paymentMethod,
                 nonce: '<?php echo wp_create_nonce('oj_dashboard_nonce'); ?>'
             }, function(response) {
+                hidePreloader();
                 if (response.success) {
-                    showSuccessModal(orderId);
+                    // Update card without page reload
+                    updateOrderCard(response.data.card_updates);
+                    // Show success modal with thermal print option
+                    showSuccessModalWithThermalPrint(orderId, response.data.thermal_invoice_url);
                 } else {
-                    alert(response.data || '<?php _e('Error occurred', 'orders-jet'); ?>');
+                    alert(response.data.message || '<?php _e('Error occurred', 'orders-jet'); ?>');
                 }
+            }).fail(function() {
+                hidePreloader();
+                alert('<?php _e('Network error occurred', 'orders-jet'); ?>');
             });
         });
         
@@ -618,7 +628,10 @@ jQuery(document).ready(function($) {
                     nonce: '<?php echo wp_create_nonce('oj_table_order'); ?>'
                 }, function(response) {
                     if (response.success) {
-                        showTableSuccessModal(tableNumber, response.data);
+                        // Remove table order cards without page reload
+                        removeTableOrderCards(response.data.card_updates.order_ids);
+                        // Show success modal with thermal print option
+                        showTableSuccessModalWithThermalPrint(tableNumber, response.data);
                     } else if (response.data && response.data.show_confirmation) {
                         // Handle processing orders confirmation
                         hidePreloader();
@@ -636,7 +649,10 @@ jQuery(document).ready(function($) {
                                 nonce: '<?php echo wp_create_nonce('oj_table_order'); ?>'
                             }, function(retryResponse) {
                                 if (retryResponse.success) {
-                                    showTableSuccessModal(tableNumber, retryResponse.data);
+                                    // Remove table order cards without page reload
+                                    removeTableOrderCards(retryResponse.data.card_updates.order_ids);
+                                    // Show success modal with thermal print option
+                                    showTableSuccessModalWithThermalPrint(tableNumber, retryResponse.data);
                                 } else {
                                     hidePreloader();
                                     alert(retryResponse.data.message || '<?php _e('Error occurred during table closure', 'orders-jet'); ?>');
@@ -680,17 +696,93 @@ jQuery(document).ready(function($) {
     });
     
     
-    // Success Modal (after order completion)
-    function showSuccessModal(orderId) {
-        hidePreloader(); // Hide preloader when showing success modal
+    
+    
+    // ===== AJAX CARD UPDATE FUNCTIONS =====
+    
+    /**
+     * Update individual order card without page reload
+     */
+    function updateOrderCard(cardUpdates) {
+        const $card = $(`.oj-order-card[data-order-id="${cardUpdates.order_id}"]`);
+        
+        if ($card.length) {
+            // Update status badge
+            const $statusBadge = $card.find('.oj-status-badge');
+            $statusBadge.text(cardUpdates.status_badge_text);
+            $statusBadge.removeClass('processing pending completed ready');
+            $statusBadge.addClass(cardUpdates.status_badge_class);
+            
+            // Update action button
+            const $actionBtn = $card.find('.oj-action-btn');
+            $actionBtn.text(cardUpdates.button_text);
+            $actionBtn.removeClass('oj-mark-ready oj-complete-order oj-thermal-print');
+            $actionBtn.addClass(cardUpdates.button_class);
+            
+            // Add thermal print functionality if needed
+            if (cardUpdates.button_action === 'thermal_print') {
+                // Set the invoice URL data attribute
+                $actionBtn.attr('data-invoice-url', cardUpdates.invoice_url || '');
+                $actionBtn.off('click').on('click', function() {
+                    const invoiceUrl = $(this).data('invoice-url');
+                    if (invoiceUrl) {
+                        window.open(invoiceUrl, '_blank');
+                    }
+                });
+            }
+            
+            // Add smooth animation
+            $card.addClass('oj-card-updated');
+            setTimeout(() => $card.removeClass('oj-card-updated'), 1000);
+        }
+    }
+    
+    /**
+     * Remove table order cards after table closure
+     */
+    function removeTableOrderCards(orderIds) {
+        orderIds.forEach(orderId => {
+            const $card = $(`.oj-order-card[data-order-id="${orderId}"]`);
+            if ($card.length) {
+                $card.addClass('oj-card-removing');
+                setTimeout(() => $card.fadeOut(300, function() {
+                    $(this).remove();
+                }), 500);
+            }
+        });
+    }
+    
+    /**
+     * Show success notification
+     */
+    function showSuccessNotification(message) {
+        const notification = $(`
+            <div class="oj-success-notification">
+                <span>✅ ${message}</span>
+            </div>
+        `);
+        $('body').append(notification);
+        
+        setTimeout(() => {
+            notification.fadeOut(300, function() {
+                $(this).remove();
+            });
+        }, 3000);
+    }
+    
+    /**
+     * Show success modal with thermal print option for individual orders
+     */
+    function showSuccessModalWithThermalPrint(orderId, thermalInvoiceUrl) {
+        hidePreloader();
         const modal = $(`
             <div class="oj-success-modal-overlay">
                 <div class="oj-success-modal">
                     <h3>✅ <?php _e('Order Completed Successfully!', 'orders-jet'); ?></h3>
                     <p><?php _e('Order', 'orders-jet'); ?> #${orderId} <?php _e('has been completed.', 'orders-jet'); ?></p>
                     <div class="oj-modal-actions">
-                        <button class="button button-primary oj-print-invoice" data-order-id="${orderId}">
-                            🖨️ <?php _e('View/Print Invoice', 'orders-jet'); ?>
+                        <button class="button button-primary oj-thermal-print-btn" data-url="${thermalInvoiceUrl}">
+                            🖨️ <?php _e('Print Thermal Invoice', 'orders-jet'); ?>
                         </button>
                         <button class="button oj-close-success">
                             <?php _e('Close', 'orders-jet'); ?>
@@ -702,46 +794,32 @@ jQuery(document).ready(function($) {
         
         $('body').append(modal);
         
-        // Print invoice
-        modal.find('.oj-print-invoice').on('click', function() {
-            const orderId = $(this).data('order-id');
-            const invoiceUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_get_order_invoice&order_id=' + orderId + '&print=1&nonce=<?php echo wp_create_nonce('oj_get_invoice'); ?>';
+        // Handle thermal print
+        modal.find('.oj-thermal-print-btn').on('click', function() {
+            const invoiceUrl = $(this).data('url');
             window.open(invoiceUrl, '_blank');
             modal.remove();
-            
-            // Preserve current filter in reload
-            const currentFilter = $('.oj-filter-btn.active').data('filter');
-            const url = new URL(window.location);
-            url.searchParams.set('filter', currentFilter);
-            window.location.href = url.toString();
         });
         
-        // Close
+        // Handle close
         modal.find('.oj-close-success').on('click', function() {
             modal.remove();
-            
-            // Preserve current filter in reload
-            const currentFilter = $('.oj-filter-btn.active').data('filter');
-            const url = new URL(window.location);
-            url.searchParams.set('filter', currentFilter);
-            window.location.href = url.toString();
         });
     }
     
-    // Table Success Modal (after table closure)
-    function showTableSuccessModal(tableNumber, responseData) {
-        hidePreloader(); // Hide preloader when showing success modal
-        const consolidatedOrderId = responseData.consolidated_order_id;
-        
+    /**
+     * Show success modal with thermal print option for table closure
+     */
+    function showTableSuccessModalWithThermalPrint(tableNumber, data) {
+        hidePreloader();
         const modal = $(`
             <div class="oj-success-modal-overlay">
                 <div class="oj-success-modal">
                     <h3>✅ <?php _e('Table Closed Successfully!', 'orders-jet'); ?></h3>
-                    <p><?php _e('Table', 'orders-jet'); ?> #${tableNumber} <?php _e('has been closed.', 'orders-jet'); ?></p>
-                    ${consolidatedOrderId ? `<p><small><?php _e('Order ID:', 'orders-jet'); ?> #${consolidatedOrderId}</small></p>` : ''}
+                    <p><?php _e('Table', 'orders-jet'); ?> ${tableNumber} <?php _e('has been closed and consolidated.', 'orders-jet'); ?></p>
                     <div class="oj-modal-actions">
-                        <button class="button button-primary oj-print-table-invoice" data-order-id="${consolidatedOrderId}">
-                            🖨️ <?php _e('View/Print Invoice', 'orders-jet'); ?>
+                        <button class="button button-primary oj-thermal-print-btn" data-url="${data.thermal_invoice_url}">
+                            🖨️ <?php _e('Print Thermal Invoice', 'orders-jet'); ?>
                         </button>
                         <button class="button oj-close-success">
                             <?php _e('Close', 'orders-jet'); ?>
@@ -753,33 +831,26 @@ jQuery(document).ready(function($) {
         
         $('body').append(modal);
         
-        // Print invoice
-        modal.find('.oj-print-table-invoice').on('click', function() {
-            const orderId = $(this).data('order-id');
-            if (orderId) {
-                const invoiceUrl = '<?php echo admin_url('admin-ajax.php'); ?>?action=oj_get_order_invoice&order_id=' + orderId + '&print=1&nonce=<?php echo wp_create_nonce('oj_get_invoice'); ?>';
-                window.open(invoiceUrl, '_blank');
-            }
+        // Handle thermal print
+        modal.find('.oj-thermal-print-btn').on('click', function() {
+            const invoiceUrl = $(this).data('url');
+            window.open(invoiceUrl, '_blank');
             modal.remove();
-            
-            // Preserve current filter in reload
-            const currentFilter = $('.oj-filter-btn.active').data('filter');
-            const url = new URL(window.location);
-            url.searchParams.set('filter', currentFilter);
-            window.location.href = url.toString();
         });
         
-        // Close
+        // Handle close
         modal.find('.oj-close-success').on('click', function() {
             modal.remove();
-            
-            // Preserve current filter in reload
-            const currentFilter = $('.oj-filter-btn.active').data('filter');
-            const url = new URL(window.location);
-            url.searchParams.set('filter', currentFilter);
-            window.location.href = url.toString();
         });
     }
+    
+    // Handle thermal print button clicks (for existing completed orders)
+    $(document).on('click', '.oj-thermal-print', function() {
+        const invoiceUrl = $(this).data('invoice-url');
+        if (invoiceUrl) {
+            window.open(invoiceUrl, '_blank');
+        }
+    });
 });
 </script>
 
@@ -915,5 +986,51 @@ jQuery(document).ready(function($) {
 
 .oj-modal-actions .button-primary:hover {
     background: #1e5a8a;
+}
+
+/* Success Notification */
+.oj-success-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #4caf50;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 10000;
+    font-weight: 600;
+    animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Card Update Animations */
+.oj-card-updated {
+    animation: cardUpdatePulse 1s ease-in-out;
+}
+
+@keyframes cardUpdatePulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.02); background: #e8f5e8; }
+    100% { transform: scale(1); }
+}
+
+.oj-card-removing {
+    animation: cardRemoveSlide 0.5s ease-in-out forwards;
+}
+
+@keyframes cardRemoveSlide {
+    0% { transform: translateX(0); opacity: 1; }
+    100% { transform: translateX(-100%); opacity: 0; }
 }
 </style>
