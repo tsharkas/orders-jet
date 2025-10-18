@@ -14,6 +14,31 @@ if (!defined('ABSPATH')) {
 // Enqueue beautiful card CSS
 wp_enqueue_style('oj-manager-orders-cards', ORDERS_JET_PLUGIN_URL . 'assets/css/manager-orders-cards.css', array(), ORDERS_JET_VERSION);
 
+// One-time fix for test orders (remove after testing)
+if (isset($_GET['fix_test_orders']) && $_GET['fix_test_orders'] === 'yes') {
+    $delivery_orders = [287, 293, 294];
+    foreach ($delivery_orders as $order_id) {
+        $order = wc_get_order($order_id);
+        if ($order) {
+            $order->update_meta_data('exwf_odmethod', 'delivery');
+            $order->save();
+        }
+    }
+    
+    $takeaway_orders = [288, 289, 292];
+    foreach ($takeaway_orders as $order_id) {
+        $order = wc_get_order($order_id);
+        if ($order) {
+            $order->update_meta_data('exwf_odmethod', 'takeaway');
+            $order->save();
+        }
+    }
+    
+    // Redirect to remove the parameter
+    wp_redirect(admin_url('admin.php?page=manager-overview'));
+    exit;
+}
+
 // Single query for all orders with WooFood order types
 $offset = isset($_GET['offset']) ? intval($_GET['offset']) : 0;
 $limit = 20;
@@ -58,10 +83,25 @@ $all_orders_for_count = wc_get_orders(array(
 foreach ($all_orders_for_count as $order) {
     $order_method = $order->get_meta('exwf_odmethod');
     
-    // If no exwf_odmethod, determine from other meta
+    // If no exwf_odmethod, determine from other meta with better logic
     if (empty($order_method)) {
         $table_number = $order->get_meta('_oj_table_number');
-        $order_method = !empty($table_number) ? 'dinein' : 'takeaway';
+        
+        if (!empty($table_number)) {
+            $order_method = 'dinein';
+        } else {
+            // Check if it's a delivery order by looking at shipping vs billing
+            $billing_address = $order->get_billing_address_1();
+            $shipping_address = $order->get_shipping_address_1();
+            
+            // If shipping address exists and differs from billing, likely delivery
+            if (!empty($shipping_address) && $shipping_address !== $billing_address) {
+                $order_method = 'delivery';
+            } else {
+                // Default to takeaway
+                $order_method = 'takeaway';
+            }
+        }
     }
     
     if ($order_method === 'dinein') {
@@ -125,11 +165,26 @@ foreach ($all_orders_for_count as $order) {
                 $order_id = $order->get_id();
                 $order_method = $order->get_meta('exwf_odmethod');
                 
-                // If no exwf_odmethod, determine from other meta
-                if (empty($order_method)) {
-                    $table_number_check = $order->get_meta('_oj_table_number');
-                    $order_method = !empty($table_number_check) ? 'dinein' : 'takeaway';
-                }
+    // If no exwf_odmethod, determine from other meta with better logic
+    if (empty($order_method)) {
+        $table_number_check = $order->get_meta('_oj_table_number');
+        
+        if (!empty($table_number_check)) {
+            $order_method = 'dinein';
+        } else {
+            // Check if it's a delivery order by looking at shipping vs billing
+            $billing_address = $order->get_billing_address_1();
+            $shipping_address = $order->get_shipping_address_1();
+            
+            // If shipping address exists and differs from billing, likely delivery
+            if (!empty($shipping_address) && $shipping_address !== $billing_address) {
+                $order_method = 'delivery';
+            } else {
+                // Default to takeaway
+                $order_method = 'takeaway';
+            }
+        }
+    }
                 $table_number = $order->get_meta('_oj_table_number');
                 $customer_name = $order->get_meta('_oj_customer_name') ?: $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
                 $status = $order->get_status();
