@@ -1497,7 +1497,7 @@ class Orders_Jet_AJAX_Handlers {
                     'new_status' => 'pending',
                     'status_badge_text' => 'READY',
                     'status_badge_class' => 'ready',
-                    'button_text' => 'Complete Order',
+                    'button_text' => 'Complete',
                     'button_class' => 'oj-complete-order'
                 )
             ));
