@@ -23,6 +23,7 @@ class Orders_Jet_AJAX_Handlers {
         add_action('wp_ajax_oj_complete_individual_order', array($this, 'complete_individual_order'));
         add_action('wp_ajax_oj_close_table_group', array($this, 'close_table_group'));
         add_action('wp_ajax_oj_get_order_invoice', array($this, 'get_order_invoice'));
+        add_action('wp_ajax_oj_get_filter_counts', array($this, 'get_filter_counts'));
         
         // NOTE: Obsolete functions still exist in this file but are no longer registered:
         // close_table(), mark_order_delivered(), confirm_pickup_payment(), get_table_summary(),
@@ -3991,6 +3992,128 @@ class Orders_Jet_AJAX_Handlers {
 </html>';
         
         return $html;
+    }
+    
+    /**
+     * Get filter counts for dashboard
+     */
+    public function get_filter_counts() {
+        try {
+            // Check nonce for security
+            check_ajax_referer('oj_dashboard_nonce', 'nonce');
+            
+            // Check permissions
+            if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_woocommerce')) {
+                wp_send_json_error(array('message' => __('Permission denied', 'orders-jet')));
+            }
+            
+            // Get counts for each filter
+            $counts = array();
+            
+            // All orders (processing, pending, completed)
+            $all_orders = wc_get_orders(array(
+                'status' => array('wc-processing', 'wc-pending', 'wc-completed'),
+                'limit' => -1,
+                'return' => 'ids'
+            ));
+            $counts['all'] = count($all_orders);
+            
+            // Active orders (processing, pending)
+            $active_orders = wc_get_orders(array(
+                'status' => array('wc-processing', 'wc-pending'),
+                'limit' => -1,
+                'return' => 'ids'
+            ));
+            $counts['active'] = count($active_orders);
+            
+            // Processing orders
+            $processing_orders = wc_get_orders(array(
+                'status' => 'wc-processing',
+                'limit' => -1,
+                'return' => 'ids'
+            ));
+            $counts['processing'] = count($processing_orders);
+            
+            // Pending orders
+            $pending_orders = wc_get_orders(array(
+                'status' => 'wc-pending',
+                'limit' => -1,
+                'return' => 'ids'
+            ));
+            $counts['pending'] = count($pending_orders);
+            
+            // Completed orders
+            $completed_orders = wc_get_orders(array(
+                'status' => 'wc-completed',
+                'limit' => -1,
+                'return' => 'ids'
+            ));
+            $counts['completed'] = count($completed_orders);
+            
+            // Dine-in orders (processing, pending)
+            $dinein_orders = wc_get_orders(array(
+                'status' => array('wc-processing', 'wc-pending'),
+                'meta_query' => array(
+                    'relation' => 'OR',
+                    array(
+                        'key' => 'exwf_odmethod',
+                        'value' => 'dinein',
+                        'compare' => '='
+                    ),
+                    array(
+                        'key' => '_oj_table_number',
+                        'compare' => 'EXISTS'
+                    )
+                ),
+                'limit' => -1,
+                'return' => 'ids'
+            ));
+            $counts['dinein'] = count($dinein_orders);
+            
+            // Takeaway orders (processing, pending)
+            $takeaway_orders = wc_get_orders(array(
+                'status' => array('wc-processing', 'wc-pending'),
+                'meta_query' => array(
+                    'relation' => 'OR',
+                    array(
+                        'key' => 'exwf_odmethod',
+                        'value' => 'takeaway',
+                        'compare' => '='
+                    ),
+                    array(
+                        'key' => '_oj_table_number',
+                        'value' => '',
+                        'compare' => 'NOT EXISTS'
+                    )
+                ),
+                'limit' => -1,
+                'return' => 'ids'
+            ));
+            $counts['takeaway'] = count($takeaway_orders);
+            
+            // Delivery orders (processing, pending)
+            $delivery_orders = wc_get_orders(array(
+                'status' => array('wc-processing', 'wc-pending'),
+                'meta_query' => array(
+                    array(
+                        'key' => 'exwf_odmethod',
+                        'value' => 'delivery',
+                        'compare' => '='
+                    )
+                ),
+                'limit' => -1,
+                'return' => 'ids'
+            ));
+            $counts['delivery'] = count($delivery_orders);
+            
+            wp_send_json_success($counts);
+            
+        } catch (Exception $e) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Orders Jet: Error getting filter counts: ' . $e->getMessage());
+            }
+            wp_send_json_error(array('message' => __('Error getting filter counts', 'orders-jet')));
+        }
     }
     
     

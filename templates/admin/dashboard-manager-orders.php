@@ -455,6 +455,8 @@ jQuery(document).ready(function($) {
                     // Update card without page reload
                     updateOrderCard(response.data.card_updates);
                     showSuccessNotification(response.data.message);
+                    // Update filter counts
+                    updateFilterCounts();
                 } else {
                     alert(response.data.message || '<?php _e('Error occurred', 'orders-jet'); ?>');
                     $btn.prop('disabled', false).text('<?php _e('Mark Ready', 'orders-jet'); ?>');
@@ -467,9 +469,23 @@ jQuery(document).ready(function($) {
     });
     
     // Complete Order - Use event delegation for dynamic buttons
-    $(document).on('click', '.oj-complete-order', function() {
+    $(document).on('click', '.oj-complete-order', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        console.log('Complete Order clicked!', e.target);
+        console.log('Button data:', $(this).data());
+        console.log('Button classes:', $(this).attr('class'));
+        
         const orderId = $(this).data('order-id');
         const orderType = $(this).data('type');
+        
+        console.log('Order ID:', orderId, 'Order Type:', orderType);
+        
+        if (!orderId) {
+            console.error('No order ID found on Complete Order button');
+            return;
+        }
         
         // Show payment method selection
         const paymentMethods = [
@@ -519,6 +535,8 @@ jQuery(document).ready(function($) {
                 if (response.success) {
                     // Update card without page reload
                     updateOrderCard(response.data.card_updates);
+                    // Update filter counts
+                    updateFilterCounts();
                     // Show success modal with thermal print option
                     showSuccessModalWithThermalPrint(orderId, response.data.thermal_invoice_url);
                 } else {
@@ -586,12 +604,14 @@ jQuery(document).ready(function($) {
                     payment_method: paymentMethod,
                     nonce: '<?php echo wp_create_nonce('oj_table_order'); ?>'
                 }, function(response) {
-                    if (response.success) {
-                        // Remove table order cards without page reload
-                        removeTableOrderCards(response.data.card_updates.order_ids);
-                        // Show success modal with thermal print option
-                        showTableSuccessModalWithThermalPrint(tableNumber, response.data);
-                    } else if (response.data && response.data.show_confirmation) {
+                if (response.success) {
+                    // Remove table order cards without page reload
+                    removeTableOrderCards(response.data.card_updates.order_ids);
+                    // Update filter counts
+                    updateFilterCounts();
+                    // Show success modal with thermal print option
+                    showTableSuccessModalWithThermalPrint(tableNumber, response.data);
+                } else if (response.data && response.data.show_confirmation) {
                         // Handle processing orders confirmation
                         const confirmMessage = response.data.message + '\n\n<?php _e('Click OK to continue or Cancel to keep the table open.', 'orders-jet'); ?>';
                         
@@ -603,13 +623,15 @@ jQuery(document).ready(function($) {
                                 payment_method: paymentMethod,
                                 force_close: 'true',
                                 nonce: '<?php echo wp_create_nonce('oj_table_order'); ?>'
-                            }, function(retryResponse) {
-                                if (retryResponse.success) {
-                                    // Remove table order cards without page reload
-                                    removeTableOrderCards(retryResponse.data.card_updates.order_ids);
-                                    // Show success modal with thermal print option
-                                    showTableSuccessModalWithThermalPrint(tableNumber, retryResponse.data);
-                                } else {
+                        }, function(retryResponse) {
+                            if (retryResponse.success) {
+                                // Remove table order cards without page reload
+                                removeTableOrderCards(retryResponse.data.card_updates.order_ids);
+                                // Update filter counts
+                                updateFilterCounts();
+                                // Show success modal with thermal print option
+                                showTableSuccessModalWithThermalPrint(tableNumber, retryResponse.data);
+                            } else {
                                     alert(retryResponse.data.message || '<?php _e('Error occurred during table closure', 'orders-jet'); ?>');
                                 }
                             }).fail(function() {
@@ -671,14 +693,54 @@ jQuery(document).ready(function($) {
             $actionBtn.removeClass('oj-mark-ready oj-complete-order oj-thermal-print');
             $actionBtn.addClass(cardUpdates.button_class);
             
-            // ✅ FIX: Set data attributes for event delegation to work
+            // ✅ FIX: Set data attributes and bind events directly
             if (cardUpdates.button_class === 'oj-complete-order') {
                 // Set data attributes for Complete Order functionality
                 $actionBtn.attr('data-order-id', cardUpdates.order_id);
                 $actionBtn.attr('data-type', 'individual');
+                
+                // Bind Complete Order functionality directly as backup
+                $actionBtn.off('click').on('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    console.log('Direct Complete Order click handler triggered');
+                    const orderId = $(this).data('order-id');
+                    const orderType = $(this).data('type');
+                    
+                    if (!orderId) {
+                        console.error('No order ID found in direct handler');
+                        return;
+                    }
+                    
+                    // Trigger the payment modal
+                    showCompleteOrderModalDirect(orderId, orderType);
+                });
+                
+                console.log('Complete Order button updated:', {
+                    orderId: cardUpdates.order_id,
+                    buttonClass: cardUpdates.button_class,
+                    buttonText: cardUpdates.button_text
+                });
             } else if (cardUpdates.button_class === 'oj-thermal-print') {
                 // Set data attributes for Thermal Print functionality
                 $actionBtn.attr('data-invoice-url', cardUpdates.invoice_url || '');
+                
+                // Bind Thermal Print functionality directly
+                $actionBtn.off('click').on('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const invoiceUrl = $(this).data('invoice-url');
+                    if (invoiceUrl) {
+                        window.open(invoiceUrl, '_blank');
+                    }
+                });
+                
+                console.log('Thermal Print button updated:', {
+                    orderId: cardUpdates.order_id,
+                    invoiceUrl: cardUpdates.invoice_url
+                });
             }
             
             // Add smooth animation
@@ -687,6 +749,77 @@ jQuery(document).ready(function($) {
         }
     }
     
+    /**
+     * Show Complete Order Modal (direct binding for AJAX updated buttons)
+     */
+    function showCompleteOrderModalDirect(orderId, orderType) {
+        console.log('showCompleteOrderModalDirect called:', orderId, orderType);
+        
+        // Show payment method selection
+        const paymentMethods = [
+            {value: 'cash', text: '<?php _e('Cash', 'orders-jet'); ?>'},
+            {value: 'card', text: '<?php _e('Card', 'orders-jet'); ?>'},
+            {value: 'online', text: '<?php _e('Online Payment', 'orders-jet'); ?>'}
+        ];
+        
+        let paymentOptions = '';
+        paymentMethods.forEach(method => {
+            paymentOptions += `<option value="${method.value}">${method.text}</option>`;
+        });
+        
+        const modal = $(`
+            <div class="oj-payment-modal-overlay">
+                <div class="oj-payment-modal">
+                    <h3><?php _e('Complete Order', 'orders-jet'); ?> #${orderId}</h3>
+                    <p><?php _e('Select payment method:', 'orders-jet'); ?></p>
+                    <select class="oj-payment-method">
+                        ${paymentOptions}
+                    </select>
+                    <div class="oj-modal-actions">
+                        <button class="button button-primary oj-confirm-complete">
+                            <?php _e('Complete Order', 'orders-jet'); ?>
+                        </button>
+                        <button class="button oj-cancel-complete">
+                            <?php _e('Cancel', 'orders-jet'); ?>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `);
+        
+        $('body').append(modal);
+        
+        // Confirm completion
+        modal.find('.oj-confirm-complete').on('click', function() {
+            const paymentMethod = modal.find('.oj-payment-method').val();
+            modal.remove();
+            
+            $.post(ajaxurl, {
+                action: 'oj_complete_individual_order',
+                order_id: orderId,
+                payment_method: paymentMethod,
+                nonce: '<?php echo wp_create_nonce('oj_dashboard_nonce'); ?>'
+            }, function(response) {
+                if (response.success) {
+                    // Update card without page reload
+                    updateOrderCard(response.data.card_updates);
+                    // Update filter counts
+                    updateFilterCounts();
+                    // Show success modal with thermal print option
+                    showSuccessModalWithThermalPrint(orderId, response.data.thermal_invoice_url);
+                } else {
+                    alert(response.data.message || '<?php _e('Error occurred', 'orders-jet'); ?>');
+                }
+            }).fail(function() {
+                alert('<?php _e('Network error occurred', 'orders-jet'); ?>');
+            });
+        });
+        
+        // Cancel
+        modal.find('.oj-cancel-complete').on('click', function() {
+            modal.remove();
+        });
+    }
     
     /**
      * Remove table order cards after table closure
@@ -719,6 +852,40 @@ jQuery(document).ready(function($) {
                 $(this).remove();
             });
         }, 3000);
+    }
+    
+    /**
+     * Update filter counts after AJAX operations
+     */
+    function updateFilterCounts() {
+        console.log('Updating filter counts...');
+        
+        // Get current filter counts from the page
+        const currentFilter = $('.oj-filter-btn.active').data('filter');
+        
+        // Update counts based on current filter
+        $.post(ajaxurl, {
+            action: 'oj_get_filter_counts',
+            nonce: '<?php echo wp_create_nonce('oj_dashboard_nonce'); ?>'
+        }, function(response) {
+            if (response.success) {
+                const counts = response.data;
+                
+                // Update filter tab counts
+                $('.oj-filter-btn[data-filter="all"] .oj-filter-count').text(counts.all);
+                $('.oj-filter-btn[data-filter="active"] .oj-filter-count').text(counts.active);
+                $('.oj-filter-btn[data-filter="processing"] .oj-filter-count').text(counts.processing);
+                $('.oj-filter-btn[data-filter="pending"] .oj-filter-count').text(counts.pending);
+                $('.oj-filter-btn[data-filter="dinein"] .oj-filter-count').text(counts.dinein);
+                $('.oj-filter-btn[data-filter="takeaway"] .oj-filter-count').text(counts.takeaway);
+                $('.oj-filter-btn[data-filter="delivery"] .oj-filter-count').text(counts.delivery);
+                $('.oj-filter-btn[data-filter="completed"] .oj-filter-count').text(counts.completed);
+                
+                console.log('Filter counts updated:', counts);
+            }
+        }).fail(function() {
+            console.log('Failed to update filter counts');
+        });
     }
     
     /**
