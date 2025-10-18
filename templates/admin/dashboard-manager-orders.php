@@ -11,8 +11,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Enqueue beautiful card CSS
-wp_enqueue_style('oj-manager-orders-cards', ORDERS_JET_PLUGIN_URL . 'assets/css/manager-orders-cards.css', array(), ORDERS_JET_VERSION);
+// Enqueue beautiful card CSS with cache busting
+wp_enqueue_style('oj-manager-orders-cards', ORDERS_JET_PLUGIN_URL . 'assets/css/manager-orders-cards.css', array(), time());
 
 
 // Server-side filtering with pagination
