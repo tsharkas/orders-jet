@@ -18,8 +18,15 @@ wp_enqueue_style('oj-manager-orders-cards', ORDERS_JET_PLUGIN_URL . 'assets/css/
 $offset = isset($_GET['offset']) ? intval($_GET['offset']) : 0;
 $limit = 20;
 
+// Debug: Check what orders exist
+$debug_orders = wc_get_orders(array('status' => array('wc-processing', 'wc-pending-payment', 'wc-completed'), 'limit' => -1));
+foreach ($debug_orders as $debug_order) {
+    $method = $debug_order->get_meta('exwf_odmethod');
+    error_log("DEBUG Order #{$debug_order->get_id()}: status={$debug_order->get_status()}, method={$method}");
+}
+
 $all_orders = wc_get_orders(array(
-    'status' => array('wc-processing', 'wc-pending', 'wc-completed'),
+    'status' => array('wc-processing', 'wc-pending-payment', 'wc-completed'),
     'limit' => $limit,
     'offset' => $offset,
     'orderby' => 'date_modified',
@@ -40,7 +47,7 @@ $processing_count = count(wc_get_orders(array(
 )));
 
 $pending_count = count(wc_get_orders(array(
-    'status' => 'wc-pending', 
+    'status' => 'wc-pending-payment', 
     'limit' => -1,
     'meta_query' => array(array('key' => 'exwf_odmethod', 'compare' => 'EXISTS'))
 )));
@@ -56,19 +63,19 @@ $all_count = $active_count + $completed_count;
 
 // Count by order type (WooFood system)
 $dinein_count = count(wc_get_orders(array(
-    'status' => array('wc-processing', 'wc-pending', 'wc-completed'),
+    'status' => array('wc-processing', 'wc-pending-payment', 'wc-completed'),
     'limit' => -1,
     'meta_query' => array(array('key' => 'exwf_odmethod', 'value' => 'dinein'))
 )));
 
 $takeaway_count = count(wc_get_orders(array(
-    'status' => array('wc-processing', 'wc-pending', 'wc-completed'),
+    'status' => array('wc-processing', 'wc-pending-payment', 'wc-completed'),
     'limit' => -1,
     'meta_query' => array(array('key' => 'exwf_odmethod', 'value' => 'takeaway'))
 )));
 
 $delivery_count = count(wc_get_orders(array(
-    'status' => array('wc-processing', 'wc-pending', 'wc-completed'),
+    'status' => array('wc-processing', 'wc-pending-payment', 'wc-completed'),
     'limit' => -1,
     'meta_query' => array(array('key' => 'exwf_odmethod', 'value' => 'delivery'))
 )));
@@ -140,7 +147,7 @@ $delivery_count = count(wc_get_orders(array(
                     $status_text = __('Cooking', 'orders-jet');
                     $status_class = 'cooking';
                     $status_icon = '🍳';
-                } elseif ($status === 'pending') {
+                } elseif ($status === 'pending-payment') {
                     $status_text = __('Ready', 'orders-jet');
                     $status_class = 'ready';
                     $status_icon = '✅';
@@ -238,7 +245,7 @@ $delivery_count = count(wc_get_orders(array(
                                 👁️ <?php _e('Details', 'orders-jet'); ?>
                             </button>
                             
-                        <?php elseif ($status === 'pending') : ?>
+                        <?php elseif ($status === 'pending-payment') : ?>
                             <!-- Ready Order Actions -->
                             <?php if ($order_method === 'dinein') : ?>
                                 <!-- Table Order - Close Table -->
@@ -307,13 +314,13 @@ jQuery(document).ready(function($) {
             
             switch(filter) {
                 case 'active':
-                    show = (status === 'processing' || status === 'pending');
+                    show = (status === 'processing' || status === 'pending-payment');
                     break;
                 case 'processing':
                     show = (status === 'processing');
                     break;
                 case 'pending':
-                    show = (status === 'pending');
+                    show = (status === 'pending-payment');
                     break;
                 case 'completed':
                     show = (status === 'completed');
