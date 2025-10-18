@@ -11,8 +11,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Enqueue beautiful card CSS with cache busting
-wp_enqueue_style('oj-manager-orders-cards', ORDERS_JET_PLUGIN_URL . 'assets/css/manager-orders-cards.css', array(), time());
+// Enqueue beautiful card CSS
+wp_enqueue_style('oj-manager-orders-cards', ORDERS_JET_PLUGIN_URL . 'assets/css/manager-orders-cards.css', array(), ORDERS_JET_VERSION);
 
 
 // Server-side filtering with pagination
@@ -400,17 +400,6 @@ foreach ($active_orders_for_count as $order) {
         <?php endif; ?>
     </div>
     
-    <!-- Debug Information -->
-    <div style="background: #f0f0f0; padding: 10px; margin: 10px 0; border: 1px solid #ccc;">
-        <strong>DEBUG INFO:</strong><br>
-        Current Filter: <?php echo $current_filter; ?><br>
-        Total Orders: <?php echo $total_orders; ?><br>
-        Total Pages: <?php echo $total_pages; ?><br>
-        Current Page: <?php echo $current_page; ?><br>
-        Orders Found: <?php echo count($all_orders); ?><br>
-        Per Page: <?php echo $per_page; ?><br>
-    </div>
-
     <!-- Pagination Controls -->
     <?php if ($total_orders > 0) : ?>
         <div class="oj-pagination-container">
