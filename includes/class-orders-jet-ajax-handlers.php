@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 /**
  * Orders Jet - AJAX Handlers Class
  * Handles AJAX requests for table ordering system

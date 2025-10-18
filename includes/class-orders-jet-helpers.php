@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 /**
  * Orders Jet - Helpers Class
  * Helper functions for the Orders Jet system

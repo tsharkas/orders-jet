@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 /**
  * Plugin Name: Orders Jet Integration
  * Plugin URI: https://ordersjet.site
@@ -61,7 +62,7 @@ class Orders_Jet_Integration {
     /**
      * Initialize hooks
      */
-    private function init_hooks() {
+    private function init_hooks(): void {
         add_action('init', array($this, 'init'), 0);
         add_action('plugins_loaded', array($this, 'check_dependencies'));
         register_activation_hook(__FILE__, array($this, 'activate'));
@@ -74,7 +75,7 @@ class Orders_Jet_Integration {
     /**
      * Initialize the plugin
      */
-    public function init() {
+    public function init(): void {
         // Load text domain
         load_plugin_textdomain('orders-jet', false, dirname(plugin_basename(__FILE__)) . '/languages');
         
@@ -94,7 +95,7 @@ class Orders_Jet_Integration {
     /**
      * Check plugin dependencies
      */
-    public function check_dependencies() {
+    public function check_dependencies(): void {
         if (!class_exists('WooCommerce')) {
             add_action('admin_notices', array($this, 'woocommerce_missing_notice'));
             return;
@@ -109,7 +110,7 @@ class Orders_Jet_Integration {
     /**
      * Include required files
      */
-    private function includes() {
+    private function includes(): void {
         // Core classes - only include what's actually used
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-delivery-time-manager.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-user-roles.php';
@@ -126,7 +127,7 @@ class Orders_Jet_Integration {
     /**
      * Initialize components
      */
-    private function init_components() {
+    private function init_components(): void {
         // Initialize user roles
         new Orders_Jet_User_Roles();
         
@@ -199,66 +200,73 @@ class Orders_Jet_Integration {
     /**
      * Display table menu
      */
-    public function display_table_menu() {
-        // Get table number from URL parameter
-        $table_number = isset($_GET['table']) ? sanitize_text_field($_GET['table']) : '';
-        
-        if (empty($table_number)) {
-            wp_die(__('Table number is required.', 'orders-jet'), __('Error', 'orders-jet'), array('response' => 400));
+    public function display_table_menu(): void {
+        try {
+            // Get table number from URL parameter
+            $table_number = isset($_GET['table']) ? sanitize_text_field($_GET['table']) : '';
+            
+            if (empty($table_number)) {
+                wp_die(__('Table number is required.', 'orders-jet'), __('Error', 'orders-jet'), array('response' => 400));
+            }
+            
+            // Get table ID
+            $table_id = oj_get_table_id_by_number($table_number);
+            
+            if (!$table_id) {
+                wp_die(__('Invalid table number. Please check your QR code.', 'orders-jet'), __('Error', 'orders-jet'), array('response' => 404));
+            }
+            
+            // Get table information
+            $table_capacity = get_post_meta($table_id, '_oj_table_capacity', true);
+            $table_status = get_post_meta($table_id, '_oj_table_status', true);
+            $table_location = get_post_meta($table_id, '_oj_table_location', true);
+            
+            // Check if table is available
+            if ($table_status !== 'available' && $table_status !== 'occupied') {
+                wp_die(__('This table is currently not available for ordering.', 'orders-jet'), __('Table Not Available', 'orders-jet'), array('response' => 403));
+            }
+            
+            // Get current order for this table
+            $current_order = oj_get_current_table_order($table_number);
+            
+            // Get menu items (WooCommerce products)
+            $menu_items = wc_get_products(array(
+                'status' => 'publish',
+                'limit' => -1,
+                'orderby' => 'menu_order',
+                'order' => 'ASC'
+            ));
+            
+            // Get product categories for filtering
+            $categories = get_terms(array(
+                'taxonomy' => 'product_cat',
+                'hide_empty' => true,
+                'orderby' => 'name',
+                'order' => 'ASC'
+            ));
+            
+            // Enqueue required assets manually
+            $this->enqueue_table_menu_assets($table_number);
+            
+            // Set page title
+            add_filter('wp_title', function($title) use ($table_number) {
+                return sprintf(__('Table %s Menu', 'orders-jet'), $table_number) . ' - ' . get_bloginfo('name');
+            });
+            
+            // Include the QR menu template
+            include ORDERS_JET_PLUGIN_DIR . 'templates/qr-menu.php';
+        } catch (Exception $e) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Orders Jet: Table menu error: ' . $e->getMessage());
+            }
+            wp_die(__('Unable to load table menu. Please try again.', 'orders-jet'), __('Error', 'orders-jet'), array('response' => 500));
         }
-        
-        // Get table ID
-        $table_id = oj_get_table_id_by_number($table_number);
-        
-        if (!$table_id) {
-            wp_die(__('Invalid table number. Please check your QR code.', 'orders-jet'), __('Error', 'orders-jet'), array('response' => 404));
-        }
-        
-        // Get table information
-        $table_capacity = get_post_meta($table_id, '_oj_table_capacity', true);
-        $table_status = get_post_meta($table_id, '_oj_table_status', true);
-        $table_location = get_post_meta($table_id, '_oj_table_location', true);
-        
-        // Check if table is available
-        if ($table_status !== 'available' && $table_status !== 'occupied') {
-            wp_die(__('This table is currently not available for ordering.', 'orders-jet'), __('Table Not Available', 'orders-jet'), array('response' => 403));
-        }
-        
-        // Get current order for this table
-        $current_order = oj_get_current_table_order($table_number);
-        
-        // Get menu items (WooCommerce products)
-        $menu_items = wc_get_products(array(
-            'status' => 'publish',
-            'limit' => -1,
-            'orderby' => 'menu_order',
-            'order' => 'ASC'
-        ));
-        
-        // Get product categories for filtering
-        $categories = get_terms(array(
-            'taxonomy' => 'product_cat',
-            'hide_empty' => true,
-            'orderby' => 'name',
-            'order' => 'ASC'
-        ));
-        
-        // Enqueue required assets manually
-        $this->enqueue_table_menu_assets($table_number);
-        
-        // Set page title
-        add_filter('wp_title', function($title) use ($table_number) {
-            return sprintf(__('Table %s Menu', 'orders-jet'), $table_number) . ' - ' . get_bloginfo('name');
-        });
-        
-        // Include the QR menu template
-        include ORDERS_JET_PLUGIN_DIR . 'templates/qr-menu.php';
     }
     
     /**
      * Display table invoice
      */
-    public function display_table_invoice() {
+    public function display_table_invoice(): void {
         // Include the invoice template
         include ORDERS_JET_PLUGIN_DIR . 'templates/table-invoice.php';
     }
@@ -266,7 +274,7 @@ class Orders_Jet_Integration {
     /**
      * Add admin menu for rewrite rules management
      */
-    public function add_admin_menu() {
+    public function add_admin_menu(): void {
         add_submenu_page(
             'edit.php?post_type=oj_table',
             __('Rewrite Rules', 'orders-jet'),
@@ -280,7 +288,7 @@ class Orders_Jet_Integration {
     /**
      * Admin page for rewrite rules management
      */
-    public function rewrite_rules_admin_page() {
+    public function rewrite_rules_admin_page(): void {
         if (isset($_POST['flush_rewrite_rules']) && wp_verify_nonce($_POST['_wpnonce'], 'flush_rewrite_rules')) {
             $this->flush_rewrite_rules();
             echo '<div class="notice notice-success"><p>' . __('Rewrite rules flushed successfully!', 'orders-jet') . '</p></div>';
@@ -510,7 +518,7 @@ Orders_Jet();
  * This ensures delivery orders placed from outside the table cart also get the required meta field
  */
 add_action('woocommerce_new_order', 'oj_set_default_order_status');
-function oj_set_default_order_status($order_id) {
+function oj_set_default_order_status(int $order_id): void {
     $order = wc_get_order($order_id);
     if ($order && !$order->get_meta('_oj_order_status')) {
         // Set default status based on order type
@@ -536,7 +544,7 @@ function oj_set_default_order_status($order_id) {
  * This handles orders that were created before the hook was added
  */
 add_action('wp_loaded', 'oj_set_existing_orders_status');
-function oj_set_existing_orders_status() {
+function oj_set_existing_orders_status(): void {
     // Only run this once per day to avoid performance issues
     $last_run = get_option('oj_last_status_update', 0);
     if (current_time('timestamp') - $last_run < ORDERS_JET_STATUS_UPDATE_INTERVAL) {

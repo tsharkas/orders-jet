@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 /**
  * Orders Jet - Admin Dashboard Class
  * Main dashboard controller with role-based views
