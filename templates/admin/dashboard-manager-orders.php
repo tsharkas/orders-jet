@@ -351,6 +351,11 @@ foreach ($all_orders_for_count as $order) {
 <script>
 jQuery(document).ready(function($) {
     
+    // Auto-apply active filter on page load
+    setTimeout(function() {
+        $('.oj-filter-btn.active').trigger('click');
+    }, 100);
+    
     // Filter Logic
     $('.oj-filter-btn').on('click', function() {
         const filter = $(this).data('filter');
