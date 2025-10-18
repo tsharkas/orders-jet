@@ -122,7 +122,11 @@ foreach ($all_orders_for_count as $order) {
     
     <!-- Filter Tabs -->
     <div class="oj-filters">
-        <button class="oj-filter-btn active" data-filter="active">
+        <button class="oj-filter-btn active" data-filter="all">
+            <?php _e('All Orders', 'orders-jet'); ?>
+            <span class="oj-filter-count"><?php echo $all_count; ?></span>
+        </button>
+        <button class="oj-filter-btn" data-filter="active">
             <?php _e('Active Orders', 'orders-jet'); ?>
             <span class="oj-filter-count"><?php echo $active_count; ?></span>
         </button>
@@ -372,6 +376,9 @@ jQuery(document).ready(function($) {
             let show = false;
             
             switch(filter) {
+                case 'all':
+                    show = true;
+                    break;
                 case 'active':
                     show = (status === 'processing' || status === 'pending') && status !== 'completed';
                     break;
