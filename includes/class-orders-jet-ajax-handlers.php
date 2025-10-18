@@ -1470,11 +1470,8 @@ class Orders_Jet_AJAX_Handlers {
             // OPTIMIZED: Use direct post status update for performance
             $order_type = !empty($table_number) ? 'table' : 'pickup';
             
-            // Use direct post status update to skip heavy WooCommerce operations
-            wp_update_post(array(
-                'ID' => $order_id,
-                'post_status' => 'wc-pending'
-            ));
+            // Use proper WooCommerce status change to trigger hooks and processes
+            $order->set_status('pending');
             
             // Add order note efficiently
             $order->add_order_note(sprintf(
@@ -1483,8 +1480,8 @@ class Orders_Jet_AJAX_Handlers {
                 ucfirst($order_type)
             ));
             
-            // Save only meta data (skip calculate_totals for performance)
-            $order->save_meta_data();
+            // Save the order (triggers proper WooCommerce status change)
+            $order->save();
             
             if (defined('WP_DEBUG') && WP_DEBUG) {
                 error_log('Orders Jet Kitchen: Order #' . $order_id . ' (' . $order_type . ') marked as ready (pending) by user #' . get_current_user_id());
@@ -1809,11 +1806,8 @@ class Orders_Jet_AJAX_Handlers {
             $this->calculate_individual_order_taxes($order);
         }
         
-        // Mark order as completed using direct update for performance
-        wp_update_post(array(
-            'ID' => $order_id,
-            'post_status' => 'wc-completed'
-        ));
+        // Mark order as completed using proper WooCommerce method (triggers invoice generation)
+        $order->set_status('completed');
         
         // Add completion note
         $order->add_order_note(sprintf(
@@ -1825,8 +1819,8 @@ class Orders_Jet_AJAX_Handlers {
             wc_price($order->get_total())
         ));
         
-        // Save only meta data (skip heavy calculate_totals)
-        $order->save_meta_data();
+        // Save the order (triggers proper WooCommerce completion process)
+        $order->save();
         
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('Orders Jet: Individual order #' . $order_id . ' completed - Original Total: ' . $original_total . ', New Total with Tax: ' . $order->get_total());
@@ -3361,11 +3355,8 @@ class Orders_Jet_AJAX_Handlers {
                 $consolidated_order->set_total($consolidated_order->get_subtotal());
             }
             
-            // 7. Complete consolidated order using direct update for performance
-            wp_update_post(array(
-                'ID' => $consolidated_order->get_id(),
-                'post_status' => 'wc-completed'
-            ));
+            // 7. Complete consolidated order using proper WooCommerce method
+            $consolidated_order->set_status('completed');
             
             // Add completion note
             $consolidated_order->add_order_note(sprintf(
