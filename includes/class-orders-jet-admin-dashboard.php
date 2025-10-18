@@ -215,7 +215,7 @@ class Orders_Jet_Admin_Dashboard {
         }
         
         // Load the orders management template (our current manager dashboard)
-        $template_path = ORDERS_JET_PLUGIN_DIR . 'templates/admin/dashboard-manager.php';
+        $template_path = ORDERS_JET_PLUGIN_DIR . 'templates/admin/dashboard-manager-orders.php';
         if (file_exists($template_path)) {
             include $template_path;
         } else {
