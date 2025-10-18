@@ -1,0 +1,536 @@
+/**
+ * Orders Jet - Manager Orders Dashboard (Card-Based Design)
+ * Beautiful, clean, and responsive card layout
+ */
+
+/* ==========================================================================
+   VARIABLES & BASE
+   ========================================================================== */
+
+:root {
+    /* Status Colors */
+    --cooking-color: #ff9800;
+    --cooking-bg: #fff3e0;
+    --ready-color: #4caf50;
+    --ready-bg: #e8f5e9;
+    --completed-color: #2196f3;
+    --completed-bg: #e3f2fd;
+    
+    /* Order Type Colors */
+    --dinein-color: #2196f3;
+    --dinein-bg: #e3f2fd;
+    --pickup-color: #ff9800;
+    --pickup-bg: #fff3e0;
+    --delivery-color: #9c27b0;
+    --delivery-bg: #f3e5f5;
+    
+    /* Base Colors */
+    --primary-color: #2271b1;
+    --success-color: #00a32a;
+    --warning-color: #dba617;
+    --danger-color: #d63638;
+    --text-color: #1d2327;
+    --text-light: #646970;
+    --border-color: #c3c4c7;
+    --bg-white: #ffffff;
+    --bg-light: #f6f7f7;
+    --shadow: 0 2px 8px rgba(0,0,0,0.1);
+    --shadow-hover: 0 4px 16px rgba(0,0,0,0.15);
+}
+
+/* ==========================================================================
+   LAYOUT
+   ========================================================================== */
+
+.oj-manager-orders {
+    margin: 20px 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.oj-page-header {
+    margin-bottom: 30px;
+}
+
+.oj-page-title {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text-color);
+    margin: 0;
+}
+
+/* ==========================================================================
+   FILTER TABS
+   ========================================================================== */
+
+.oj-filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 30px;
+    padding: 0;
+    border-bottom: 2px solid var(--bg-light);
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.oj-filters::-webkit-scrollbar {
+    display: none;
+}
+
+.oj-filter-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: transparent;
+    border: none;
+    border-radius: 8px 8px 0 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-light);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.oj-filter-btn:hover {
+    background: var(--bg-light);
+    color: var(--text-color);
+}
+
+.oj-filter-btn.active {
+    background: var(--bg-white);
+    color: var(--primary-color);
+    font-weight: 600;
+    box-shadow: var(--shadow);
+}
+
+.oj-filter-btn.active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--primary-color);
+}
+
+.oj-filter-count {
+    background: var(--primary-color);
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 12px;
+    min-width: 20px;
+    text-align: center;
+}
+
+.oj-filter-btn.active .oj-filter-count {
+    background: var(--primary-color);
+}
+
+/* ==========================================================================
+   ORDERS GRID
+   ========================================================================== */
+
+.oj-orders-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+/* ==========================================================================
+   ORDER CARDS
+   ========================================================================== */
+
+.oj-order-card {
+    background: var(--bg-white);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+    transition: all 0.2s ease;
+    border: 1px solid var(--border-color);
+    position: relative;
+    overflow: hidden;
+}
+
+.oj-order-card:hover {
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-2px);
+}
+
+.oj-order-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: var(--primary-color);
+}
+
+/* Order Type Specific Left Borders */
+.oj-order-card[data-order-type="dinein"]::before {
+    background: var(--dinein-color);
+}
+
+.oj-order-card[data-order-type="takeaway"]::before {
+    background: var(--pickup-color);
+}
+
+.oj-order-card[data-order-type="delivery"]::before {
+    background: var(--delivery-color);
+}
+
+/* ==========================================================================
+   CARD HEADER
+   ========================================================================== */
+
+.oj-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 16px;
+}
+
+.oj-order-id {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-color);
+    margin: 0;
+}
+
+.oj-table-info {
+    font-size: 14px;
+    color: var(--text-light);
+    margin-top: 2px;
+}
+
+.oj-status-badges {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-end;
+}
+
+/* ==========================================================================
+   STATUS BADGES
+   ========================================================================== */
+
+.oj-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Status Colors */
+.oj-status-badge.cooking {
+    background: var(--cooking-bg);
+    color: var(--cooking-color);
+}
+
+.oj-status-badge.ready {
+    background: var(--ready-bg);
+    color: var(--ready-color);
+}
+
+.oj-status-badge.completed {
+    background: var(--completed-bg);
+    color: var(--completed-color);
+}
+
+/* Order Type Badge */
+.oj-type-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 16px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.oj-type-badge.dinein {
+    background: var(--dinein-bg);
+    color: var(--dinein-color);
+}
+
+.oj-type-badge.takeaway {
+    background: var(--pickup-bg);
+    color: var(--pickup-color);
+}
+
+.oj-type-badge.delivery {
+    background: var(--delivery-bg);
+    color: var(--delivery-color);
+}
+
+/* ==========================================================================
+   CARD CONTENT
+   ========================================================================== */
+
+.oj-card-content {
+    margin-bottom: 16px;
+}
+
+.oj-customer-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-color);
+    margin-bottom: 8px;
+}
+
+.oj-order-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    color: var(--text-light);
+}
+
+.oj-order-time {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.oj-order-total {
+    font-weight: 600;
+    color: var(--text-color);
+    font-size: 16px;
+}
+
+/* ==========================================================================
+   CARD ACTIONS
+   ========================================================================== */
+
+.oj-card-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--bg-light);
+}
+
+.oj-action-btn {
+    flex: 1;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    text-decoration: none;
+}
+
+/* Primary Action Button */
+.oj-action-btn.primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.oj-action-btn.primary:hover {
+    background: #1e5a8a;
+    transform: translateY(-1px);
+}
+
+/* Success Action Button */
+.oj-action-btn.success {
+    background: var(--success-color);
+    color: white;
+}
+
+.oj-action-btn.success:hover {
+    background: #008a00;
+    transform: translateY(-1px);
+}
+
+/* Warning Action Button */
+.oj-action-btn.warning {
+    background: var(--warning-color);
+    color: white;
+}
+
+.oj-action-btn.warning:hover {
+    background: #c29d00;
+    transform: translateY(-1px);
+}
+
+/* Secondary Action Button */
+.oj-action-btn.secondary {
+    background: var(--bg-light);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+.oj-action-btn.secondary:hover {
+    background: #e0e0e0;
+    transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   ICONS
+   ========================================================================== */
+
+.oj-icon {
+    width: 16px;
+    height: 16px;
+    display: inline-block;
+}
+
+/* ==========================================================================
+   EMPTY STATE
+   ========================================================================== */
+
+.oj-empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-light);
+}
+
+.oj-empty-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+.oj-empty-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text-color);
+}
+
+.oj-empty-message {
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+/* ==========================================================================
+   LOAD MORE
+   ========================================================================== */
+
+.oj-load-more-container {
+    text-align: center;
+    padding: 30px;
+}
+
+.oj-load-more-btn {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.oj-load-more-btn:hover {
+    background: #1e5a8a;
+    transform: translateY(-1px);
+}
+
+.oj-load-more-btn:disabled {
+    background: var(--border-color);
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* ==========================================================================
+   RESPONSIVE DESIGN
+   ========================================================================== */
+
+@media (max-width: 768px) {
+    .oj-orders-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    
+    .oj-filters {
+        gap: 4px;
+        padding: 0 10px;
+        margin: 0 -10px 20px;
+    }
+    
+    .oj-filter-btn {
+        padding: 10px 16px;
+        font-size: 13px;
+    }
+    
+    .oj-order-card {
+        padding: 16px;
+    }
+    
+    .oj-card-actions {
+        flex-direction: column;
+    }
+    
+    .oj-action-btn {
+        padding: 12px 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .oj-manager-orders {
+        margin: 10px 0;
+    }
+    
+    .oj-page-title {
+        font-size: 24px;
+    }
+    
+    .oj-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    
+    .oj-status-badges {
+        flex-direction: row;
+        align-items: flex-start;
+    }
+}
+
+/* ==========================================================================
+   UTILITY CLASSES
+   ========================================================================== */
+
+.oj-hidden {
+    display: none !important;
+}
+
+.oj-loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.oj-text-center {
+    text-align: center;
+}
+
+.oj-mb-0 {
+    margin-bottom: 0 !important;
+}
+
+.oj-mt-20 {
+    margin-top: 20px !important;
+}
