@@ -24,6 +24,12 @@ class Orders_Jet_AJAX_Handlers {
         add_action('wp_ajax_oj_get_order_invoice', array($this, 'get_order_invoice'));
         add_action('wp_ajax_oj_load_more_orders', array($this, 'load_more_orders'));
         
+        // NOTE: Obsolete functions still exist in this file but are no longer registered:
+        // close_table(), mark_order_delivered(), confirm_pickup_payment(), get_table_summary(),
+        // complete_table_cash(), get_completed_orders_for_pdf(), generate_guest_pdf(),
+        // generate_admin_pdf(), generate_table_pdf(), bulk_action(), search_order_invoice(),
+        // download_order_invoice(), get_order_details() - These can be removed in future cleanup.
+        
         // AJAX handlers for non-logged in users (guests)
         add_action('wp_ajax_nopriv_oj_submit_table_order', array($this, 'submit_table_order'));
         add_action('wp_ajax_nopriv_oj_get_table_status', array($this, 'get_table_status'));
