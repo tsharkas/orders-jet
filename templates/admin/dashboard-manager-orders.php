@@ -47,8 +47,8 @@ $all_orders = wc_get_orders(array(
     'status' => array('wc-processing', 'wc-pending', 'wc-completed'),
     'limit' => $limit,
     'offset' => $offset,
-    'orderby' => 'date_modified',
-    'order' => 'DESC'
+    'orderby' => 'date',
+    'order' => 'ASC'
 ));
 
 // Count orders for filter tabs - all WooCommerce orders
@@ -75,12 +75,20 @@ $dinein_count = 0;
 $takeaway_count = 0;
 $delivery_count = 0;
 
+// Get all orders for All Orders and Completed counts
 $all_orders_for_count = wc_get_orders(array(
     'status' => array('wc-processing', 'wc-pending', 'wc-completed'),
     'limit' => -1
 ));
 
-foreach ($all_orders_for_count as $order) {
+// Get active orders only for operational filter counts
+$active_orders_for_count = wc_get_orders(array(
+    'status' => array('wc-processing', 'wc-pending'),
+    'limit' => -1
+));
+
+// Count operational filters (dinein, takeaway, delivery) using ACTIVE orders only
+foreach ($active_orders_for_count as $order) {
     $order_method = $order->get_meta('exwf_odmethod');
     
     // If no exwf_odmethod, determine from other meta with better logic
@@ -392,13 +400,13 @@ jQuery(document).ready(function($) {
                     show = (status === 'completed');
                     break;
                 case 'dinein':
-                    show = (orderType === 'dinein');
+                    show = (orderType === 'dinein') && (status === 'processing' || status === 'pending');
                     break;
                 case 'takeaway':
-                    show = (orderType === 'takeaway');
+                    show = (orderType === 'takeaway') && (status === 'processing' || status === 'pending');
                     break;
                 case 'delivery':
-                    show = (orderType === 'delivery');
+                    show = (orderType === 'delivery') && (status === 'processing' || status === 'pending');
                     break;
             }
             
