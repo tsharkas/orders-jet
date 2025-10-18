@@ -270,6 +270,7 @@ class Orders_Jet_AJAX_Handlers {
         $order->update_meta_data('_oj_order_timestamp', current_time('mysql'));
         $order->update_meta_data('_oj_session_id', $session_id);
         $order->update_meta_data('_oj_session_start', $is_new_session ? 'yes' : 'no');
+        $order->update_meta_data('_oj_order_type', 'dine_in');
         
         // Set order status
         $order->set_status('processing');
