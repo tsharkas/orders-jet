@@ -271,8 +271,8 @@ class Orders_Jet_AJAX_Handlers {
         $order->update_meta_data('_oj_session_id', $session_id);
         $order->update_meta_data('_oj_session_start', $is_new_session ? 'yes' : 'no');
         
-        // Set WooFood compatible order type meta
-        $order->update_meta_data('_exwf_order_type', 'dine_in');
+        // Set WooFood compatible order method meta
+        $order->update_meta_data('exwf_odmethod', 'dinein');
         $order->update_meta_data('_oj_order_type', 'dine_in');
         
         // Set order status
