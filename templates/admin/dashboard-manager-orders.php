@@ -14,8 +14,9 @@ if (!defined('ABSPATH')) {
 // Enqueue beautiful card CSS
 wp_enqueue_style('oj-manager-orders-cards', ORDERS_JET_PLUGIN_URL . 'assets/css/manager-orders-cards.css', array(), ORDERS_JET_VERSION);
 
-// One-time fix for test orders (remove after testing)
-if (isset($_GET['fix_test_orders']) && $_GET['fix_test_orders'] === 'yes') {
+// One-time fix for test orders (runs automatically once)
+$fix_flag = get_option('oj_test_orders_fixed', false);
+if (!$fix_flag) {
     $delivery_orders = [287, 293, 294];
     foreach ($delivery_orders as $order_id) {
         $order = wc_get_order($order_id);
@@ -34,9 +35,8 @@ if (isset($_GET['fix_test_orders']) && $_GET['fix_test_orders'] === 'yes') {
         }
     }
     
-    // Redirect to remove the parameter
-    wp_redirect(admin_url('admin.php?page=manager-overview'));
-    exit;
+    // Set flag to prevent running again
+    update_option('oj_test_orders_fixed', true);
 }
 
 // Single query for all orders with WooFood order types
