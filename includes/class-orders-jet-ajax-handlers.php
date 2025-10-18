@@ -3170,22 +3170,78 @@ class Orders_Jet_AJAX_Handlers {
             
             error_log('Orders Jet: Found ' . count($table_orders) . ' orders for table ' . $table_number);
             
-            // 2. Check if all orders are ready (pending status)
-            $all_ready = true;
-            $not_ready_orders = array();
+            // 2. Analyze order statuses and handle processing orders
+            $processing_orders = array();
+            $pending_orders = array();
+            $other_orders = array();
             
             foreach ($table_orders as $order) {
-                if ($order->get_status() !== 'pending') {
-                    $all_ready = false;
-                    $not_ready_orders[] = '#' . $order->get_id();
+                $status = $order->get_status();
+                if ($status === 'processing') {
+                    $processing_orders[] = $order;
+                } elseif ($status === 'pending') {
+                    $pending_orders[] = $order;
+                } else {
+                    $other_orders[] = array('id' => $order->get_id(), 'status' => $status);
                 }
             }
             
-            if (!$all_ready) {
+            error_log('Orders Jet: Order status analysis - Processing: ' . count($processing_orders) . ', Pending: ' . count($pending_orders) . ', Other: ' . count($other_orders));
+            
+            // Handle processing orders with confirmation
+            if (!empty($processing_orders)) {
+                $force_close = isset($_POST['force_close']) && $_POST['force_close'] === 'true';
+                
+                if (!$force_close) {
+                    // First request - ask for confirmation
+                    $processing_order_numbers = array_map(function($order) {
+                        return '#' . $order->get_id();
+                    }, $processing_orders);
+                    
+                    wp_send_json_error(array(
+                        'message' => sprintf(__('There are %d processing orders in this table (%s) that are not ready yet. Closing the table will automatically mark them as ready. Are you sure you want to continue?', 'orders-jet'), 
+                            count($processing_orders),
+                            implode(', ', $processing_order_numbers)),
+                        'action_required' => 'confirm_force_close',
+                        'processing_orders' => $processing_order_numbers,
+                        'show_confirmation' => true
+                    ));
+                } else {
+                    // User confirmed - auto-mark processing orders as ready
+                    foreach ($processing_orders as $order) {
+                        $order->set_status('pending');
+                        $order->add_order_note(__('Automatically marked as ready during table closure', 'orders-jet'));
+                        $order->save();
+                        error_log('Orders Jet: Auto-marked order #' . $order->get_id() . ' as ready');
+                    }
+                    
+                    error_log('Orders Jet: Auto-marked ' . count($processing_orders) . ' processing orders as ready');
+                    
+                    // Update the orders list to reflect the status changes
+                    $table_orders = wc_get_orders(array(
+                        'status' => array('processing', 'pending'),
+                        'meta_key' => '_oj_table_number',
+                        'meta_value' => $table_number,
+                        'limit' => -1,
+                        'orderby' => 'date',
+                        'order' => 'ASC'
+                    ));
+                }
+            }
+            
+            // Check for any remaining non-pending orders (shouldn't happen after auto-marking)
+            $non_pending_orders = array();
+            foreach ($table_orders as $order) {
+                if ($order->get_status() !== 'pending') {
+                    $non_pending_orders[] = '#' . $order->get_id() . ' (' . $order->get_status() . ')';
+                }
+            }
+            
+            if (!empty($non_pending_orders)) {
                 wp_send_json_error(array(
-                    'message' => sprintf(__('All orders must be ready before closing table. Orders not ready: %s', 'orders-jet'), 
-                        implode(', ', $not_ready_orders)),
-                    'action_required' => 'make_all_ready'
+                    'message' => sprintf(__('Some orders have unexpected statuses and cannot be processed: %s', 'orders-jet'), 
+                        implode(', ', $non_pending_orders)),
+                    'action_required' => 'check_order_statuses'
                 ));
             }
             

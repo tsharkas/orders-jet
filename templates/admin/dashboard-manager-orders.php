@@ -589,16 +589,48 @@ jQuery(document).ready(function($) {
                 showPreloader('<?php _e('Closing table...', 'orders-jet'); ?>');
                 
                 $.post(ajaxurl, {
-                    action: 'oj_close_table',
+                    action: 'oj_close_table_group',
                     table_number: tableNumber,
                     payment_method: paymentMethod,
                     nonce: '<?php echo wp_create_nonce('oj_table_order'); ?>'
                 }, function(response) {
                     if (response.success) {
                         showTableSuccessModal(tableNumber, response.data);
+                    } else if (response.data && response.data.show_confirmation) {
+                        // Handle processing orders confirmation
+                        hidePreloader();
+                        const confirmMessage = response.data.message + '\n\n<?php _e('Click OK to continue or Cancel to keep the table open.', 'orders-jet'); ?>';
+                        
+                        if (confirm(confirmMessage)) {
+                            // User confirmed - retry with force_close flag
+                            showPreloader('<?php _e('Marking orders ready and closing table...', 'orders-jet'); ?>');
+                            
+                            $.post(ajaxurl, {
+                                action: 'oj_close_table_group',
+                                table_number: tableNumber,
+                                payment_method: paymentMethod,
+                                force_close: 'true',
+                                nonce: '<?php echo wp_create_nonce('oj_table_order'); ?>'
+                            }, function(retryResponse) {
+                                if (retryResponse.success) {
+                                    showTableSuccessModal(tableNumber, retryResponse.data);
+                                } else {
+                                    hidePreloader();
+                                    alert(retryResponse.data.message || '<?php _e('Error occurred during table closure', 'orders-jet'); ?>');
+                                }
+                            }).fail(function() {
+                                hidePreloader();
+                                alert('<?php _e('Network error occurred during table closure', 'orders-jet'); ?>');
+                            });
+                        }
+                        // If user cancels, do nothing (table stays open)
                     } else {
-                        alert(response.data || '<?php _e('Error occurred', 'orders-jet'); ?>');
+                        hidePreloader();
+                        alert(response.data.message || '<?php _e('Error occurred', 'orders-jet'); ?>');
                     }
+                }).fail(function() {
+                    hidePreloader();
+                    alert('<?php _e('Network error occurred', 'orders-jet'); ?>');
                 });
             });
             
