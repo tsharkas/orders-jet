@@ -15,13 +15,23 @@ if (!defined('ABSPATH')) {
 wp_enqueue_style('oj-manager-orders-cards', ORDERS_JET_PLUGIN_URL . 'assets/css/manager-orders-cards.css', array(), ORDERS_JET_VERSION);
 
 
-// Single query for all orders with WooFood order types
-$offset = isset($_GET['offset']) ? intval($_GET['offset']) : 0;
-$limit = 20;
+// Pagination logic for better filter compatibility
+$current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
+$per_page = 20;
+$offset = ($current_page - 1) * $per_page;
 
+// Get total count for pagination
+$total_orders = count(wc_get_orders(array(
+    'status' => array('wc-processing', 'wc-pending', 'wc-completed'),
+    'limit' => -1
+)));
+
+$total_pages = ceil($total_orders / $per_page);
+
+// Single query for all orders with pagination
 $all_orders = wc_get_orders(array(
     'status' => array('wc-processing', 'wc-pending', 'wc-completed'),
-    'limit' => $limit,
+    'limit' => $per_page,
     'offset' => $offset,
     'orderby' => 'date',
     'order' => 'ASC'
@@ -328,12 +338,30 @@ foreach ($active_orders_for_count as $order) {
         <?php endif; ?>
     </div>
     
-    <!-- Load More Button -->
-    <?php if (count($all_orders) >= $limit) : ?>
-        <div class="oj-load-more-container">
-            <button class="oj-load-more-btn" data-offset="<?php echo $offset + $limit; ?>">
-                <?php _e('Load More Orders', 'orders-jet'); ?>
-            </button>
+    <!-- Pagination Controls -->
+    <?php if ($total_pages > 1) : ?>
+        <div class="oj-pagination-container">
+            <div class="oj-pagination-info">
+                <?php printf(__('Page %d of %d (%d total orders)', 'orders-jet'), $current_page, $total_pages, $total_orders); ?>
+            </div>
+            
+            <div class="oj-pagination-controls">
+                <?php if ($current_page > 1) : ?>
+                    <a href="<?php echo esc_url(add_query_arg(array('paged' => $current_page - 1, 'filter' => isset($_GET['filter']) ? $_GET['filter'] : 'all'))); ?>" class="oj-pagination-btn oj-prev-btn">
+                        <strong>← <?php _e('Previous', 'orders-jet'); ?></strong>
+                    </a>
+                <?php endif; ?>
+                
+                <span class="oj-pagination-current">
+                    <?php echo $current_page; ?> / <?php echo $total_pages; ?>
+                </span>
+                
+                <?php if ($current_page < $total_pages) : ?>
+                    <a href="<?php echo esc_url(add_query_arg(array('paged' => $current_page + 1, 'filter' => isset($_GET['filter']) ? $_GET['filter'] : 'all'))); ?>" class="oj-pagination-btn oj-next-btn">
+                        <strong><?php _e('Next', 'orders-jet'); ?> →</strong>
+                    </a>
+                <?php endif; ?>
+            </div>
         </div>
     <?php endif; ?>
 </div>
@@ -656,30 +684,17 @@ jQuery(document).ready(function($) {
         window.open(orderUrl, '_blank');
     });
     
-    // Load More Orders
-    $('.oj-load-more-btn').on('click', function() {
-        const offset = $(this).data('offset');
-        const $button = $(this);
+    // Pagination: Reset to page 1 when changing filters
+    $('.oj-filter-btn').on('click', function() {
+        const filter = $(this).data('filter');
         
-        $button.prop('disabled', true).text('<?php _e('Loading...', 'orders-jet'); ?>');
+        // Update URL to reset pagination when changing filters
+        const url = new URL(window.location);
+        url.searchParams.set('filter', filter);
+        url.searchParams.delete('paged'); // Reset to page 1
         
-        $.post(ajaxurl, {
-            action: 'oj_load_more_orders',
-            offset: offset,
-            nonce: '<?php echo wp_create_nonce('oj_load_more'); ?>'
-        }, function(response) {
-            if (response.success && response.data.html) {
-                $('#oj-orders-grid').append(response.data.html);
-                
-                if (response.data.has_more) {
-                    $button.data('offset', offset + 20).prop('disabled', false).text('<?php _e('Load More Orders', 'orders-jet'); ?>');
-                } else {
-                    $button.remove();
-                }
-            } else {
-                $button.prop('disabled', false).text('<?php _e('Load More Orders', 'orders-jet'); ?>');
-            }
-        });
+        // Update browser history without reload for better UX
+        window.history.replaceState({}, '', url);
     });
     
     // Success Modal (after order completion)

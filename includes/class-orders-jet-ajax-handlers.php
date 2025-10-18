@@ -23,13 +23,12 @@ class Orders_Jet_AJAX_Handlers {
         add_action('wp_ajax_oj_complete_individual_order', array($this, 'complete_individual_order'));
         add_action('wp_ajax_oj_close_table_group', array($this, 'close_table_group'));
         add_action('wp_ajax_oj_get_order_invoice', array($this, 'get_order_invoice'));
-        add_action('wp_ajax_oj_load_more_orders', array($this, 'load_more_orders'));
         
         // NOTE: Obsolete functions still exist in this file but are no longer registered:
         // close_table(), mark_order_delivered(), confirm_pickup_payment(), get_table_summary(),
         // complete_table_cash(), get_completed_orders_for_pdf(), generate_guest_pdf(),
         // generate_admin_pdf(), generate_table_pdf(), bulk_action(), search_order_invoice(),
-        // download_order_invoice(), get_order_details() - These can be removed in future cleanup.
+        // download_order_invoice(), get_order_details(), load_more_orders() - These can be removed in future cleanup.
         
         // AJAX handlers for non-logged in users (guests)
         add_action('wp_ajax_nopriv_oj_submit_table_order', array($this, 'submit_table_order'));
@@ -3937,68 +3936,5 @@ class Orders_Jet_AJAX_Handlers {
         return $html;
     }
     
-    /**
-     * Load more orders for lazy loading (20 by 20)
-     */
-    public function load_more_orders() {
-        try {
-            check_ajax_referer('oj_dashboard_nonce', 'nonce');
-            
-            if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_woocommerce')) {
-                wp_send_json_error(array('message' => __('Permission denied', 'orders-jet')));
-            }
-            
-            $status = sanitize_text_field($_POST['status']); // 'processing', 'pending', 'completed'
-            $offset = intval($_POST['offset']); // Current count
-            $limit = 20; // Load 20 more
-            
-            // Validate status
-            if (!in_array($status, array('processing', 'pending', 'completed'))) {
-                wp_send_json_error(array('message' => __('Invalid status', 'orders-jet')));
-            }
-            
-            // Get orders based on status with proper sorting
-            $order_args = array(
-                'status' => $status,
-                'limit' => $limit,
-                'offset' => $offset,
-                'orderby' => $status === 'completed' ? 'date_modified' : 'date',
-                'order' => $status === 'completed' ? 'DESC' : 'ASC' // FIFO for active, newest first for completed
-            );
-            
-            $orders = wc_get_orders($order_args);
-            $formatted_orders = array();
-            
-            foreach ($orders as $order) {
-                $order_data = array(
-                    'id' => $order->get_id(),
-                    'status' => $order->get_status(),
-                    'total' => $order->get_total(),
-                    'customer' => $order->get_billing_first_name() ?: 'Guest',
-                    'table' => $order->get_meta('_oj_table_number') ?: '',
-                    'date' => $status === 'completed' ? $order->get_date_modified()->format('H:i') : $order->get_date_created()->format('H:i'),
-                    'type' => !empty($order->get_meta('_oj_table_number')) ? 'table' : 'pickup',
-                    'formatted_total' => wc_price($order->get_total())
-                );
-                
-                // Add payment method for completed orders
-                if ($status === 'completed') {
-                    $order_data['payment_method'] = $order->get_meta('_oj_payment_method') ?: '';
-                }
-                
-                $formatted_orders[] = $order_data;
-            }
-            
-            wp_send_json_success(array(
-                'orders' => $formatted_orders,
-                'has_more' => count($orders) === $limit, // If we got exactly 20, there might be more
-                'new_offset' => $offset + count($orders)
-            ));
-            
-        } catch (Exception $e) {
-            error_log('Orders Jet: Error loading more orders: ' . $e->getMessage());
-            wp_send_json_error(array('message' => __('Failed to load more orders', 'orders-jet')));
-        }
-    }
     
 }

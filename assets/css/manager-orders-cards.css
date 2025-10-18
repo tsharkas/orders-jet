@@ -424,35 +424,68 @@
 }
 
 /* ==========================================================================
-   LOAD MORE
+   PAGINATION
    ========================================================================== */
 
-.oj-load-more-container {
-    text-align: center;
-    padding: 30px;
+.oj-pagination-container {
+    margin-top: 30px;
+    padding: 20px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
 }
 
-.oj-load-more-btn {
+.oj-pagination-info {
+    color: var(--text-light);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.oj-pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.oj-pagination-btn {
+    padding: 10px 18px;
     background: var(--primary-color);
     color: white;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 8px;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: bold;
     font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
     transition: all 0.2s ease;
+    border: none;
+    cursor: pointer;
 }
 
-.oj-load-more-btn:hover {
+.oj-pagination-btn:hover {
     background: #1e5a8a;
     transform: translateY(-1px);
+    text-decoration: none;
+    color: white;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
 }
 
-.oj-load-more-btn:disabled {
-    background: var(--border-color);
-    cursor: not-allowed;
-    transform: none;
+.oj-pagination-btn:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+.oj-pagination-current {
+    padding: 10px 16px;
+    background: var(--bg-light);
+    border-radius: 6px;
+    font-weight: bold;
+    color: var(--text-color);
+    font-size: 14px;
+    border: 2px solid var(--border-color);
 }
 
 /* ==========================================================================
@@ -486,6 +519,21 @@
     
     .oj-action-btn {
         padding: 12px 16px;
+    }
+    
+    .oj-pagination-container {
+        flex-direction: column;
+        text-align: center;
+        gap: 10px;
+    }
+    
+    .oj-pagination-controls {
+        gap: 10px;
+    }
+    
+    .oj-pagination-btn {
+        padding: 8px 14px;
+        font-size: 13px;
     }
 }
 
