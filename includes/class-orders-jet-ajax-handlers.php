@@ -3489,6 +3489,16 @@ class Orders_Jet_AJAX_Handlers {
                 'session' => $session_id
             ), ORDERS_JET_PLUGIN_URL . 'table-invoice.php');
 
+            // Get combined order items for display
+            $combined_items = array();
+            foreach ($consolidated_order->get_items() as $item) {
+                $combined_items[] = array(
+                    'name' => $item->get_name(),
+                    'quantity' => $item->get_quantity(),
+                    'total' => $item->get_total()
+                );
+            }
+            
             wp_send_json_success(array(
                 'message' => __('Table closed and invoice generated', 'orders-jet'),
                 'consolidated_order_id' => $consolidated_order->get_id(),
@@ -3500,15 +3510,24 @@ class Orders_Jet_AJAX_Handlers {
                 'thermal_invoice_url' => $thermal_invoice_url,
                 'child_order_ids' => $child_order_ids,
                 'tax_method' => 'consolidated_woocommerce',
-                'card_updates' => array(
-                    'action' => 'update_to_print_invoice',
-                    'order_ids' => $child_order_ids,
+                'combined_order' => array(
+                    'order_id' => $consolidated_order->get_id(),
+                    'order_number' => $consolidated_order->get_order_number(),
                     'table_number' => $table_number,
-                    'invoice_url' => $thermal_invoice_url,
-                    'button_text' => '🖨️ Print Invoice',
-                    'button_class' => 'oj-print-invoice-table',
-                    'status_badge_text' => 'READY FOR PAYMENT',
-                    'status_badge_class' => 'completed'
+                    'total' => $consolidated_order->get_total(),
+                    'subtotal' => $consolidated_order->get_subtotal(),
+                    'tax' => $consolidated_order->get_total_tax(),
+                    'items' => $combined_items,
+                    'item_count' => count($combined_items),
+                    'date' => $consolidated_order->get_date_created()->date('g:i A'),
+                    'status' => 'completed',
+                    'order_type' => 'dinein',
+                    'invoice_url' => $thermal_invoice_url
+                ),
+                'card_updates' => array(
+                    'action' => 'replace_with_combined_order',
+                    'child_order_ids' => $child_order_ids,
+                    'table_number' => $table_number
                 )
             ));
             

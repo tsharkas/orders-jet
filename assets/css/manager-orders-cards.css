@@ -632,6 +632,30 @@
     color: white;
 }
 
+/* Print Invoice Button for Combined Orders */
+.oj-action-btn.oj-print-invoice-combined {
+    background: #0073aa;
+    color: white;
+    font-weight: 500;
+}
+
+.oj-action-btn.oj-print-invoice-combined:hover {
+    background: #005a87;
+    color: white;
+}
+
+/* Payment Confirmation Button for Combined Orders (Paid?) */
+.oj-action-btn.oj-confirm-payment-combined {
+    background: #28a745;
+    color: white;
+    font-weight: 600;
+}
+
+.oj-action-btn.oj-confirm-payment-combined:hover {
+    background: #218838;
+    color: white;
+}
+
 /* Waiting Payment Status Badge */
 .oj-status-badge.waiting-payment {
     background: #ffc107;

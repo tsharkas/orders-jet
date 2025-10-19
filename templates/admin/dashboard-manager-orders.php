@@ -594,6 +594,214 @@ jQuery(document).ready(function($) {
     // ===== AJAX CARD UPDATE FUNCTIONS =====
     
     /**
+     * Replace child order cards with combined order card
+     */
+    function replaceWithCombinedOrder(cardUpdates, combinedOrder) {
+        console.log('🔄 Replacing child order cards with combined order card');
+        console.log('Child order IDs to remove:', cardUpdates.child_order_ids);
+        console.log('Combined order data:', combinedOrder);
+        
+        // Find the first child order card to use as insertion point
+        const firstChildCard = $(`.oj-order-card[data-order-id="${cardUpdates.child_order_ids[0]}"]`);
+        
+        if (firstChildCard.length) {
+            // Create the new combined order card HTML
+            const combinedCardHtml = `
+                <div class="oj-order-card" data-order-id="${combinedOrder.order_id}" data-status="${combinedOrder.status}" data-type="${combinedOrder.order_type}">
+                    <div class="oj-card-header">
+                        <div class="oj-order-info">
+                            <h3 class="oj-order-number">#${combinedOrder.order_id} | ${combinedOrder.table_number}</h3>
+                            <span class="oj-order-type-badge dinein">
+                                🏢 <?php _e('DINE IN', 'orders-jet'); ?>
+                            </span>
+                        </div>
+                        <span class="oj-status-badge completed"><?php _e('READY FOR PAYMENT', 'orders-jet'); ?></span>
+                    </div>
+                    
+                    <div class="oj-card-body">
+                        <div class="oj-order-meta">
+                            <span class="oj-meta-item">
+                                <strong><?php _e('Table Guest', 'orders-jet'); ?></strong>
+                            </span>
+                            <span class="oj-meta-item">
+                                ⏰ ${combinedOrder.date}
+                            </span>
+                            <span class="oj-meta-item">
+                                📦 ${combinedOrder.item_count} <?php _e('items', 'orders-jet'); ?>
+                            </span>
+                        </div>
+                        
+                        <div class="oj-order-total">
+                            ${combinedOrder.total} <?php echo get_woocommerce_currency(); ?>
+                        </div>
+                    </div>
+                    
+                    <div class="oj-card-footer">
+                        <button class="oj-action-btn success oj-print-invoice-combined" 
+                                data-order-id="${combinedOrder.order_id}"
+                                data-invoice-url="${combinedOrder.invoice_url}"
+                                data-table-number="${combinedOrder.table_number}"
+                                data-type="combined">
+                            🖨️ <?php _e('Print Invoice', 'orders-jet'); ?>
+                        </button>
+                        <button class="oj-action-btn secondary oj-view-details" 
+                                data-order-id="${combinedOrder.order_id}">
+                            👁️ <?php _e('Details', 'orders-jet'); ?>
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            // Insert the new combined order card before the first child card
+            firstChildCard.before(combinedCardHtml);
+            
+            // Remove all child order cards with animation
+            cardUpdates.child_order_ids.forEach(orderId => {
+                const $card = $(`.oj-order-card[data-order-id="${orderId}"]`);
+                if ($card.length) {
+                    $card.addClass('oj-card-removing');
+                    setTimeout(() => {
+                        $card.remove();
+                        console.log('✅ Removed child order card:', orderId);
+                    }, 300);
+                }
+            });
+            
+            // Bind Print Invoice functionality to the new combined order card
+            setTimeout(() => {
+                const $combinedCard = $(`.oj-order-card[data-order-id="${combinedOrder.order_id}"]`);
+                const $printBtn = $combinedCard.find('.oj-print-invoice-combined');
+                
+                $printBtn.on('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const invoiceUrl = $(this).data('invoice-url');
+                    const orderId = $(this).data('order-id');
+                    const tableNumber = $(this).data('table-number');
+                    
+                    if (invoiceUrl) {
+                        console.log('🖨️ Opening combined order invoice with direct print for order:', orderId);
+                        
+                        // Create hidden iframe for direct printing
+                        const iframe = document.createElement('iframe');
+                        iframe.style.display = 'none';
+                        iframe.style.position = 'absolute';
+                        iframe.style.left = '-9999px';
+                        iframe.style.top = '-9999px';
+                        iframe.style.width = '1px';
+                        iframe.style.height = '1px';
+                        iframe.src = invoiceUrl;
+                        document.body.appendChild(iframe);
+                        
+                        let printAttempted = false;
+                        const printTimeout = setTimeout(() => {
+                            if (!printAttempted) {
+                                console.error('❌ Print timeout - invoice failed to load');
+                                showPrintError('Invoice failed to load. Please try again.');
+                                cleanupIframe();
+                            }
+                        }, 10000);
+                        
+                        iframe.onload = function() {
+                            console.log('✅ Invoice loaded, preparing to print...');
+                            setTimeout(() => {
+                                try {
+                                    printAttempted = true;
+                                    clearTimeout(printTimeout);
+                                    iframe.contentWindow.print();
+                                    console.log('🖨️ Print dialog opened successfully');
+                                    setTimeout(() => {
+                                        cleanupIframe();
+                                    }, 1000);
+                                } catch (error) {
+                                    console.error('❌ Print failed:', error);
+                                    showPrintError('Print dialog could not be opened. Please try again.');
+                                    cleanupIframe();
+                                }
+                            }, 500);
+                        };
+                        
+                        iframe.onerror = function() {
+                            console.error('❌ Invoice failed to load');
+                            clearTimeout(printTimeout);
+                            showPrintError('Invoice could not be loaded. Please check the URL and try again.');
+                            cleanupIframe();
+                        };
+                        
+                        function cleanupIframe() {
+                            if (iframe && iframe.parentNode) {
+                                document.body.removeChild(iframe);
+                                console.log('🧹 Iframe cleaned up');
+                            }
+                        }
+                        
+                        function showPrintError(message) {
+                            const errorNotification = $(`
+                                <div class="oj-error-notification">
+                                    <span>❌ ${message}</span>
+                                    <button class="oj-error-close">×</button>
+                                </div>
+                            `);
+                            $('body').append(errorNotification);
+                            setTimeout(() => {
+                                errorNotification.fadeOut(300, function() {
+                                    $(this).remove();
+                                });
+                            }, 5000);
+                            errorNotification.find('.oj-error-close').on('click', function() {
+                                errorNotification.fadeOut(300, function() {
+                                    $(this).remove();
+                                });
+                            });
+                        }
+                        
+                        // Update button to "Paid?" after print dialog opens
+                        setTimeout(() => {
+                            $printBtn.text('Paid?');
+                            $printBtn.removeClass('oj-print-invoice-combined');
+                            $printBtn.addClass('oj-confirm-payment-combined');
+                            $printBtn.off('click');
+                            
+                            // Update status badge
+                            $combinedCard.find('.oj-status-badge').text('<?php _e('WAITING PAYMENT', 'orders-jet'); ?>').removeClass('completed').addClass('waiting-payment');
+                            
+                            // Bind Paid? functionality
+                            $printBtn.on('click', function(e) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                
+                                if (confirm('<?php _e('Confirm payment received for this order?', 'orders-jet'); ?>')) {
+                                    $.post(ajaxurl, {
+                                        action: 'oj_confirm_payment_received',
+                                        order_id: orderId,
+                                        order_type: 'combined',
+                                        table_number: tableNumber,
+                                        nonce: '<?php echo wp_create_nonce('oj_dashboard_nonce'); ?>'
+                                    }, function(response) {
+                                        if (response.success) {
+                                            console.log('✅ Payment confirmed, removing combined order card');
+                                            removeOrderCard(orderId);
+                                            updateFilterCounts();
+                                            showSuccessNotification(response.data.message);
+                                        } else {
+                                            alert(response.data.message || '<?php _e('Error confirming payment', 'orders-jet'); ?>');
+                                        }
+                                    }).fail(function() {
+                                        alert('<?php _e('Network error occurred', 'orders-jet'); ?>');
+                                    });
+                                }
+                            });
+                        }, 1000);
+                    }
+                });
+                
+                console.log('✅ Combined order card created and Print Invoice button bound');
+            }, 350); // Wait for child cards to be removed
+        }
+    }
+    
+    /**
      * Update multiple table order cards to Print Invoice state
      */
     function updateTableOrderCards(cardUpdates) {
@@ -946,8 +1154,8 @@ jQuery(document).ready(function($) {
                                 nonce: '<?php echo wp_create_nonce('oj_table_order'); ?>'
                             }, function(response) {
                                 if (response.success) {
-                                    // Update all table order cards to Print Invoice state
-                                    updateTableOrderCards(response.data.card_updates);
+                                    // Replace child order cards with combined order card
+                                    replaceWithCombinedOrder(response.data.card_updates, response.data.combined_order);
                                     updateFilterCounts();
                                     showSuccessNotification(response.data.message);
                                 } else if (response.data && response.data.show_confirmation) {
@@ -962,8 +1170,8 @@ jQuery(document).ready(function($) {
                                             nonce: '<?php echo wp_create_nonce('oj_table_order'); ?>'
                                         }, function(retryResponse) {
                                             if (retryResponse.success) {
-                                                // Update all table order cards to Print Invoice state
-                                                updateTableOrderCards(retryResponse.data.card_updates);
+                                                // Replace child order cards with combined order card
+                                                replaceWithCombinedOrder(retryResponse.data.card_updates, retryResponse.data.combined_order);
                                                 updateFilterCounts();
                                                 showSuccessNotification(retryResponse.data.message);
                                             } else {
