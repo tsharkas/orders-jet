@@ -1488,6 +1488,10 @@ class Orders_Jet_AJAX_Handlers {
                 ? sprintf(__('Table order #%d marked as ready!', 'orders-jet'), $order_id)
                 : sprintf(__('Pickup order #%d marked as ready!', 'orders-jet'), $order_id);
             
+            // Determine button text and class based on order type
+            $button_text = !empty($table_number) ? 'Close Table' : 'Complete';
+            $button_class = !empty($table_number) ? 'oj-close-table' : 'oj-complete-order';
+            
             wp_send_json_success(array(
                 'message' => $success_message,
                 'order_id' => $order_id,
@@ -1499,8 +1503,9 @@ class Orders_Jet_AJAX_Handlers {
                     'new_status' => 'pending',
                     'status_badge_text' => 'READY',
                     'status_badge_class' => 'ready',
-                    'button_text' => 'Complete',
-                    'button_class' => 'oj-complete-order'
+                    'button_text' => $button_text,
+                    'button_class' => $button_class,
+                    'table_number' => $table_number
                 )
             ));
             
