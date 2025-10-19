@@ -24,6 +24,7 @@ class Orders_Jet_AJAX_Handlers {
         add_action('wp_ajax_oj_close_table_group', array($this, 'close_table_group'));
         add_action('wp_ajax_oj_get_order_invoice', array($this, 'get_order_invoice'));
         add_action('wp_ajax_oj_get_filter_counts', array($this, 'get_filter_counts'));
+        add_action('wp_ajax_oj_confirm_payment_received', array($this, 'confirm_payment_received'));
         
         // NOTE: Obsolete functions still exist in this file but are no longer registered:
         // close_table(), mark_order_delivered(), confirm_pickup_payment(), get_table_summary(),
@@ -1846,11 +1847,11 @@ class Orders_Jet_AJAX_Handlers {
             'card_updates' => array(
                 'order_id' => $order_id,
                 'new_status' => 'completed',
-                'status_badge_text' => 'COMPLETED',
+                'status_badge_text' => 'READY FOR PAYMENT',
                 'status_badge_class' => 'completed',
                 'button_text' => '🖨️ Print Invoice',
-                'button_class' => 'oj-thermal-print',
-                'button_action' => 'thermal_print',
+                'button_class' => 'oj-print-invoice',
+                'button_action' => 'print_invoice',
                 'invoice_url' => $thermal_invoice_url
             )
         ));
@@ -4113,6 +4114,57 @@ class Orders_Jet_AJAX_Handlers {
                 error_log('Orders Jet: Error getting filter counts: ' . $e->getMessage());
             }
             wp_send_json_error(array('message' => __('Error getting filter counts', 'orders-jet')));
+        }
+    }
+    
+    /**
+     * Confirm payment received for individual order
+     */
+    public function confirm_payment_received() {
+        try {
+            // Check nonce for security
+            check_ajax_referer('oj_dashboard_nonce', 'nonce');
+            
+            // Check permissions
+            if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_woocommerce')) {
+                wp_send_json_error(array('message' => __('Permission denied', 'orders-jet')));
+            }
+            
+            $order_id = intval($_POST['order_id'] ?? 0);
+            
+            if (!$order_id) {
+                wp_send_json_error(array('message' => __('Invalid order ID', 'orders-jet')));
+            }
+            
+            $order = wc_get_order($order_id);
+            if (!$order) {
+                wp_send_json_error(array('message' => __('Order not found', 'orders-jet')));
+            }
+            
+            // Add order note for payment confirmation
+            $order->add_order_note(__('Payment confirmed by manager', 'orders-jet'));
+            
+            // Update order status to completed (if not already)
+            if ($order->get_status() !== 'completed') {
+                $order->set_status('completed');
+                $order->save();
+            }
+            
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Orders Jet: Payment confirmed for order #' . $order_id);
+            }
+            
+            wp_send_json_success(array(
+                'message' => sprintf(__('Payment confirmed for order #%d', 'orders-jet'), $order_id),
+                'order_id' => $order_id,
+                'status' => 'payment_confirmed'
+            ));
+            
+        } catch (Exception $e) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('Orders Jet: Error confirming payment: ' . $e->getMessage());
+            }
+            wp_send_json_error(array('message' => __('Error confirming payment', 'orders-jet')));
         }
     }
     

@@ -582,3 +582,63 @@
 .oj-mt-20 {
     margin-top: 20px !important;
 }
+
+/* ===== NEW PAYMENT CONFIRMATION CYCLE STYLES ===== */
+
+/* Print Invoice Button */
+.oj-action-btn.oj-print-invoice {
+    background: #0073aa;
+    color: white;
+}
+
+.oj-action-btn.oj-print-invoice:hover {
+    background: #005a87;
+    color: white;
+}
+
+/* Payment Confirmation Button (Paid?) */
+.oj-action-btn.oj-confirm-payment {
+    background: #28a745;
+    color: white;
+    font-weight: 600;
+}
+
+.oj-action-btn.oj-confirm-payment:hover {
+    background: #218838;
+    color: white;
+}
+
+/* Waiting Payment Status Badge */
+.oj-status-badge.waiting-payment {
+    background: #ffc107;
+    color: #212529;
+    font-weight: 600;
+}
+
+/* Card Removal Animation */
+.oj-card-removing {
+    opacity: 0.7;
+    transform: translateX(-20px);
+    transition: all 0.5s ease;
+}
+
+/* Print Invoice Button Animation */
+.oj-action-btn.oj-print-invoice:active {
+    transform: scale(0.95);
+}
+
+/* Payment Confirmation Button Animation */
+.oj-action-btn.oj-confirm-payment:active {
+    transform: scale(0.95);
+}
+
+/* Enhanced Card Update Animation */
+.oj-card-updated {
+    animation: cardUpdatePulse 1s ease-in-out;
+}
+
+@keyframes cardUpdatePulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+}

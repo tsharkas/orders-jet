@@ -672,24 +672,90 @@ jQuery(document).ready(function($) {
                     buttonClass: cardUpdates.button_class,
                     buttonText: cardUpdates.button_text
                 });
-            } else if (cardUpdates.button_class === 'oj-thermal-print') {
-                // Set data attributes for Thermal Print functionality
+            } else if (cardUpdates.button_class === 'oj-print-invoice') {
+                // Set data attributes for Print Invoice functionality
                 $actionBtn.attr('data-invoice-url', cardUpdates.invoice_url || '');
+                $actionBtn.attr('data-order-id', cardUpdates.order_id);
                 
-                // Bind Thermal Print functionality directly
+                // Bind Print Invoice functionality with auto-print
                 $actionBtn.off('click').on('click', function(e) {
                     e.preventDefault();
                     e.stopPropagation();
                     
                     const invoiceUrl = $(this).data('invoice-url');
+                    const orderId = $(this).data('order-id');
+                    
                     if (invoiceUrl) {
-                        window.open(invoiceUrl, '_blank');
+                        console.log('🖨️ Opening invoice with auto-print for order:', orderId);
+                        
+                        // Open invoice in new tab and auto-print
+                        const printWindow = window.open(invoiceUrl, '_blank');
+                        printWindow.onload = function() {
+                            setTimeout(() => {
+                                printWindow.print();
+                                // Close after printing (optional)
+                                setTimeout(() => printWindow.close(), 1000);
+                            }, 500); // Small delay to ensure page loads
+                        };
+                        
+                        // Update button to "Paid?" after print dialog opens
+                        setTimeout(() => {
+                            updateOrderCard({
+                                order_id: orderId,
+                                button_text: 'Paid?',
+                                button_class: 'oj-confirm-payment',
+                                status_badge_text: 'WAITING PAYMENT',
+                                status_badge_class: 'waiting-payment'
+                            });
+                        }, 1000);
                     }
                 });
                 
-                console.log('Thermal Print button updated:', {
+                console.log('Print Invoice button updated:', {
                     orderId: cardUpdates.order_id,
                     invoiceUrl: cardUpdates.invoice_url
+                });
+            } else if (cardUpdates.button_class === 'oj-confirm-payment') {
+                // Set data attributes for Payment Confirmation functionality
+                $actionBtn.attr('data-order-id', cardUpdates.order_id);
+                $actionBtn.attr('data-type', 'individual');
+                
+                // Bind Payment Confirmation functionality
+                $actionBtn.off('click').on('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const orderId = $(this).data('order-id');
+                    const orderType = $(this).data('type');
+                    
+                    console.log('💰 Payment confirmation clicked for order:', orderId);
+                    
+                    if (confirm('<?php _e('Confirm payment received for this order?', 'orders-jet'); ?>')) {
+                        // Call payment confirmation AJAX
+                        $.post(ajaxurl, {
+                            action: 'oj_confirm_payment_received',
+                            order_id: orderId,
+                            nonce: '<?php echo wp_create_nonce('oj_dashboard_nonce'); ?>'
+                        }, function(response) {
+                            if (response.success) {
+                                console.log('✅ Payment confirmed, removing card');
+                                // Remove card with animation
+                                removeOrderCard(orderId);
+                                // Update filter counts
+                                updateFilterCounts();
+                            } else {
+                                alert(response.data.message || '<?php _e('Error confirming payment', 'orders-jet'); ?>');
+                            }
+                        }).fail(function() {
+                            alert('<?php _e('Network error occurred', 'orders-jet'); ?>');
+                        });
+                    }
+                });
+                
+                console.log('Paid? button updated:', {
+                    orderId: cardUpdates.order_id,
+                    buttonClass: cardUpdates.button_class,
+                    buttonText: cardUpdates.button_text
                 });
             }
             
@@ -755,8 +821,7 @@ jQuery(document).ready(function($) {
                     updateOrderCard(response.data.card_updates);
                     // Update filter counts
                     updateFilterCounts();
-                    // Show success modal with thermal print option
-                    showSuccessModalWithThermalPrint(orderId, response.data.thermal_invoice_url);
+                    // No success modal - card updates directly to "Print Invoice" button
                 } else {
                     alert(response.data.message || '<?php _e('Error occurred', 'orders-jet'); ?>');
                 }
@@ -769,6 +834,23 @@ jQuery(document).ready(function($) {
         modal.find('.oj-cancel-complete').on('click', function() {
             modal.remove();
         });
+    }
+    
+    /**
+     * Remove individual order card after payment confirmation
+     */
+    function removeOrderCard(orderId) {
+        const $card = $(`.oj-order-card[data-order-id="${orderId}"]`);
+        if ($card.length) {
+            console.log('🗑️ Removing order card:', orderId);
+            $card.addClass('oj-card-removing');
+            setTimeout(() => {
+                $card.fadeOut(300, function() {
+                    $(this).remove();
+                    console.log('✅ Order card removed:', orderId);
+                });
+            }, 500);
+        }
     }
     
     /**
