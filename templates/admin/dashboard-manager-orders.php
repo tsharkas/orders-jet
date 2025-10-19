@@ -609,7 +609,7 @@ jQuery(document).ready(function($) {
             // ✅ FIX: Update ONLY the first button (action button)
             const $actionBtn = $card.find('.oj-action-btn:first');
             $actionBtn.text(cardUpdates.button_text);
-            $actionBtn.removeClass('oj-mark-ready oj-complete-order oj-thermal-print');
+            $actionBtn.removeClass('oj-mark-ready oj-complete-order oj-thermal-print oj-close-table');
             $actionBtn.addClass(cardUpdates.button_class);
             
             // ✅ FIX: Set data attributes and bind events directly
@@ -669,6 +669,120 @@ jQuery(document).ready(function($) {
                 
                 console.log('Complete Order button updated:', {
                     orderId: cardUpdates.order_id,
+                    buttonClass: cardUpdates.button_class,
+                    buttonText: cardUpdates.button_text
+                });
+            } else if (cardUpdates.button_class === 'oj-close-table') {
+                // Set data attributes for Close Table functionality
+                $actionBtn.attr('data-table', cardUpdates.table_number || '');
+                $actionBtn.attr('data-order-id', cardUpdates.order_id);
+                
+                // 🔥 CRITICAL: Remove ALL original handlers and attributes
+                $actionBtn.removeAttr('onclick');
+                $actionBtn.removeAttr('formaction');
+                $actionBtn.removeAttr('form');
+                $actionBtn.attr('type', 'button');
+                $actionBtn.prop('disabled', false);
+                
+                // Remove ALL existing click handlers first
+                $actionBtn.off('click');
+                
+                // Bind Close Table functionality directly
+                $actionBtn.on('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const tableNumber = $(this).data('table');
+                    const orderId = $(this).data('order-id');
+                    
+                    console.log('🏢 Close Table clicked for order:', orderId, 'table:', tableNumber);
+                    
+                    if (confirm('<?php _e('Close this table and generate consolidated invoice?', 'orders-jet'); ?>')) {
+                        // Show payment method selection
+                        const paymentMethods = [
+                            {value: 'cash', text: '<?php _e('Cash', 'orders-jet'); ?>'},
+                            {value: 'card', text: '<?php _e('Card', 'orders-jet'); ?>'},
+                            {value: 'online', text: '<?php _e('Online Payment', 'orders-jet'); ?>'}
+                        ];
+                        
+                        let paymentOptions = '';
+                        paymentMethods.forEach(method => {
+                            paymentOptions += `<option value="${method.value}">${method.text}</option>`;
+                        });
+                        
+                        const modal = $(`
+                            <div class="oj-payment-modal-overlay">
+                                <div class="oj-payment-modal">
+                                    <h3><?php _e('Close Table', 'orders-jet'); ?> ${tableNumber}</h3>
+                                    <p><?php _e('Select payment method:', 'orders-jet'); ?></p>
+                                    <select class="oj-payment-method">
+                                        ${paymentOptions}
+                                    </select>
+                                    <div class="oj-modal-actions">
+                                        <button class="button button-primary oj-confirm-close">
+                                            <?php _e('Confirm', 'orders-jet'); ?>
+                                        </button>
+                                        <button class="button oj-cancel-close">
+                                            <?php _e('Cancel', 'orders-jet'); ?>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `);
+                        
+                        $('body').append(modal);
+                        
+                        modal.find('.oj-confirm-close').on('click', function() {
+                            const paymentMethod = modal.find('.oj-payment-method').val();
+                            modal.remove();
+                            
+                            $.post(ajaxurl, {
+                                action: 'oj_close_table_group',
+                                table_number: tableNumber,
+                                payment_method: paymentMethod,
+                                nonce: '<?php echo wp_create_nonce('oj_table_order'); ?>'
+                            }, function(response) {
+                                if (response.success) {
+                                    removeTableOrderCards(response.data.card_updates.order_ids);
+                                    updateFilterCounts();
+                                } else if (response.data && response.data.show_confirmation) {
+                                    const confirmMessage = response.data.message + '\n\n<?php _e('Click OK to continue or Cancel to keep the table open.', 'orders-jet'); ?>';
+                                    
+                                    if (confirm(confirmMessage)) {
+                                        $.post(ajaxurl, {
+                                            action: 'oj_close_table_group',
+                                            table_number: tableNumber,
+                                            payment_method: paymentMethod,
+                                            force_close: 'true',
+                                            nonce: '<?php echo wp_create_nonce('oj_table_order'); ?>'
+                                        }, function(retryResponse) {
+                                            if (retryResponse.success) {
+                                                removeTableOrderCards(retryResponse.data.card_updates.order_ids);
+                                                updateFilterCounts();
+                                            } else {
+                                                alert(retryResponse.data.message || '<?php _e('Error occurred during table closure', 'orders-jet'); ?>');
+                                            }
+                                        }).fail(function() {
+                                            alert('<?php _e('Network error occurred during table closure', 'orders-jet'); ?>');
+                                        });
+                                    }
+                                } else {
+                                    alert(response.data.message || '<?php _e('Error occurred', 'orders-jet'); ?>');
+                                }
+                            }).fail(function() {
+                                alert('<?php _e('Network error occurred', 'orders-jet'); ?>');
+                            });
+                        });
+                        
+                        modal.find('.oj-cancel-close').on('click', function() {
+                            modal.remove();
+                        });
+                    }
+                });
+                
+                console.log('Close Table button updated:', {
+                    orderId: cardUpdates.order_id,
+                    tableNumber: cardUpdates.table_number,
                     buttonClass: cardUpdates.button_class,
                     buttonText: cardUpdates.button_text
                 });
