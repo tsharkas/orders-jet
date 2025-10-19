@@ -62,6 +62,15 @@ class Orders_Jet_Admin_Dashboard {
             
             add_submenu_page(
                 'manager-overview',
+                __('Orders Express', 'orders-jet'),
+                __('⚡ Orders Express', 'orders-jet'),
+                'manage_options',
+                'manager-orders-express',
+                array($this, 'render_manager_orders_express')
+            );
+            
+            add_submenu_page(
+                'manager-overview',
                 __('Tables Management', 'orders-jet'),
                 __('Tables Management', 'orders-jet'),
                 'manage_options',
@@ -221,6 +230,24 @@ class Orders_Jet_Admin_Dashboard {
             include $template_path;
         } else {
             wp_die(__('Orders Management template not found.', 'orders-jet'));
+        }
+    }
+    
+    /**
+     * Render Orders Express page (clean architecture - active orders only)
+     */
+    public function render_manager_orders_express() {
+        // Check permissions with fallback to admin
+        if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_options')) {
+            wp_die(__('You do not have permission to access this page.', 'orders-jet'));
+        }
+        
+        // Load the orders express template
+        $template_path = ORDERS_JET_PLUGIN_DIR . 'templates/admin/dashboard-manager-orders-express.php';
+        if (file_exists($template_path)) {
+            include $template_path;
+        } else {
+            wp_die(__('Orders Express template not found.', 'orders-jet'));
         }
     }
     
