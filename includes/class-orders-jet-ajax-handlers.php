@@ -3773,7 +3773,7 @@ class Orders_Jet_AJAX_Handlers {
             }
             $items_html .= '</td>';
             $items_html .= '<td class="thermal-center">' . $item->get_quantity() . '</td>';
-            $items_html .= '<td class="thermal-right">' . number_format($item->get_total(), 2) . '</td>';
+            $items_html .= '<td class="thermal-right">' . number_format(floatval($item->get_total()), 2) . '</td>';
             $items_html .= '</tr>';
         }
         
@@ -3975,11 +3975,11 @@ class Orders_Jet_AJAX_Handlers {
         <div class="thermal-separator"></div>
         
         <table class="thermal-table">
-            <tr><td>Subtotal:</td><td class="thermal-right">' . number_format($order->get_subtotal(), 2) . ' ' . $currency . '</td></tr>
-            ' . ($order->get_total_tax() > 0 ? '<tr><td>Tax:</td><td class="thermal-right">' . number_format($order->get_total_tax(), 2) . ' ' . $currency . '</td></tr>' : '') . '
+            <tr><td>Subtotal:</td><td class="thermal-right">' . number_format(floatval($order->get_subtotal()), 2) . ' ' . $currency . '</td></tr>
+            ' . ($order->get_total_tax() > 0 ? '<tr><td>Tax:</td><td class="thermal-right">' . number_format(floatval($order->get_total_tax()), 2) . ' ' . $currency . '</td></tr>' : '') . '
             <tr class="thermal-total">
                 <td>TOTAL:</td>
-                <td class="thermal-right">' . number_format($order->get_total(), 2) . ' ' . $currency . '</td>
+                <td class="thermal-right">' . number_format(floatval($order->get_total()), 2) . ' ' . $currency . '</td>
             </tr>
         </table>
         

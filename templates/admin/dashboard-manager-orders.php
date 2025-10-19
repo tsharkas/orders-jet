@@ -468,91 +468,9 @@ jQuery(document).ready(function($) {
         }
     });
     
-    // Complete Order - Use event delegation for dynamic buttons
-    $(document).on('click', '.oj-complete-order', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        console.log('🎯 EVENT DELEGATION Complete Order clicked!', e.target);
-        console.log('Button data:', $(this).data());
-        console.log('Button classes:', $(this).attr('class'));
-        console.log('Event target classes:', $(e.target).attr('class'));
-        
-        const orderId = $(this).data('order-id');
-        const orderType = $(this).data('type');
-        
-        console.log('Order ID from delegation:', orderId, 'Order Type:', orderType);
-        
-        if (!orderId) {
-            console.error('❌ No order ID found on Complete Order button in delegation');
-            return;
-        }
-        
-        // Show payment method selection
-        const paymentMethods = [
-            {value: 'cash', text: '<?php _e('Cash', 'orders-jet'); ?>'},
-            {value: 'card', text: '<?php _e('Card', 'orders-jet'); ?>'},
-            {value: 'online', text: '<?php _e('Online Payment', 'orders-jet'); ?>'}
-        ];
-        
-        let paymentOptions = '';
-        paymentMethods.forEach(method => {
-            paymentOptions += `<option value="${method.value}">${method.text}</option>`;
-        });
-        
-        const modal = $(`
-            <div class="oj-payment-modal-overlay">
-                <div class="oj-payment-modal">
-                    <h3><?php _e('Complete Order', 'orders-jet'); ?> #${orderId}</h3>
-                    <p><?php _e('Select payment method:', 'orders-jet'); ?></p>
-                    <select class="oj-payment-method">
-                        ${paymentOptions}
-                    </select>
-                    <div class="oj-modal-actions">
-                        <button class="button button-primary oj-confirm-complete">
-                            <?php _e('Complete Order', 'orders-jet'); ?>
-                        </button>
-                        <button class="button oj-cancel-complete">
-                            <?php _e('Cancel', 'orders-jet'); ?>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `);
-        
-        $('body').append(modal);
-        
-        // Confirm completion
-        modal.find('.oj-confirm-complete').on('click', function() {
-            const paymentMethod = modal.find('.oj-payment-method').val();
-            modal.remove();
-            
-            $.post(ajaxurl, {
-                action: 'oj_complete_individual_order',
-                order_id: orderId,
-                payment_method: paymentMethod,
-                nonce: '<?php echo wp_create_nonce('oj_dashboard_nonce'); ?>'
-            }, function(response) {
-                if (response.success) {
-                    // Update card without page reload
-                    updateOrderCard(response.data.card_updates);
-                    // Update filter counts
-                    updateFilterCounts();
-                    // Show success modal with thermal print option
-                    showSuccessModalWithThermalPrint(orderId, response.data.thermal_invoice_url);
-                } else {
-                    alert(response.data.message || '<?php _e('Error occurred', 'orders-jet'); ?>');
-                }
-            }).fail(function() {
-                alert('<?php _e('Network error occurred', 'orders-jet'); ?>');
-            });
-        });
-        
-        // Cancel
-        modal.find('.oj-cancel-complete').on('click', function() {
-            modal.remove();
-        });
-    });
+    // Complete Order - DISABLED: Using direct binding instead of event delegation
+    // The event delegation handler has been disabled to prevent conflicts with direct binding
+    // All Complete Order functionality is now handled by the direct binding in updateOrderCard()
     
     // Close Table
     $('.oj-close-table').on('click', function() {
@@ -700,8 +618,18 @@ jQuery(document).ready(function($) {
                 $actionBtn.attr('data-order-id', cardUpdates.order_id);
                 $actionBtn.attr('data-type', 'individual');
                 
-                // Bind Complete Order functionality directly as backup
-                $actionBtn.off('click').on('click', function(e) {
+                // 🔥 CRITICAL: Remove ALL original handlers and attributes
+                $actionBtn.removeAttr('onclick');           // Remove onclick handlers
+                $actionBtn.removeAttr('formaction');        // Remove form actions
+                $actionBtn.removeAttr('form');              // Remove form associations
+                $actionBtn.attr('type', 'button');          // Change from submit to button
+                $actionBtn.prop('disabled', false);         // Ensure button is enabled
+                
+                // Remove ALL existing click handlers first
+                $actionBtn.off('click');
+                
+                // Bind Complete Order functionality directly
+                $actionBtn.on('click', function(e) {
                     e.preventDefault();
                     e.stopPropagation();
                     
@@ -730,11 +658,7 @@ jQuery(document).ready(function($) {
                 console.log('🔍 Button after binding:', $actionBtn[0]);
                 console.log('🔍 Button clickable test:', $actionBtn.is(':visible'), $actionBtn.prop('disabled'));
                 
-                // Add a simple test click handler to verify the button works
-                $actionBtn.on('click.test', function() {
-                    console.log('🧪 TEST CLICK HANDLER TRIGGERED!');
-                    alert('Test click works!');
-                });
+                // Test click handler removed - not needed anymore
                 
                 // Test if there are any CSS issues preventing clicks
                 $actionBtn.css({
