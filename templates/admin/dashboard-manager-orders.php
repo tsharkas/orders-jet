@@ -605,38 +605,44 @@ jQuery(document).ready(function($) {
         const firstChildCard = $(`.oj-order-card[data-order-id="${cardUpdates.child_order_ids[0]}"]`);
         
         if (firstChildCard.length) {
-            // Create the new combined order card HTML
+            // Create the new combined order card HTML (matching individual order card structure)
             const combinedCardHtml = `
                 <div class="oj-order-card" data-order-id="${combinedOrder.order_id}" data-status="${combinedOrder.status}" data-type="${combinedOrder.order_type}">
-                    <div class="oj-card-header">
-                        <div class="oj-order-info">
-                            <h3 class="oj-order-number">#${combinedOrder.order_id} | ${combinedOrder.table_number}</h3>
-                            <span class="oj-order-type-badge dinein">
-                                🏢 <?php _e('DINE IN', 'orders-jet'); ?>
-                            </span>
-                        </div>
-                        <span class="oj-status-badge completed"><?php _e('READY FOR PAYMENT', 'orders-jet'); ?></span>
-                    </div>
                     
-                    <div class="oj-card-body">
-                        <div class="oj-order-meta">
-                            <span class="oj-meta-item">
-                                <strong><?php _e('Table Guest', 'orders-jet'); ?></strong>
-                            </span>
-                            <span class="oj-meta-item">
-                                ⏰ ${combinedOrder.date}
-                            </span>
-                            <span class="oj-meta-item">
-                                📦 ${combinedOrder.item_count} <?php _e('items', 'orders-jet'); ?>
-                            </span>
+                    <!-- Card Header -->
+                    <div class="oj-card-header">
+                        <div>
+                            <h3 class="oj-order-id">
+                                #${combinedOrder.order_id} | ${combinedOrder.table_number}
+                            </h3>
                         </div>
                         
-                        <div class="oj-order-total">
-                            ${combinedOrder.total} <?php echo get_woocommerce_currency(); ?>
+                        <div class="oj-status-badges">
+                            <span class="oj-type-badge dinein">
+                                🏢 <?php _e('DINE IN', 'orders-jet'); ?>
+                            </span>
+                            <span class="oj-status-badge completed">
+                                <?php _e('READY FOR PAYMENT', 'orders-jet'); ?>
+                            </span>
                         </div>
                     </div>
                     
-                    <div class="oj-card-footer">
+                    <!-- Card Content -->
+                    <div class="oj-card-content">
+                        <div class="oj-customer-name"><?php _e('Table Guest', 'orders-jet'); ?></div>
+                        
+                        <div class="oj-order-meta">
+                            <div class="oj-order-time">
+                                🕐 ${combinedOrder.date}
+                            </div>
+                            <div class="oj-order-total">
+                                ${combinedOrder.total} <?php echo get_woocommerce_currency(); ?>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Card Actions -->
+                    <div class="oj-card-actions">
                         <button class="oj-action-btn success oj-print-invoice-combined" 
                                 data-order-id="${combinedOrder.order_id}"
                                 data-invoice-url="${combinedOrder.invoice_url}"
@@ -644,7 +650,7 @@ jQuery(document).ready(function($) {
                                 data-type="combined">
                             🖨️ <?php _e('Print Invoice', 'orders-jet'); ?>
                         </button>
-                        <button class="oj-action-btn secondary oj-view-details" 
+                        <button class="oj-action-btn secondary oj-view-order" 
                                 data-order-id="${combinedOrder.order_id}">
                             👁️ <?php _e('Details', 'orders-jet'); ?>
                         </button>

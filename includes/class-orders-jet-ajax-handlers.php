@@ -3482,12 +3482,13 @@ class Orders_Jet_AJAX_Handlers {
             
             error_log('Orders Jet: ========== TABLE GROUP CLOSURE COMPLETE ==========');
             
-            // Generate thermal invoice URL for table
+            // Generate thermal invoice URL for consolidated order
             $thermal_invoice_url = add_query_arg(array(
-                'table' => $table_number,
-                'payment_method' => $payment_method,
-                'session' => $session_id
-            ), ORDERS_JET_PLUGIN_URL . 'table-invoice.php');
+                'action' => 'oj_get_order_invoice',
+                'order_id' => $consolidated_order->get_id(),
+                'print' => '1',
+                'nonce' => wp_create_nonce('oj_get_invoice')
+            ), admin_url('admin-ajax.php'));
 
             // Get combined order items for display
             $combined_items = array();
