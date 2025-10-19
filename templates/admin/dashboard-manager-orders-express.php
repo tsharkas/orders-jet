@@ -21,15 +21,30 @@ if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manag
 wp_enqueue_style('oj-manager-orders-cards', ORDERS_JET_PLUGIN_URL . 'assets/css/manager-orders-cards.css', array(), ORDERS_JET_VERSION);
 
 /**
- * Helper function: Get clean order method with minimal fallback
+ * Helper function: Get clean order method with proper fallback logic
  */
 function oj_express_get_order_method($order) {
     $method = $order->get_meta('exwf_odmethod');
     
-    // Only fallback for dine-in (table number exists)
+    // If no exwf_odmethod, determine from other meta with same logic as main orders page
     if (empty($method)) {
-        $table = $order->get_meta('_oj_table_number');
-        return !empty($table) ? 'dinein' : '';
+        $table_number = $order->get_meta('_oj_table_number');
+        
+        if (!empty($table_number)) {
+            $method = 'dinein';
+        } else {
+            // Check if it's a delivery order by looking at shipping vs billing
+            $billing_address = $order->get_billing_address_1();
+            $shipping_address = $order->get_shipping_address_1();
+            
+            // If shipping address exists and differs from billing, likely delivery
+            if (!empty($shipping_address) && $shipping_address !== $billing_address) {
+                $method = 'delivery';
+            } else {
+                // Default to takeaway
+                $method = 'takeaway';
+            }
+        }
     }
     
     return $method;
@@ -69,15 +84,13 @@ function oj_express_update_filter_counts(&$counts, $order_data) {
         $counts['pending']++;
     }
     
-    // Count by method (only for known methods)
-    if (!empty($method)) {
-        if ($method === 'dinein') {
-            $counts['dinein']++;
-        } elseif ($method === 'takeaway') {
-            $counts['takeaway']++;
-        } elseif ($method === 'delivery') {
-            $counts['delivery']++;
-        }
+    // Count by method (all methods including fallback)
+    if ($method === 'dinein') {
+        $counts['dinein']++;
+    } elseif ($method === 'takeaway') {
+        $counts['takeaway']++;
+    } elseif ($method === 'delivery') {
+        $counts['delivery']++;
     }
 }
 
@@ -206,7 +219,7 @@ foreach ($active_orders as $order) {
                     'takeaway' => array('icon' => '📦', 'text' => __('Takeaway', 'orders-jet'), 'class' => 'takeaway'),
                     'delivery' => array('icon' => '🚚', 'text' => __('Delivery', 'orders-jet'), 'class' => 'delivery')
                 );
-                $type_badge = $type_badges[$method] ?? array('icon' => '❓', 'text' => __('Unknown', 'orders-jet'), 'class' => 'unknown');
+                $type_badge = $type_badges[$method] ?? $type_badges['takeaway']; // Default to takeaway if method not found
                 ?>
                 
                 <div class="oj-order-card" 
