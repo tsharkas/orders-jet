@@ -686,17 +686,94 @@ jQuery(document).ready(function($) {
                     const orderId = $(this).data('order-id');
                     
                     if (invoiceUrl) {
-                        console.log('🖨️ Opening invoice with auto-print for order:', orderId);
+                        console.log('🖨️ Opening invoice with direct print for order:', orderId);
                         
-                        // Open invoice in new tab and auto-print
-                        const printWindow = window.open(invoiceUrl, '_blank');
-                        printWindow.onload = function() {
+                        // Create hidden iframe for direct printing
+                        const iframe = document.createElement('iframe');
+                        iframe.style.display = 'none';
+                        iframe.style.position = 'absolute';
+                        iframe.style.left = '-9999px';
+                        iframe.style.top = '-9999px';
+                        iframe.style.width = '1px';
+                        iframe.style.height = '1px';
+                        iframe.src = invoiceUrl;
+                        document.body.appendChild(iframe);
+                        
+                        // Set up error handling
+                        let printAttempted = false;
+                        const printTimeout = setTimeout(() => {
+                            if (!printAttempted) {
+                                console.error('❌ Print timeout - invoice failed to load');
+                                showPrintError('Invoice failed to load. Please try again.');
+                                cleanupIframe();
+                            }
+                        }, 10000); // 10 second timeout
+                        
+                        iframe.onload = function() {
+                            console.log('✅ Invoice loaded, preparing to print...');
                             setTimeout(() => {
-                                printWindow.print();
-                                // Close after printing (optional)
-                                setTimeout(() => printWindow.close(), 1000);
-                            }, 500); // Small delay to ensure page loads
+                                try {
+                                    printAttempted = true;
+                                    clearTimeout(printTimeout);
+                                    
+                                    // Attempt to print
+                                    iframe.contentWindow.print();
+                                    console.log('🖨️ Print dialog opened successfully');
+                                    
+                                    // Clean up iframe after printing
+                                    setTimeout(() => {
+                                        cleanupIframe();
+                                    }, 1000);
+                                    
+                                } catch (error) {
+                                    console.error('❌ Print failed:', error);
+                                    showPrintError('Print dialog could not be opened. Please try again.');
+                                    cleanupIframe();
+                                }
+                            }, 500); // Small delay to ensure content loads
                         };
+                        
+                        iframe.onerror = function() {
+                            console.error('❌ Invoice failed to load');
+                            clearTimeout(printTimeout);
+                            showPrintError('Invoice could not be loaded. Please check the URL and try again.');
+                            cleanupIframe();
+                        };
+                        
+                        // Cleanup function
+                        function cleanupIframe() {
+                            if (iframe && iframe.parentNode) {
+                                document.body.removeChild(iframe);
+                                console.log('🧹 Iframe cleaned up');
+                            }
+                        }
+                        
+                        // Show error message function
+                        function showPrintError(message) {
+                            // Create a more user-friendly error notification
+                            const errorNotification = $(`
+                                <div class="oj-error-notification">
+                                    <span>❌ ${message}</span>
+                                    <button class="oj-error-close">×</button>
+                                </div>
+                            `);
+                            
+                            $('body').append(errorNotification);
+                            
+                            // Auto-remove after 5 seconds
+                            setTimeout(() => {
+                                errorNotification.fadeOut(300, function() {
+                                    $(this).remove();
+                                });
+                            }, 5000);
+                            
+                            // Manual close button
+                            errorNotification.find('.oj-error-close').on('click', function() {
+                                errorNotification.fadeOut(300, function() {
+                                    $(this).remove();
+                                });
+                            });
+                        }
                         
                         // Update button to "Paid?" after print dialog opens
                         setTimeout(() => {
