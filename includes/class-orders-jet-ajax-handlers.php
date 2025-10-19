@@ -3490,7 +3490,7 @@ class Orders_Jet_AJAX_Handlers {
             ), ORDERS_JET_PLUGIN_URL . 'table-invoice.php');
 
             wp_send_json_success(array(
-                'message' => __('Table closed successfully', 'orders-jet'),
+                'message' => __('Table closed and invoice generated', 'orders-jet'),
                 'consolidated_order_id' => $consolidated_order->get_id(),
                 'subtotal' => $consolidated_order->get_subtotal(),
                 'total_tax' => $consolidated_order->get_total_tax(),
@@ -3501,9 +3501,14 @@ class Orders_Jet_AJAX_Handlers {
                 'child_order_ids' => $child_order_ids,
                 'tax_method' => 'consolidated_woocommerce',
                 'card_updates' => array(
-                    'action' => 'remove_cards',
+                    'action' => 'update_to_print_invoice',
                     'order_ids' => $child_order_ids,
-                    'table_number' => $table_number
+                    'table_number' => $table_number,
+                    'invoice_url' => $thermal_invoice_url,
+                    'button_text' => '🖨️ Print Invoice',
+                    'button_class' => 'oj-print-invoice-table',
+                    'status_badge_text' => 'READY FOR PAYMENT',
+                    'status_badge_class' => 'completed'
                 )
             ));
             

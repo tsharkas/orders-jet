@@ -594,6 +594,209 @@ jQuery(document).ready(function($) {
     // ===== AJAX CARD UPDATE FUNCTIONS =====
     
     /**
+     * Update multiple table order cards to Print Invoice state
+     */
+    function updateTableOrderCards(cardUpdates) {
+        if (cardUpdates.action === 'update_to_print_invoice' && cardUpdates.order_ids) {
+            console.log('🔄 Updating table order cards to Print Invoice state');
+            cardUpdates.order_ids.forEach(orderId => {
+                const $card = $(`.oj-order-card[data-order-id="${orderId}"]`);
+                if ($card.length) {
+                    // Update status badge
+                    const $statusBadge = $card.find('.oj-status-badge');
+                    $statusBadge.text(cardUpdates.status_badge_text);
+                    $statusBadge.removeClass('processing pending completed ready waiting-payment');
+                    $statusBadge.addClass(cardUpdates.status_badge_class);
+                    
+                    // Update the first button (action button)
+                    const $actionBtn = $card.find('.oj-action-btn:first');
+                    $actionBtn.text(cardUpdates.button_text);
+                    $actionBtn.removeClass('oj-mark-ready oj-complete-order oj-thermal-print oj-close-table oj-print-invoice oj-print-invoice-table oj-confirm-payment');
+                    $actionBtn.addClass(cardUpdates.button_class);
+                    
+                    // Set data attributes for Print Invoice functionality
+                    $actionBtn.attr('data-invoice-url', cardUpdates.invoice_url || '');
+                    $actionBtn.attr('data-order-id', orderId);
+                    $actionBtn.attr('data-table-number', cardUpdates.table_number || '');
+                    $actionBtn.attr('data-type', 'table');
+                    
+                    // Remove old handlers and attributes
+                    $actionBtn.removeAttr('onclick');
+                    $actionBtn.removeAttr('formaction');
+                    $actionBtn.removeAttr('form');
+                    $actionBtn.attr('type', 'button');
+                    $actionBtn.prop('disabled', false);
+                    $actionBtn.off('click');
+                    
+                    // Bind Print Invoice functionality for table orders
+                    $actionBtn.on('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        const invoiceUrl = $(this).data('invoice-url');
+                        const orderId = $(this).data('order-id');
+                        const tableNumber = $(this).data('table-number');
+                        
+                        if (invoiceUrl) {
+                            console.log('🖨️ Opening table invoice with direct print for order:', orderId);
+                            
+                            // Create hidden iframe for direct printing
+                            const iframe = document.createElement('iframe');
+                            iframe.style.display = 'none';
+                            iframe.style.position = 'absolute';
+                            iframe.style.left = '-9999px';
+                            iframe.style.top = '-9999px';
+                            iframe.style.width = '1px';
+                            iframe.style.height = '1px';
+                            iframe.src = invoiceUrl;
+                            document.body.appendChild(iframe);
+                            
+                            let printAttempted = false;
+                            const printTimeout = setTimeout(() => {
+                                if (!printAttempted) {
+                                    console.error('❌ Print timeout - invoice failed to load');
+                                    showPrintError('Invoice failed to load. Please try again.');
+                                    cleanupIframe();
+                                }
+                            }, 10000);
+                            
+                            iframe.onload = function() {
+                                console.log('✅ Invoice loaded, preparing to print...');
+                                setTimeout(() => {
+                                    try {
+                                        printAttempted = true;
+                                        clearTimeout(printTimeout);
+                                        iframe.contentWindow.print();
+                                        console.log('🖨️ Print dialog opened successfully');
+                                        setTimeout(() => {
+                                            cleanupIframe();
+                                        }, 1000);
+                                    } catch (error) {
+                                        console.error('❌ Print failed:', error);
+                                        showPrintError('Print dialog could not be opened. Please try again.');
+                                        cleanupIframe();
+                                    }
+                                }, 500);
+                            };
+                            
+                            iframe.onerror = function() {
+                                console.error('❌ Invoice failed to load');
+                                clearTimeout(printTimeout);
+                                showPrintError('Invoice could not be loaded. Please check the URL and try again.');
+                                cleanupIframe();
+                            };
+                            
+                            function cleanupIframe() {
+                                if (iframe && iframe.parentNode) {
+                                    document.body.removeChild(iframe);
+                                    console.log('🧹 Iframe cleaned up');
+                                }
+                            }
+                            
+                            function showPrintError(message) {
+                                const errorNotification = $(`
+                                    <div class="oj-error-notification">
+                                        <span>❌ ${message}</span>
+                                        <button class="oj-error-close">×</button>
+                                    </div>
+                                `);
+                                $('body').append(errorNotification);
+                                setTimeout(() => {
+                                    errorNotification.fadeOut(300, function() {
+                                        $(this).remove();
+                                    });
+                                }, 5000);
+                                errorNotification.find('.oj-error-close').on('click', function() {
+                                    errorNotification.fadeOut(300, function() {
+                                        $(this).remove();
+                                    });
+                                });
+                            }
+                            
+                            // Update ALL table order cards to "Paid?" after print dialog opens
+                            setTimeout(() => {
+                                updateTableOrderCardsToPaid(cardUpdates.order_ids, tableNumber);
+                            }, 1000);
+                        }
+                    });
+                    
+                    console.log('Table order card updated to Print Invoice:', {
+                        orderId: orderId,
+                        tableNumber: cardUpdates.table_number,
+                        invoiceUrl: cardUpdates.invoice_url
+                    });
+                }
+            });
+        }
+    }
+    
+    /**
+     * Update all table order cards to Paid? state
+     */
+    function updateTableOrderCardsToPaid(orderIds, tableNumber) {
+        console.log('💰 Updating table order cards to Paid? state');
+        orderIds.forEach(orderId => {
+            const $card = $(`.oj-order-card[data-order-id="${orderId}"]`);
+            if ($card.length) {
+                // Update status badge
+                const $statusBadge = $card.find('.oj-status-badge');
+                $statusBadge.text('WAITING PAYMENT');
+                $statusBadge.removeClass('processing pending completed ready waiting-payment');
+                $statusBadge.addClass('waiting-payment');
+                
+                // Update button
+                const $actionBtn = $card.find('.oj-action-btn:first');
+                $actionBtn.text('Paid?');
+                $actionBtn.removeClass('oj-mark-ready oj-complete-order oj-thermal-print oj-close-table oj-print-invoice oj-print-invoice-table oj-confirm-payment oj-confirm-payment-table');
+                $actionBtn.addClass('oj-confirm-payment-table');
+                
+                // Set data attributes
+                $actionBtn.attr('data-order-id', orderId);
+                $actionBtn.attr('data-type', 'table');
+                $actionBtn.attr('data-table-number', tableNumber);
+                
+                // Remove old handlers
+                $actionBtn.off('click');
+                
+                // Bind Paid? functionality for table orders
+                $actionBtn.on('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const orderId = $(this).data('order-id');
+                    const tableNumber = $(this).data('table-number');
+                    
+                    console.log('💰 Payment confirmation clicked for table order:', orderId, 'table:', tableNumber);
+                    
+                    if (confirm('<?php _e('Confirm payment received for this table?', 'orders-jet'); ?>')) {
+                        $.post(ajaxurl, {
+                            action: 'oj_confirm_payment_received',
+                            order_id: orderId,
+                            order_type: 'table',
+                            table_number: tableNumber,
+                            nonce: '<?php echo wp_create_nonce('oj_dashboard_nonce'); ?>'
+                        }, function(response) {
+                            if (response.success) {
+                                console.log('✅ Payment confirmed, removing all table cards');
+                                // Remove all table order cards
+                                if (response.data.table_order_ids) {
+                                    removeTableOrderCards(response.data.table_order_ids);
+                                }
+                                updateFilterCounts();
+                                showSuccessNotification(response.data.message);
+                            } else {
+                                alert(response.data.message || '<?php _e('Error confirming payment', 'orders-jet'); ?>');
+                            }
+                        }).fail(function() {
+                            alert('<?php _e('Network error occurred', 'orders-jet'); ?>');
+                        });
+                    }
+                });
+            }
+        });
+    }
+    
+    /**
      * Update individual order card without page reload
      */
     function updateOrderCard(cardUpdates) {
@@ -743,8 +946,10 @@ jQuery(document).ready(function($) {
                                 nonce: '<?php echo wp_create_nonce('oj_table_order'); ?>'
                             }, function(response) {
                                 if (response.success) {
-                                    removeTableOrderCards(response.data.card_updates.order_ids);
+                                    // Update all table order cards to Print Invoice state
+                                    updateTableOrderCards(response.data.card_updates);
                                     updateFilterCounts();
+                                    showSuccessNotification(response.data.message);
                                 } else if (response.data && response.data.show_confirmation) {
                                     const confirmMessage = response.data.message + '\n\n<?php _e('Click OK to continue or Cancel to keep the table open.', 'orders-jet'); ?>';
                                     
@@ -757,8 +962,10 @@ jQuery(document).ready(function($) {
                                             nonce: '<?php echo wp_create_nonce('oj_table_order'); ?>'
                                         }, function(retryResponse) {
                                             if (retryResponse.success) {
-                                                removeTableOrderCards(retryResponse.data.card_updates.order_ids);
+                                                // Update all table order cards to Print Invoice state
+                                                updateTableOrderCards(retryResponse.data.card_updates);
                                                 updateFilterCounts();
+                                                showSuccessNotification(retryResponse.data.message);
                                             } else {
                                                 alert(retryResponse.data.message || '<?php _e('Error occurred during table closure', 'orders-jet'); ?>');
                                             }

@@ -596,6 +596,18 @@
     color: white;
 }
 
+/* Print Invoice Button for Table Orders */
+.oj-action-btn.oj-print-invoice-table {
+    background: #0073aa;
+    color: white;
+    font-weight: 500;
+}
+
+.oj-action-btn.oj-print-invoice-table:hover {
+    background: #005a87;
+    color: white;
+}
+
 /* Payment Confirmation Button (Paid?) */
 .oj-action-btn.oj-confirm-payment {
     background: #28a745;
@@ -604,6 +616,18 @@
 }
 
 .oj-action-btn.oj-confirm-payment:hover {
+    background: #218838;
+    color: white;
+}
+
+/* Payment Confirmation Button for Table Orders (Paid?) */
+.oj-action-btn.oj-confirm-payment-table {
+    background: #28a745;
+    color: white;
+    font-weight: 600;
+}
+
+.oj-action-btn.oj-confirm-payment-table:hover {
     background: #218838;
     color: white;
 }
