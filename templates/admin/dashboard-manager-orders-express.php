@@ -26,24 +26,46 @@ wp_enqueue_style('oj-manager-orders-cards', ORDERS_JET_PLUGIN_URL . 'assets/css/
 function oj_express_get_order_method($order) {
     $method = $order->get_meta('exwf_odmethod');
     
+    // Debug logging
+    if (defined('WP_DEBUG') && WP_DEBUG) {
+        error_log("Orders Express Debug - Order #{$order->get_id()}: exwf_odmethod = '{$method}'");
+    }
+    
     // If no exwf_odmethod, determine from other meta with same logic as main orders page
     if (empty($method)) {
         $table_number = $order->get_meta('_oj_table_number');
         
         if (!empty($table_number)) {
             $method = 'dinein';
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log("Orders Express Debug - Order #{$order->get_id()}: Set to dinein (table: {$table_number})");
+            }
         } else {
             // Check if it's a delivery order by looking at shipping vs billing
             $billing_address = $order->get_billing_address_1();
             $shipping_address = $order->get_shipping_address_1();
             
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log("Orders Express Debug - Order #{$order->get_id()}: billing='{$billing_address}', shipping='{$shipping_address}'");
+            }
+            
             // If shipping address exists and differs from billing, likely delivery
             if (!empty($shipping_address) && $shipping_address !== $billing_address) {
                 $method = 'delivery';
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log("Orders Express Debug - Order #{$order->get_id()}: Set to delivery (addresses differ)");
+                }
             } else {
                 // Default to takeaway
                 $method = 'takeaway';
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log("Orders Express Debug - Order #{$order->get_id()}: Set to takeaway (default)");
+                }
             }
+        }
+    } else {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log("Orders Express Debug - Order #{$order->get_id()}: Using exwf_odmethod = '{$method}'");
         }
     }
     
