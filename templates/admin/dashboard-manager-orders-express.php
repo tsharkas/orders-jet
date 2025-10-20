@@ -692,10 +692,9 @@ jQuery(document).ready(function($) {
                 type: 'POST',
                 data: {
                     action: 'oj_close_table_group',
-                    order_id: orderId,
                     table_number: tableNumber,
                     payment_method: paymentMethod,
-                    nonce: '<?php echo wp_create_nonce('oj_dashboard_nonce'); ?>'
+                    nonce: '<?php echo wp_create_nonce('oj_table_order'); ?>'
                 },
                 success: function(response) {
                     if (response.success && response.data.combined_order) {
@@ -712,9 +711,56 @@ jQuery(document).ready(function($) {
                             
                             showExpressNotification('✅ Table closed! Combined order created.', 'success');
                         }, 500);
+                    } else if (response.data && response.data.show_confirmation) {
+                        // Handle processing orders confirmation - same as main orders page
+                        const confirmMessage = response.data.message + '\n\n<?php _e('Click OK to continue or Cancel to keep the table open.', 'orders-jet'); ?>';
+                        
+                        if (confirm(confirmMessage)) {
+                            // User confirmed - retry with force_close flag
+                            $btn.prop('disabled', true).html('⏳ <?php _e('Force Closing...', 'orders-jet'); ?>');
+                            
+                            $.ajax({
+                                url: ajaxurl,
+                                type: 'POST',
+                                data: {
+                                    action: 'oj_close_table_group',
+                                    table_number: tableNumber,
+                                    payment_method: paymentMethod,
+                                    force_close: 'true',
+                                    nonce: '<?php echo wp_create_nonce('oj_table_order'); ?>'
+                                },
+                                success: function(forceResponse) {
+                                    if (forceResponse.success && forceResponse.data.combined_order) {
+                                        // Same success logic as above
+                                        $(`.oj-order-card[data-table-number="${tableNumber}"]`).addClass('oj-card-removing');
+                                        
+                                        setTimeout(() => {
+                                            $(`.oj-order-card[data-table-number="${tableNumber}"]`).remove();
+                                            
+                                            const combinedOrder = forceResponse.data.combined_order;
+                                            const combinedCard = createExpressCombinedOrderCard(combinedOrder);
+                                            $('.oj-orders-grid').prepend(combinedCard);
+                                            
+                                            showExpressNotification('✅ Table force closed! Combined order created.', 'success');
+                                        }, 500);
+                                    } else {
+                                        $btn.prop('disabled', false).html('🍽️ <?php _e('Close Table', 'orders-jet'); ?>');
+                                        showExpressNotification('❌ Failed to force close table', 'error');
+                                    }
+                                },
+                                error: function() {
+                                    $btn.prop('disabled', false).html('🍽️ <?php _e('Close Table', 'orders-jet'); ?>');
+                                    showExpressNotification('❌ Connection error during force close', 'error');
+                                }
+                            });
+                        } else {
+                            // User cancelled - restore button
+                            $btn.prop('disabled', false).html('🍽️ <?php _e('Close Table', 'orders-jet'); ?>');
+                        }
                     } else {
                         $btn.prop('disabled', false).html('🍽️ <?php _e('Close Table', 'orders-jet'); ?>');
-                        showExpressNotification('❌ Failed to close table', 'error');
+                        const errorMessage = response.data && response.data.message ? response.data.message : 'Failed to close table';
+                        showExpressNotification('❌ ' + errorMessage, 'error');
                     }
                 },
                 error: function() {
