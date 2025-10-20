@@ -4,12 +4,29 @@
  * Simple file to debug what's actually stored in the database
  */
 
-// WordPress bootstrap
-require_once('../../../wp-load.php');
+// Enable error reporting for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+// WordPress bootstrap - try different paths
+if (file_exists('../../../wp-load.php')) {
+    require_once('../../../wp-load.php');
+} elseif (file_exists('../../../../wp-load.php')) {
+    require_once('../../../../wp-load.php');
+} elseif (file_exists('../../../../../wp-load.php')) {
+    require_once('../../../../../wp-load.php');
+} else {
+    die('WordPress not found. Please access this file through WordPress admin or adjust the path.');
+}
 
 // Security check
 if (!current_user_can('manage_options')) {
     die('Access denied');
+}
+
+// Check if WooCommerce is loaded
+if (!function_exists('wc_get_orders')) {
+    die('WooCommerce not found or not active');
 }
 
 echo "<h1>🔍 Order Method Debug Test</h1>";
