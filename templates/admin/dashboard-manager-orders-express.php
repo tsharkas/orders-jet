@@ -21,55 +21,33 @@ if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manag
 wp_enqueue_style('oj-manager-orders-cards', ORDERS_JET_PLUGIN_URL . 'assets/css/manager-orders-cards.css', array(), ORDERS_JET_VERSION);
 
 /**
- * Helper function: Get clean order method with proper fallback logic
+ * Helper function: Get order method - EXACT copy from main orders page
  */
 function oj_express_get_order_method($order) {
-    $method = $order->get_meta('exwf_odmethod');
+    $order_method = $order->get_meta('exwf_odmethod');
     
-    // Debug logging
-    if (defined('WP_DEBUG') && WP_DEBUG) {
-        error_log("Orders Express Debug - Order #{$order->get_id()}: exwf_odmethod = '{$method}'");
-    }
-    
-    // If no exwf_odmethod, determine from other meta with same logic as main orders page
-    if (empty($method)) {
-        $table_number = $order->get_meta('_oj_table_number');
+    // If no exwf_odmethod, determine from other meta with better logic
+    if (empty($order_method)) {
+        $table_number_check = $order->get_meta('_oj_table_number');
         
-        if (!empty($table_number)) {
-            $method = 'dinein';
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log("Orders Express Debug - Order #{$order->get_id()}: Set to dinein (table: {$table_number})");
-            }
+        if (!empty($table_number_check)) {
+            $order_method = 'dinein';
         } else {
             // Check if it's a delivery order by looking at shipping vs billing
             $billing_address = $order->get_billing_address_1();
             $shipping_address = $order->get_shipping_address_1();
             
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log("Orders Express Debug - Order #{$order->get_id()}: billing='{$billing_address}', shipping='{$shipping_address}'");
-            }
-            
             // If shipping address exists and differs from billing, likely delivery
             if (!empty($shipping_address) && $shipping_address !== $billing_address) {
-                $method = 'delivery';
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log("Orders Express Debug - Order #{$order->get_id()}: Set to delivery (addresses differ)");
-                }
+                $order_method = 'delivery';
             } else {
                 // Default to takeaway
-                $method = 'takeaway';
-                if (defined('WP_DEBUG') && WP_DEBUG) {
-                    error_log("Orders Express Debug - Order #{$order->get_id()}: Set to takeaway (default)");
-                }
+                $order_method = 'takeaway';
             }
-        }
-    } else {
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log("Orders Express Debug - Order #{$order->get_id()}: Using exwf_odmethod = '{$method}'");
         }
     }
     
-    return $method;
+    return $order_method;
 }
 
 /**
@@ -127,20 +105,6 @@ $active_orders = wc_get_orders(array(
     'order' => 'ASC', // Oldest first for operational priority
     'return' => 'objects'
 ));
-
-// DEBUG: Check actual meta values in database
-if (defined('WP_DEBUG') && WP_DEBUG) {
-    error_log("=== Orders Express Meta Debug ===");
-    foreach ($active_orders as $order) {
-        $order_id = $order->get_id();
-        $exwf_method = get_post_meta($order_id, 'exwf_odmethod', true);
-        $oj_method = get_post_meta($order_id, '_oj_order_method', true);
-        $table_number = get_post_meta($order_id, '_oj_table_number', true);
-        
-        error_log("Order #{$order_id}: exwf_odmethod='{$exwf_method}', _oj_order_method='{$oj_method}', table='{$table_number}'");
-    }
-    error_log("=== End Meta Debug ===");
-}
 
 // ============================================================================
 // DATA PREPARATION - Clean data structure
