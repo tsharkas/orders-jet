@@ -128,6 +128,20 @@ $active_orders = wc_get_orders(array(
     'return' => 'objects'
 ));
 
+// DEBUG: Check actual meta values in database
+if (defined('WP_DEBUG') && WP_DEBUG) {
+    error_log("=== Orders Express Meta Debug ===");
+    foreach ($active_orders as $order) {
+        $order_id = $order->get_id();
+        $exwf_method = get_post_meta($order_id, 'exwf_odmethod', true);
+        $oj_method = get_post_meta($order_id, '_oj_order_method', true);
+        $table_number = get_post_meta($order_id, '_oj_table_number', true);
+        
+        error_log("Order #{$order_id}: exwf_odmethod='{$exwf_method}', _oj_order_method='{$oj_method}', table='{$table_number}'");
+    }
+    error_log("=== End Meta Debug ===");
+}
+
 // ============================================================================
 // DATA PREPARATION - Clean data structure
 // ============================================================================
