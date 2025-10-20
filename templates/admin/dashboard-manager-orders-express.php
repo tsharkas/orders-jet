@@ -526,9 +526,11 @@ jQuery(document).ready(function($) {
                     
                     // Update button based on order type
                     if (updates.button_class === 'oj-close-table') {
+                        const tableNumber = $card.attr('data-table-number');
                         $btn.removeClass('oj-mark-ready')
                             .addClass('oj-close-table')
                             .html('🍽️ <?php _e('Close Table', 'orders-jet'); ?>')
+                            .attr('data-table-number', tableNumber)
                             .prop('disabled', false);
                     } else {
                         $btn.removeClass('oj-mark-ready')
