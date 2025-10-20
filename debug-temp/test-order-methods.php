@@ -149,11 +149,16 @@ foreach ($active_orders as $order) {
     // TEST THE PROPOSED FIX
     echo "<h4>🧪 TESTING PROPOSED FIX:</h4>";
     
-    // Proposed fix function test
-    function test_proposed_fix($order) {
-        // Use CORRECT field name: exwfood_order_method
+    // Proposed fix function test - DUAL FIELD APPROACH
+    function test_dual_field_approach($order) {
         $order_id = $order->get_id();
-        $order_method = get_post_meta($order_id, 'exwfood_order_method', true);
+        
+        // Check BOTH fields - WooFood uses different fields for different order types
+        $method1 = get_post_meta($order_id, 'exwf_odmethod', true);           // For dinein
+        $method2 = get_post_meta($order_id, 'exwfood_order_method', true);    // For takeaway/delivery
+        
+        // Use whichever field has a value
+        $order_method = !empty($method1) ? $method1 : $method2;
         
         // If no exwf_odmethod, determine from other meta with better logic
         if (empty($order_method)) {
@@ -179,20 +184,44 @@ foreach ($active_orders as $order) {
         return $order_method;
     }
     
-    $fixed_method = test_proposed_fix($order);
-    echo "<div class='meta-field'><strong>🔧 PROPOSED FIX RESULT: <span class='detected'>{$fixed_method}</span></strong></div>";
+    $dual_field_method = test_dual_field_approach($order);
+    echo "<div class='meta-field'><strong>🔧 DUAL FIELD APPROACH: <span class='detected'>{$dual_field_method}</span></strong></div>";
     
-    // Compare with current methods
-    if ($fixed_method === $new_detected_method) {
-        echo "<div class='meta-field' style='background: #ccffcc; border-left-color: #00cc00;'><strong>✅ FIX MATCHES DATABASE METHOD</strong> - Proposed fix gives same result as direct database method.</div>";
+    // Show which field was used
+    $method1 = get_post_meta($order_id, 'exwf_odmethod', true);
+    $method2 = get_post_meta($order_id, 'exwfood_order_method', true);
+    
+    if (!empty($method1)) {
+        echo "<div class='meta-field' style='background: #e6f3ff;'>📍 Used: exwf_odmethod = '{$method1}'</div>";
+    } elseif (!empty($method2)) {
+        echo "<div class='meta-field' style='background: #ffe6f3;'>📍 Used: exwfood_order_method = '{$method2}'</div>";
     } else {
-        echo "<div class='meta-field' style='background: #ffffcc; border-left-color: #cccc00;'><strong>⚠️ FIX DIFFERS FROM DATABASE</strong> - Proposed fix gives different result.</div>";
+        echo "<div class='meta-field' style='background: #fff3e6;'>📍 Used: Fallback logic</div>";
     }
     
-    if ($fixed_method !== $old_detected_method) {
-        echo "<div class='meta-field' style='background: #e6f3ff; border-left-color: #0066cc;'><strong>🎯 FIX WILL CHANGE RESULT</strong> - From '{$old_detected_method}' to '{$fixed_method}'</div>";
+    // Compare dual field approach with current methods
+    if ($dual_field_method === $new_detected_method) {
+        echo "<div class='meta-field' style='background: #ccffcc; border-left-color: #00cc00;'><strong>✅ DUAL FIELD MATCHES DATABASE</strong> - Dual field approach gives same result as direct database method.</div>";
     } else {
-        echo "<div class='meta-field' style='background: #f0f0f0; border-left-color: #666;'><strong>➡️ NO CHANGE</strong> - Fix gives same result as current method.</div>";
+        echo "<div class='meta-field' style='background: #ffffcc; border-left-color: #cccc00;'><strong>⚠️ DUAL FIELD DIFFERS</strong> - Dual field approach gives different result.</div>";
+    }
+    
+    if ($dual_field_method !== $old_detected_method) {
+        echo "<div class='meta-field' style='background: #e6f3ff; border-left-color: #0066cc;'><strong>🎯 DUAL FIELD WILL CHANGE RESULT</strong> - From '{$old_detected_method}' to '{$dual_field_method}'</div>";
+    } else {
+        echo "<div class='meta-field' style='background: #f0f0f0; border-left-color: #666;'><strong>➡️ NO CHANGE</strong> - Dual field gives same result as current method.</div>";
+    }
+    
+    // TEST UNIFICATION APPROACH
+    echo "<h4>🔄 TESTING UNIFICATION (exwf_odmethod for all):</h4>";
+    
+    if (!empty($method2) && empty($method1)) {
+        echo "<div class='meta-field' style='background: #fff9e6; border-left-color: #ff9900;'><strong>🔧 UNIFICATION NEEDED</strong> - This order has exwfood_order_method = '{$method2}' but no exwf_odmethod</div>";
+        echo "<div class='meta-field' style='background: #e6ffe6; border-left-color: #009900;'><strong>✅ AFTER UNIFICATION</strong> - Will have exwf_odmethod = '{$method2}'</div>";
+    } elseif (!empty($method1)) {
+        echo "<div class='meta-field' style='background: #e6f3ff; border-left-color: #0066cc;'><strong>✅ ALREADY UNIFIED</strong> - This order already uses exwf_odmethod = '{$method1}'</div>";
+    } else {
+        echo "<div class='meta-field' style='background: #f0f0f0; border-left-color: #666;'><strong>➡️ NO META FIELDS</strong> - This order will use fallback logic</div>";
     }
     
     // Show all meta for this order
