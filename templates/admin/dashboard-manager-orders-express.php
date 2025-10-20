@@ -673,9 +673,9 @@ jQuery(document).ready(function($) {
         // Filter cards with smooth animation
         $cards.each(function() {
             const $card = $(this);
-            const status = $card.data('status');
-            const method = $card.data('method');
-            const kitchenType = $card.data('kitchen-type');
+            const status = $card.attr('data-status');
+            const method = $card.attr('data-method');
+            const kitchenType = $card.attr('data-kitchen-type');
             let showCard = false;
             
             switch (filter) {
