@@ -700,10 +700,6 @@ jQuery(document).ready(function($) {
                 },
                 success: function(response) {
                     if (response.success && response.data.combined_order) {
-                        // Debug: Log the combined order data structure
-                        console.log('Combined order data received:', response.data.combined_order);
-                        console.log('Combined order keys:', Object.keys(response.data.combined_order));
-                        
                         // Remove all child order cards for this table
                         $(`.oj-order-card[data-table-number="${tableNumber}"]`).addClass('oj-card-removing');
                         
@@ -847,21 +843,17 @@ jQuery(document).ready(function($) {
     }
     
     function createExpressCombinedOrderCard(combinedOrder) {
-        console.log('Creating combined order card with data:', combinedOrder);
-        console.log('Order ID field:', combinedOrder.id);
-        console.log('Order ID field (order_id):', combinedOrder.order_id);
-        console.log('All keys:', Object.keys(combinedOrder));
         return $(`
             <div class="oj-order-card oj-combined-card" 
-                 data-order-id="${combinedOrder.id}" 
+                 data-order-id="${combinedOrder.order_id}" 
                  data-status="pending" 
                  data-method="dinein" 
-                 data-table-number="${combinedOrder.table}">
+                 data-table-number="${combinedOrder.table_number}">
                 <div class="oj-card-header">
                     <div class="oj-order-info">
-                        <h3 class="oj-order-number">#${combinedOrder.number}</h3>
-                        <span class="oj-table-number">Table ${combinedOrder.table}</span>
-                        <span class="oj-order-time">Just now</span>
+                        <h3 class="oj-order-number">#${combinedOrder.order_number}</h3>
+                        <span class="oj-table-number">Table ${combinedOrder.table_number}</span>
+                        <span class="oj-order-time">${combinedOrder.date}</span>
                     </div>
                     <div class="oj-order-badges">
                         <span class="oj-status-badge ready">✅ <?php _e('Ready', 'orders-jet'); ?></span>
@@ -871,11 +863,11 @@ jQuery(document).ready(function($) {
                 </div>
                 <div class="oj-card-body">
                     <div class="oj-customer-info">
-                        <span class="oj-customer-name">Table ${combinedOrder.table}</span>
+                        <span class="oj-customer-name">Table ${combinedOrder.table_number}</span>
                         <span class="oj-order-total">${combinedOrder.total}</span>
                     </div>
                     <div class="oj-order-summary">
-                        <span class="oj-item-count">${combinedOrder.items.length} <?php _e('items', 'orders-jet'); ?></span>
+                        <span class="oj-item-count">${combinedOrder.item_count} <?php _e('items', 'orders-jet'); ?></span>
                     </div>
                     <div class="oj-items-preview">
                         ${combinedOrder.items.slice(0, 3).map(item => `<span class="oj-item-preview">${item.quantity}x ${item.name}</span>`).join('')}
@@ -883,10 +875,10 @@ jQuery(document).ready(function($) {
                     </div>
                 </div>
                 <div class="oj-card-actions">
-                    <button class="oj-action-btn primary oj-print-invoice" data-order-id="${combinedOrder.id}" data-invoice-url="${combinedOrder.invoice_url}">
+                    <button class="oj-action-btn primary oj-print-invoice" data-order-id="${combinedOrder.order_id}" data-invoice-url="${combinedOrder.invoice_url}">
                         🖨️ <?php _e('Print Invoice', 'orders-jet'); ?>
                     </button>
-                    <button class="oj-action-btn secondary oj-view-order" data-order-id="${combinedOrder.id}">
+                    <button class="oj-action-btn secondary oj-view-order" data-order-id="${combinedOrder.order_id}">
                         👁️ <?php _e('Details', 'orders-jet'); ?>
                     </button>
                 </div>
