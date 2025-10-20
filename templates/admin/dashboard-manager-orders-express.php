@@ -158,13 +158,12 @@ function oj_express_update_filter_counts(&$counts, $order_data) {
         $counts['delivery']++;
     }
     
-    // Count by kitchen type
-    if ($kitchen_type === 'food') {
+    // Count by kitchen type - mixed orders count in both kitchens
+    if ($kitchen_type === 'food' || $kitchen_type === 'mixed') {
         $counts['food_kitchen']++;
-    } elseif ($kitchen_type === 'beverages') {
+    }
+    if ($kitchen_type === 'beverages' || $kitchen_type === 'mixed') {
         $counts['beverage_kitchen']++;
-    } elseif ($kitchen_type === 'mixed') {
-        $counts['mixed_kitchen']++;
     }
 }
 
@@ -769,6 +768,9 @@ jQuery(document).ready(function($) {
                             $btn.html('🥤✅ <?php _e('Beverages Ready', 'orders-jet'); ?>').prop('disabled', true);
                         }
                         showExpressNotification(`✅ ${kitchenType.charAt(0).toUpperCase() + kitchenType.slice(1)} ready! ${updates.button_text}`, 'success');
+                        
+                        // Update filter counts for partial ready
+                        updateExpressFilterCounts();
                     } else {
                         // Fully ready - replace all buttons with completion button
                         const tableNumber = $card.attr('data-table-number');
@@ -788,6 +790,9 @@ jQuery(document).ready(function($) {
                     // Add update animation
                     $card.addClass('oj-card-updated');
                     setTimeout(() => $card.removeClass('oj-card-updated'), 1000);
+                    
+                    // Update filter counts
+                    updateExpressFilterCounts();
                     
                 } else {
                     $btn.prop('disabled', false);
@@ -846,6 +851,9 @@ jQuery(document).ready(function($) {
                             .attr('data-invoice-url', response.data.card_updates.invoice_url);
                         
                         showExpressNotification('✅ Order completed! Print invoice for payment.', 'success');
+                        
+                        // Update filter counts after completion
+                        updateExpressFilterCounts();
                     } else {
                         $btn.prop('disabled', false).html('✅ <?php _e('Complete', 'orders-jet'); ?>');
                         showExpressNotification('❌ Failed to complete order', 'error');
@@ -926,6 +934,9 @@ jQuery(document).ready(function($) {
                     setTimeout(() => {
                         $card.remove();
                         showExpressNotification('✅ Payment confirmed! Order completed.', 'success');
+                        
+                        // Update filter counts after card removal
+                        updateExpressFilterCounts();
                     }, 500);
                 } else {
                     $btn.prop('disabled', false).html('💰 <?php _e('Paid?', 'orders-jet'); ?>');
@@ -973,6 +984,9 @@ jQuery(document).ready(function($) {
                             $('.oj-orders-grid').prepend(combinedCard);
                             
                             showExpressNotification('✅ Table closed! Combined order created.', 'success');
+                            
+                            // Update filter counts after table closure
+                            updateExpressFilterCounts();
                         }, 500);
                     } else if (response.data && response.data.show_confirmation) {
                         // Handle processing orders confirmation - same as main orders page
@@ -1101,6 +1115,72 @@ jQuery(document).ready(function($) {
         });
         
         setTimeout(() => notification.remove(), 5000);
+    }
+    
+    // Update filter counts based on current visible cards
+    function updateExpressFilterCounts() {
+        const counts = {
+            active: 0,
+            processing: 0,
+            pending: 0,
+            dinein: 0,
+            takeaway: 0,
+            delivery: 0,
+            food_kitchen: 0,
+            beverage_kitchen: 0
+        };
+        
+        // Count all visible cards
+        $('.oj-order-card').each(function() {
+            const $card = $(this);
+            const status = $card.attr('data-status');
+            const method = $card.attr('data-method');
+            const kitchenType = $card.attr('data-kitchen-type');
+            
+            // Count active orders
+            if (status === 'processing' || status === 'pending') {
+                counts.active++;
+            }
+            
+            // Count by status
+            if (status === 'processing') {
+                counts.processing++;
+            } else if (status === 'pending') {
+                counts.pending++;
+            }
+            
+            // Count by method
+            if (method === 'dinein') {
+                counts.dinein++;
+            } else if (method === 'takeaway') {
+                counts.takeaway++;
+            } else if (method === 'delivery') {
+                counts.delivery++;
+            }
+            
+            // Count by kitchen type - mixed orders count in both kitchens
+            if (kitchenType === 'food' || kitchenType === 'mixed') {
+                counts.food_kitchen++;
+            }
+            if (kitchenType === 'beverages' || kitchenType === 'mixed') {
+                counts.beverage_kitchen++;
+            }
+        });
+        
+        // Update filter button counts
+        $('.oj-filter-btn[data-filter="active"] .oj-filter-count').text(counts.active);
+        $('.oj-filter-btn[data-filter="processing"] .oj-filter-count').text(counts.processing);
+        $('.oj-filter-btn[data-filter="pending"] .oj-filter-count').text(counts.pending);
+        $('.oj-filter-btn[data-filter="dinein"] .oj-filter-count').text(counts.dinein);
+        $('.oj-filter-btn[data-filter="takeaway"] .oj-filter-count').text(counts.takeaway);
+        $('.oj-filter-btn[data-filter="delivery"] .oj-filter-count').text(counts.delivery);
+        $('.oj-filter-btn[data-filter="food-kitchen"] .oj-filter-count').text(counts.food_kitchen);
+        $('.oj-filter-btn[data-filter="beverage-kitchen"] .oj-filter-count').text(counts.beverage_kitchen);
+        
+        // Update header stats
+        $('.oj-stat-item:nth-child(1) .oj-stat-number').text(counts.processing);
+        $('.oj-stat-item:nth-child(2) .oj-stat-number').text(counts.pending);
+        $('.oj-stat-item:nth-child(3) .oj-stat-number').text(counts.active);
     }
     
     function createExpressCombinedOrderCard(combinedOrder) {
