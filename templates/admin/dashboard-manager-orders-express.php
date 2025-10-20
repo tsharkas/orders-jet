@@ -700,6 +700,10 @@ jQuery(document).ready(function($) {
                 },
                 success: function(response) {
                     if (response.success && response.data.combined_order) {
+                        // Debug: Log the combined order data structure
+                        console.log('Combined order data received:', response.data.combined_order);
+                        console.log('Combined order keys:', Object.keys(response.data.combined_order));
+                        
                         // Remove all child order cards for this table
                         $(`.oj-order-card[data-table-number="${tableNumber}"]`).addClass('oj-card-removing');
                         
@@ -843,6 +847,10 @@ jQuery(document).ready(function($) {
     }
     
     function createExpressCombinedOrderCard(combinedOrder) {
+        console.log('Creating combined order card with data:', combinedOrder);
+        console.log('Order ID field:', combinedOrder.id);
+        console.log('Order ID field (order_id):', combinedOrder.order_id);
+        console.log('All keys:', Object.keys(combinedOrder));
         return $(`
             <div class="oj-order-card oj-combined-card" 
                  data-order-id="${combinedOrder.id}" 
