@@ -1,0 +1,120 @@
+<?php
+/**
+ * DEBUG: Test Order Method Detection
+ * Simple file to debug what's actually stored in the database
+ */
+
+// WordPress bootstrap
+require_once('../../../wp-load.php');
+
+// Security check
+if (!current_user_can('manage_options')) {
+    die('Access denied');
+}
+
+echo "<h1>🔍 Order Method Debug Test</h1>";
+echo "<style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .order-debug { border: 1px solid #ddd; padding: 15px; margin: 10px 0; background: #f9f9f9; }
+    .meta-field { background: #fff; padding: 5px; margin: 2px 0; border-left: 3px solid #0073aa; }
+    .detected { color: green; font-weight: bold; }
+    .fallback { color: orange; font-weight: bold; }
+    .empty { color: red; }
+</style>";
+
+// Get active orders
+$active_orders = wc_get_orders(array(
+    'status' => array('wc-pending', 'wc-processing'),
+    'limit' => 10,
+    'orderby' => 'date',
+    'order' => 'DESC',
+    'return' => 'objects'
+));
+
+echo "<h2>📊 Found " . count($active_orders) . " Active Orders</h2>";
+
+foreach ($active_orders as $order) {
+    $order_id = $order->get_id();
+    $order_number = $order->get_order_number();
+    $status = $order->get_status();
+    
+    echo "<div class='order-debug'>";
+    echo "<h3>Order #{$order_number} (ID: {$order_id}) - Status: {$status}</h3>";
+    
+    // Check all possible meta fields
+    $exwf_method = $order->get_meta('exwf_odmethod');
+    $oj_method = $order->get_meta('_oj_order_method');
+    $oj_type = $order->get_meta('_oj_order_type');
+    $table_number = $order->get_meta('_oj_table_number');
+    
+    // Also check directly from database
+    $db_exwf = get_post_meta($order_id, 'exwf_odmethod', true);
+    $db_oj_method = get_post_meta($order_id, '_oj_order_method', true);
+    $db_oj_type = get_post_meta($order_id, '_oj_order_type', true);
+    $db_table = get_post_meta($order_id, '_oj_table_number', true);
+    
+    echo "<h4>📋 Meta Fields (via WooCommerce):</h4>";
+    echo "<div class='meta-field'>exwf_odmethod: " . ($exwf_method ? "<span class='detected'>'{$exwf_method}'</span>" : "<span class='empty'>EMPTY</span>") . "</div>";
+    echo "<div class='meta-field'>_oj_order_method: " . ($oj_method ? "<span class='detected'>'{$oj_method}'</span>" : "<span class='empty'>EMPTY</span>") . "</div>";
+    echo "<div class='meta-field'>_oj_order_type: " . ($oj_type ? "<span class='detected'>'{$oj_type}'</span>" : "<span class='empty'>EMPTY</span>") . "</div>";
+    echo "<div class='meta-field'>_oj_table_number: " . ($table_number ? "<span class='detected'>'{$table_number}'</span>" : "<span class='empty'>EMPTY</span>") . "</div>";
+    
+    echo "<h4>💾 Meta Fields (Direct Database):</h4>";
+    echo "<div class='meta-field'>exwf_odmethod: " . ($db_exwf ? "<span class='detected'>'{$db_exwf}'</span>" : "<span class='empty'>EMPTY</span>") . "</div>";
+    echo "<div class='meta-field'>_oj_order_method: " . ($db_oj_method ? "<span class='detected'>'{$db_oj_method}'</span>" : "<span class='empty'>EMPTY</span>") . "</div>";
+    echo "<div class='meta-field'>_oj_order_type: " . ($db_oj_type ? "<span class='detected'>'{$db_oj_type}'</span>" : "<span class='empty'>EMPTY</span>") . "</div>";
+    echo "<div class='meta-field'>_oj_table_number: " . ($db_table ? "<span class='detected'>'{$db_table}'</span>" : "<span class='empty'>EMPTY</span>") . "</div>";
+    
+    // Test fallback logic
+    echo "<h4>🔄 Fallback Logic Test:</h4>";
+    
+    $detected_method = $exwf_method;
+    $detection_source = "exwf_odmethod";
+    
+    if (empty($detected_method)) {
+        if (!empty($table_number)) {
+            $detected_method = 'dinein';
+            $detection_source = "table number fallback";
+        } else {
+            // Address comparison
+            $billing_address = $order->get_billing_address_1();
+            $shipping_address = $order->get_shipping_address_1();
+            
+            echo "<div class='meta-field'>Billing Address: " . ($billing_address ? "'{$billing_address}'" : "EMPTY") . "</div>";
+            echo "<div class='meta-field'>Shipping Address: " . ($shipping_address ? "'{$shipping_address}'" : "EMPTY") . "</div>";
+            
+            if (!empty($shipping_address) && $shipping_address !== $billing_address) {
+                $detected_method = 'delivery';
+                $detection_source = "address comparison (different addresses)";
+            } else {
+                $detected_method = 'takeaway';
+                $detection_source = "default fallback";
+            }
+        }
+    }
+    
+    echo "<div class='meta-field'><strong>🎯 FINAL DETECTED METHOD: <span class='detected'>{$detected_method}</span></strong></div>";
+    echo "<div class='meta-field'><strong>📍 DETECTION SOURCE: <span class='fallback'>{$detection_source}</span></strong></div>";
+    
+    // Show all meta for this order
+    echo "<h4>🗂️ All Order Meta (for reference):</h4>";
+    $all_meta = get_post_meta($order_id);
+    echo "<details><summary>Click to expand all meta fields</summary>";
+    echo "<pre style='background: #f0f0f0; padding: 10px; font-size: 12px;'>";
+    foreach ($all_meta as $key => $values) {
+        echo "{$key}: " . print_r($values, true) . "\n";
+    }
+    echo "</pre></details>";
+    
+    echo "</div>";
+}
+
+echo "<h2>🎯 Summary</h2>";
+echo "<p>This debug shows exactly what meta fields are stored and how the detection logic works.</p>";
+echo "<p><strong>Look for:</strong></p>";
+echo "<ul>";
+echo "<li>Are exwf_odmethod values actually stored?</li>";
+echo "<li>Are the addresses different for delivery orders?</li>";
+echo "<li>Is the fallback logic working correctly?</li>";
+echo "</ul>";
+?>
