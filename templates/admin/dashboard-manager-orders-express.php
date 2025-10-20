@@ -303,6 +303,139 @@ foreach ($active_orders as $order) {
     </div>
 </div>
 
+<!-- Modal CSS for Payment Selection -->
+<style>
+.oj-success-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.oj-success-modal {
+    background: white;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    max-width: 400px;
+    width: 90%;
+    position: relative;
+    text-align: center;
+}
+
+.oj-success-modal h3 {
+    margin: 0 0 15px 0;
+    color: #333;
+    font-size: 20px;
+}
+
+.oj-success-modal p {
+    margin: 0 0 20px 0;
+    color: #666;
+}
+
+.oj-payment-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.oj-payment-btn {
+    background: #0073aa;
+    color: white;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background 0.2s;
+    min-width: 100px;
+}
+
+.oj-payment-btn:hover {
+    background: #005a87;
+}
+
+.oj-payment-btn.cash {
+    background: #28a745;
+}
+
+.oj-payment-btn.cash:hover {
+    background: #218838;
+}
+
+.oj-payment-btn.card {
+    background: #007cba;
+}
+
+.oj-payment-btn.card:hover {
+    background: #005a87;
+}
+
+.oj-payment-btn.other {
+    background: #6c757d;
+}
+
+.oj-payment-btn.other:hover {
+    background: #5a6268;
+}
+
+.oj-modal-close {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: #999;
+    padding: 5px;
+    line-height: 1;
+}
+
+.oj-modal-close:hover {
+    color: #333;
+}
+
+.oj-success-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #28a745;
+    color: white;
+    padding: 15px 20px;
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    z-index: 10000;
+    max-width: 300px;
+}
+
+.oj-success-notification.error {
+    background: #dc3545;
+}
+
+.oj-notification-close {
+    background: none;
+    border: none;
+    color: white;
+    float: right;
+    font-size: 16px;
+    cursor: pointer;
+    margin-left: 10px;
+    padding: 0;
+    line-height: 1;
+}
+</style>
+
 <!-- Clean JavaScript Implementation -->
 <script type="text/javascript">
 jQuery(document).ready(function($) {
