@@ -140,6 +140,55 @@ foreach ($active_orders as $order) {
         echo "<div class='meta-field' style='background: #ccffcc; border-left-color: #00cc00;'><strong>✅ METHODS MATCH</strong> Both give same result.</div>";
     }
     
+    // TEST THE PROPOSED FIX
+    echo "<h4>🧪 TESTING PROPOSED FIX:</h4>";
+    
+    // Proposed fix function test
+    function test_proposed_fix($order) {
+        // Use direct database query instead of WooCommerce API to avoid caching issues
+        $order_id = $order->get_id();
+        $order_method = get_post_meta($order_id, 'exwf_odmethod', true);
+        
+        // If no exwf_odmethod, determine from other meta with better logic
+        if (empty($order_method)) {
+            $table_number_check = get_post_meta($order_id, '_oj_table_number', true);
+            
+            if (!empty($table_number_check)) {
+                $order_method = 'dinein';
+            } else {
+                // Check if it's a delivery order by looking at shipping vs billing
+                $billing_address = $order->get_billing_address_1();
+                $shipping_address = $order->get_shipping_address_1();
+                
+                // If shipping address exists and differs from billing, likely delivery
+                if (!empty($shipping_address) && $shipping_address !== $billing_address) {
+                    $order_method = 'delivery';
+                } else {
+                    // Default to takeaway
+                    $order_method = 'takeaway';
+                }
+            }
+        }
+        
+        return $order_method;
+    }
+    
+    $fixed_method = test_proposed_fix($order);
+    echo "<div class='meta-field'><strong>🔧 PROPOSED FIX RESULT: <span class='detected'>{$fixed_method}</span></strong></div>";
+    
+    // Compare with current methods
+    if ($fixed_method === $new_detected_method) {
+        echo "<div class='meta-field' style='background: #ccffcc; border-left-color: #00cc00;'><strong>✅ FIX MATCHES DATABASE METHOD</strong> - Proposed fix gives same result as direct database method.</div>";
+    } else {
+        echo "<div class='meta-field' style='background: #ffffcc; border-left-color: #cccc00;'><strong>⚠️ FIX DIFFERS FROM DATABASE</strong> - Proposed fix gives different result.</div>";
+    }
+    
+    if ($fixed_method !== $old_detected_method) {
+        echo "<div class='meta-field' style='background: #e6f3ff; border-left-color: #0066cc;'><strong>🎯 FIX WILL CHANGE RESULT</strong> - From '{$old_detected_method}' to '{$fixed_method}'</div>";
+    } else {
+        echo "<div class='meta-field' style='background: #f0f0f0; border-left-color: #666;'><strong>➡️ NO CHANGE</strong> - Fix gives same result as current method.</div>";
+    }
+    
     // Show all meta for this order
     echo "<h4>🗂️ All Order Meta (for reference):</h4>";
     $all_meta = get_post_meta($order_id);
