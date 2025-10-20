@@ -85,13 +85,14 @@ foreach ($active_orders as $order) {
     // Test fallback logic
     echo "<h4>🔄 Fallback Logic Test:</h4>";
     
-    $detected_method = $exwf_method;
-    $detection_source = "exwf_odmethod";
+    // OLD METHOD (WooCommerce API - potentially cached/wrong)
+    $old_detected_method = $exwf_method;
+    $old_detection_source = "exwf_odmethod (WooCommerce API)";
     
-    if (empty($detected_method)) {
+    if (empty($old_detected_method)) {
         if (!empty($table_number)) {
-            $detected_method = 'dinein';
-            $detection_source = "table number fallback";
+            $old_detected_method = 'dinein';
+            $old_detection_source = "table number fallback";
         } else {
             // Address comparison
             $billing_address = $order->get_billing_address_1();
@@ -101,17 +102,43 @@ foreach ($active_orders as $order) {
             echo "<div class='meta-field'>Shipping Address: " . ($shipping_address ? "'{$shipping_address}'" : "EMPTY") . "</div>";
             
             if (!empty($shipping_address) && $shipping_address !== $billing_address) {
-                $detected_method = 'delivery';
-                $detection_source = "address comparison (different addresses)";
+                $old_detected_method = 'delivery';
+                $old_detection_source = "address comparison (different addresses)";
             } else {
-                $detected_method = 'takeaway';
-                $detection_source = "default fallback";
+                $old_detected_method = 'takeaway';
+                $old_detection_source = "default fallback";
             }
         }
     }
     
-    echo "<div class='meta-field'><strong>🎯 FINAL DETECTED METHOD: <span class='detected'>{$detected_method}</span></strong></div>";
-    echo "<div class='meta-field'><strong>📍 DETECTION SOURCE: <span class='fallback'>{$detection_source}</span></strong></div>";
+    // NEW METHOD (Direct Database - reliable)
+    $new_detected_method = $db_exwf; // Use direct database value
+    $new_detection_source = "exwf_odmethod (Direct Database)";
+    
+    if (empty($new_detected_method)) {
+        if (!empty($db_table)) {
+            $new_detected_method = 'dinein';
+            $new_detection_source = "table number fallback (DB)";
+        } else {
+            // Address comparison (same as before)
+            if (!empty($shipping_address) && $shipping_address !== $billing_address) {
+                $new_detected_method = 'delivery';
+                $new_detection_source = "address comparison (different addresses)";
+            } else {
+                $new_detected_method = 'takeaway';
+                $new_detection_source = "default fallback";
+            }
+        }
+    }
+    
+    echo "<div class='meta-field'><strong>❌ OLD METHOD (WooCommerce API): <span class='detected'>{$old_detected_method}</span></strong> - {$old_detection_source}</div>";
+    echo "<div class='meta-field'><strong>✅ NEW METHOD (Direct Database): <span class='detected'>{$new_detected_method}</span></strong> - {$new_detection_source}</div>";
+    
+    if ($old_detected_method !== $new_detected_method) {
+        echo "<div class='meta-field' style='background: #ffcccc; border-left-color: #cc0000;'><strong>⚠️ MISMATCH DETECTED!</strong> Old method gives different result than new method.</div>";
+    } else {
+        echo "<div class='meta-field' style='background: #ccffcc; border-left-color: #00cc00;'><strong>✅ METHODS MATCH</strong> Both give same result.</div>";
+    }
     
     // Show all meta for this order
     echo "<h4>🗂️ All Order Meta (for reference):</h4>";
