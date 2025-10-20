@@ -4326,9 +4326,15 @@ class Orders_Jet_AJAX_Handlers {
             $product_id = $item->get_product_id();
             $variation_id = $item->get_variation_id();
             
-            // Check variation first, then main product
-            $check_id = $variation_id > 0 ? $variation_id : $product_id;
-            $kitchen = get_post_meta($check_id, 'Kitchen', true);
+            // Check variation first, then fall back to main product
+            $kitchen = '';
+            if ($variation_id > 0) {
+                $kitchen = get_post_meta($variation_id, 'Kitchen', true);
+            }
+            // Fall back to main product if variation doesn't have Kitchen field
+            if (empty($kitchen)) {
+                $kitchen = get_post_meta($product_id, 'Kitchen', true);
+            }
             
             if (!empty($kitchen)) {
                 $kitchen_types[] = strtolower(trim($kitchen));
