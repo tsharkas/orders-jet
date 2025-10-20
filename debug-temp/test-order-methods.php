@@ -70,6 +70,9 @@ foreach ($active_orders as $order) {
     $db_oj_type = get_post_meta($order_id, '_oj_order_type', true);
     $db_table = get_post_meta($order_id, '_oj_table_number', true);
     
+    // TEST THE CORRECT FIELD NAME
+    $db_correct_field = get_post_meta($order_id, 'exwfood_order_method', true);
+    
     echo "<h4>📋 Meta Fields (via WooCommerce):</h4>";
     echo "<div class='meta-field'>exwf_odmethod: " . ($exwf_method ? "<span class='detected'>'{$exwf_method}'</span>" : "<span class='empty'>EMPTY</span>") . "</div>";
     echo "<div class='meta-field'>_oj_order_method: " . ($oj_method ? "<span class='detected'>'{$oj_method}'</span>" : "<span class='empty'>EMPTY</span>") . "</div>";
@@ -81,6 +84,9 @@ foreach ($active_orders as $order) {
     echo "<div class='meta-field'>_oj_order_method: " . ($db_oj_method ? "<span class='detected'>'{$db_oj_method}'</span>" : "<span class='empty'>EMPTY</span>") . "</div>";
     echo "<div class='meta-field'>_oj_order_type: " . ($db_oj_type ? "<span class='detected'>'{$db_oj_type}'</span>" : "<span class='empty'>EMPTY</span>") . "</div>";
     echo "<div class='meta-field'>_oj_table_number: " . ($db_table ? "<span class='detected'>'{$db_table}'</span>" : "<span class='empty'>EMPTY</span>") . "</div>";
+    
+    echo "<h4>🎯 CORRECT FIELD TEST:</h4>";
+    echo "<div class='meta-field' style='background: #e6f3ff; border-left-color: #0066cc;'><strong>exwfood_order_method: " . ($db_correct_field ? "<span class='detected'>'{$db_correct_field}'</span>" : "<span class='empty'>EMPTY</span>") . "</strong></div>";
     
     // Test fallback logic
     echo "<h4>🔄 Fallback Logic Test:</h4>";
@@ -145,9 +151,9 @@ foreach ($active_orders as $order) {
     
     // Proposed fix function test
     function test_proposed_fix($order) {
-        // Use direct database query instead of WooCommerce API to avoid caching issues
+        // Use CORRECT field name: exwfood_order_method
         $order_id = $order->get_id();
-        $order_method = get_post_meta($order_id, 'exwf_odmethod', true);
+        $order_method = get_post_meta($order_id, 'exwfood_order_method', true);
         
         // If no exwf_odmethod, determine from other meta with better logic
         if (empty($order_method)) {
