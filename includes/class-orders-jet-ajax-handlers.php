@@ -1438,6 +1438,7 @@ class Orders_Jet_AJAX_Handlers {
         }
         
         $order_id = intval($_POST['order_id']);
+        $kitchen_type = sanitize_text_field($_POST['kitchen_type'] ?? 'food'); // Which kitchen is marking ready
         
         if (!$order_id) {
             wp_send_json_error(array('message' => __('Order ID is required.', 'orders-jet')));
@@ -1460,52 +1461,106 @@ class Orders_Jet_AJAX_Handlers {
         }
         
         try {
-            // Mark order as ready (pending status means ready for pickup/payment)
-            // OPTIMIZED: Use direct post status update for performance
             $order_type = !empty($table_number) ? 'table' : 'pickup';
             
-            // Use proper WooCommerce status change to trigger hooks and processes
-            $order->set_status('pending');
+            // Get or determine kitchen type for this order
+            $order_kitchen_type = $order->get_meta('_oj_kitchen_type');
+            if (empty($order_kitchen_type)) {
+                $order_kitchen_type = $this->get_order_kitchen_type($order);
+                $order->update_meta_data('_oj_kitchen_type', $order_kitchen_type);
+            }
             
-            // Add order note efficiently
-            $order->add_order_note(sprintf(
-                __('Order marked as ready by kitchen staff (%s) - %s order', 'orders-jet'), 
-                wp_get_current_user()->display_name,
-                ucfirst($order_type)
-            ));
+            // Handle dual kitchen logic
+            if ($order_kitchen_type === 'mixed') {
+                // Mark specific kitchen as ready
+                if ($kitchen_type === 'food') {
+                    $order->update_meta_data('_oj_food_kitchen_ready', 'yes');
+                    $order->add_order_note(sprintf(
+                        __('Food items marked as ready by kitchen staff (%s)', 'orders-jet'), 
+                        wp_get_current_user()->display_name
+                    ));
+                } else {
+                    $order->update_meta_data('_oj_beverage_kitchen_ready', 'yes');
+                    $order->add_order_note(sprintf(
+                        __('Beverage items marked as ready by kitchen staff (%s)', 'orders-jet'), 
+                        wp_get_current_user()->display_name
+                    ));
+                }
+                
+                // Check if both kitchens are ready
+                $food_ready = $order->get_meta('_oj_food_kitchen_ready') === 'yes';
+                $beverage_ready = $order->get_meta('_oj_beverage_kitchen_ready') === 'yes';
+                
+                if ($food_ready && $beverage_ready) {
+                    // All kitchens ready - mark as pending (ready for completion)
+                    $order->set_status('pending');
+                    $order->add_order_note(__('All kitchen items ready - order ready for completion', 'orders-jet'));
+                    $button_text = !empty($table_number) ? 'Close Table' : 'Complete';
+                    $button_class = !empty($table_number) ? 'oj-close-table' : 'oj-complete-order';
+                    $success_message = sprintf(__('Order #%d fully ready! All kitchens complete.', 'orders-jet'), $order_id);
+                } else {
+                    // Partial ready - stay in processing
+                    $order->set_status('processing');
+                    $waiting_for = ($food_ready !== 'yes') ? __('Food Kitchen', 'orders-jet') : __('Beverage Kitchen', 'orders-jet');
+                    $button_text = sprintf(__('Waiting for %s', 'orders-jet'), $waiting_for);
+                    $button_class = 'oj-waiting-kitchen';
+                    $success_message = sprintf(__('%s ready! Waiting for %s.', 'orders-jet'), 
+                        ucfirst($kitchen_type), $waiting_for);
+                }
+            } else {
+                // Single kitchen order - normal flow
+                if ($order_kitchen_type === 'food') {
+                    $order->update_meta_data('_oj_food_kitchen_ready', 'yes');
+                } else {
+                    $order->update_meta_data('_oj_beverage_kitchen_ready', 'yes');
+                }
+                
+                $order->set_status('pending');
+                $order->add_order_note(sprintf(
+                    __('Order marked as ready by kitchen staff (%s) - %s order', 'orders-jet'), 
+                    wp_get_current_user()->display_name,
+                    ucfirst($order_type)
+                ));
+                
+                $button_text = !empty($table_number) ? 'Close Table' : 'Complete';
+                $button_class = !empty($table_number) ? 'oj-close-table' : 'oj-complete-order';
+                $success_message = !empty($table_number) 
+                    ? sprintf(__('Table order #%d marked as ready!', 'orders-jet'), $order_id)
+                    : sprintf(__('Pickup order #%d marked as ready!', 'orders-jet'), $order_id);
+            }
             
-            // Save the order (triggers proper WooCommerce status change)
+            // Save the order
             $order->save();
             
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Orders Jet Kitchen: Order #' . $order_id . ' (' . $order_type . ') marked as ready (pending) by user #' . get_current_user_id());
+                error_log('Orders Jet Kitchen: Order #' . $order_id . ' (' . $order_type . ') kitchen ready update by user #' . get_current_user_id());
             }
             
-            // Send notifications to manager and waiter dashboards
-            $this->send_ready_notifications($order, $table_number);
+            // Send notifications if fully ready
+            if ($order->get_status() === 'pending') {
+                $this->send_ready_notifications($order, $table_number);
+            }
             
-            $success_message = !empty($table_number) 
-                ? sprintf(__('Table order #%d marked as ready!', 'orders-jet'), $order_id)
-                : sprintf(__('Pickup order #%d marked as ready!', 'orders-jet'), $order_id);
-            
-            // Determine button text and class based on order type
-            $button_text = !empty($table_number) ? 'Close Table' : 'Complete';
-            $button_class = !empty($table_number) ? 'oj-close-table' : 'oj-complete-order';
+            // Get updated kitchen status for response
+            $kitchen_status = $this->get_kitchen_readiness_status($order);
             
             wp_send_json_success(array(
                 'message' => $success_message,
                 'order_id' => $order_id,
                 'table_number' => $table_number,
                 'order_type' => $order_type,
-                'new_status' => 'pending',
+                'kitchen_type' => $order_kitchen_type,
+                'kitchen_status' => $kitchen_status,
+                'new_status' => $order->get_status(),
                 'card_updates' => array(
                     'order_id' => $order_id,
-                    'new_status' => 'pending',
-                    'status_badge_text' => 'READY',
-                    'status_badge_class' => 'ready',
+                    'new_status' => $order->get_status(),
+                    'status_badge_html' => $this->get_kitchen_status_badge($order),
+                    'kitchen_type_badge_html' => $this->get_kitchen_type_badge($order),
                     'button_text' => $button_text,
                     'button_class' => $button_class,
-                    'table_number' => $table_number
+                    'table_number' => $table_number,
+                    'partial_ready' => ($order_kitchen_type === 'mixed' && $order->get_status() === 'processing')
                 )
             ));
             
@@ -3238,6 +3293,51 @@ class Orders_Jet_AJAX_Handlers {
                 error_log('Orders Jet: Order status analysis - Processing: ' . count($processing_orders) . ', Pending: ' . count($pending_orders) . ', Other: ' . count($other_orders));
             }
             
+            // 3. Check for mixed orders that aren't fully ready (dual kitchen validation)
+            $kitchen_blocking_orders = array();
+            foreach ($table_orders as $order) {
+                $kitchen_type = $order->get_meta('_oj_kitchen_type');
+                if (empty($kitchen_type)) {
+                    $kitchen_type = $this->get_order_kitchen_type($order);
+                    $order->update_meta_data('_oj_kitchen_type', $kitchen_type);
+                    $order->save();
+                }
+                
+                if ($kitchen_type === 'mixed' && $order->get_status() === 'processing') {
+                    $food_ready = $order->get_meta('_oj_food_kitchen_ready') === 'yes';
+                    $beverage_ready = $order->get_meta('_oj_beverage_kitchen_ready') === 'yes';
+                    
+                    if (!$food_ready || !$beverage_ready) {
+                        $pending_kitchens = array();
+                        if (!$food_ready) $pending_kitchens[] = __('Food Kitchen', 'orders-jet');
+                        if (!$beverage_ready) $pending_kitchens[] = __('Beverage Kitchen', 'orders-jet');
+                        
+                        $kitchen_blocking_orders[] = array(
+                            'id' => $order->get_id(),
+                            'pending_kitchens' => $pending_kitchens
+                        );
+                    }
+                }
+            }
+            
+            // Block table closure if mixed orders aren't fully ready
+            if (!empty($kitchen_blocking_orders)) {
+                $error_messages = array();
+                foreach ($kitchen_blocking_orders as $blocking_order) {
+                    $error_messages[] = sprintf(
+                        __('Order #%d is waiting for: %s', 'orders-jet'),
+                        $blocking_order['id'],
+                        implode(', ', $blocking_order['pending_kitchens'])
+                    );
+                }
+                
+                wp_send_json_error(array(
+                    'message' => __('Cannot close table. Some mixed orders are not fully ready:', 'orders-jet') . "\n\n" . implode("\n", $error_messages),
+                    'kitchen_blocking' => true,
+                    'blocking_orders' => $kitchen_blocking_orders
+                ));
+            }
+            
             // Handle processing orders with confirmation
             if (!empty($processing_orders)) {
                 $force_close = isset($_POST['force_close']) && $_POST['force_close'] === 'true';
@@ -3257,8 +3357,19 @@ class Orders_Jet_AJAX_Handlers {
                         'show_confirmation' => true
                     ));
                 } else {
-                    // User confirmed - auto-mark processing orders as ready
+                    // User confirmed - auto-mark processing orders as ready (with kitchen validation)
                     foreach ($processing_orders as $order) {
+                        $kitchen_type = $order->get_meta('_oj_kitchen_type');
+                        if ($kitchen_type === 'mixed') {
+                            // For mixed orders, mark both kitchens as ready
+                            $order->update_meta_data('_oj_food_kitchen_ready', 'yes');
+                            $order->update_meta_data('_oj_beverage_kitchen_ready', 'yes');
+                        } elseif ($kitchen_type === 'food') {
+                            $order->update_meta_data('_oj_food_kitchen_ready', 'yes');
+                        } else {
+                            $order->update_meta_data('_oj_beverage_kitchen_ready', 'yes');
+                        }
+                        
                         $order->set_status('pending');
                         $order->add_order_note(__('Automatically marked as ready during table closure', 'orders-jet'));
                         $order->save();
@@ -4195,6 +4306,156 @@ class Orders_Jet_AJAX_Handlers {
                 error_log('Orders Jet: Error confirming payment: ' . $e->getMessage());
             }
             wp_send_json_error(array('message' => __('Error confirming payment', 'orders-jet')));
+        }
+    }
+    
+    // ========================================================================
+    // DUAL KITCHEN SYSTEM FUNCTIONS
+    // ========================================================================
+    
+    /**
+     * Determine the kitchen type for an order based on its items
+     * 
+     * @param WC_Order $order The WooCommerce order object
+     * @return string 'food', 'beverages', or 'mixed'
+     */
+    private function get_order_kitchen_type($order) {
+        $kitchen_types = array();
+        
+        foreach ($order->get_items() as $item) {
+            $product_id = $item->get_product_id();
+            $variation_id = $item->get_variation_id();
+            
+            // Check variation first, then main product
+            $check_id = $variation_id > 0 ? $variation_id : $product_id;
+            $kitchen = get_post_meta($check_id, 'Kitchen', true);
+            
+            if (!empty($kitchen)) {
+                $kitchen_types[] = strtolower(trim($kitchen));
+            }
+        }
+        
+        // Remove duplicates and determine final kitchen type
+        $unique_types = array_unique($kitchen_types);
+        
+        if (count($unique_types) === 1) {
+            return $unique_types[0];
+        } elseif (count($unique_types) > 1) {
+            return 'mixed';
+        }
+        
+        // Default fallback to food if no kitchen field is set
+        return 'food';
+    }
+    
+    /**
+     * Get kitchen readiness status for an order
+     * 
+     * @param WC_Order $order The WooCommerce order object
+     * @return array Kitchen readiness information
+     */
+    private function get_kitchen_readiness_status($order) {
+        $kitchen_type = $order->get_meta('_oj_kitchen_type');
+        if (empty($kitchen_type)) {
+            // Determine and store kitchen type if not set
+            $kitchen_type = $this->get_order_kitchen_type($order);
+            $order->update_meta_data('_oj_kitchen_type', $kitchen_type);
+            $order->save();
+        }
+        
+        $food_ready = $order->get_meta('_oj_food_kitchen_ready') === 'yes';
+        $beverage_ready = $order->get_meta('_oj_beverage_kitchen_ready') === 'yes';
+        
+        $status = array(
+            'kitchen_type' => $kitchen_type,
+            'food_ready' => $food_ready,
+            'beverage_ready' => $beverage_ready,
+            'all_ready' => false,
+            'waiting_for' => array()
+        );
+        
+        // Determine overall readiness
+        if ($kitchen_type === 'food') {
+            $status['all_ready'] = $food_ready;
+            if (!$food_ready) {
+                $status['waiting_for'][] = 'food';
+            }
+        } elseif ($kitchen_type === 'beverages') {
+            $status['all_ready'] = $beverage_ready;
+            if (!$beverage_ready) {
+                $status['waiting_for'][] = 'beverages';
+            }
+        } elseif ($kitchen_type === 'mixed') {
+            $status['all_ready'] = $food_ready && $beverage_ready;
+            if (!$food_ready) {
+                $status['waiting_for'][] = 'food';
+            }
+            if (!$beverage_ready) {
+                $status['waiting_for'][] = 'beverages';
+            }
+        }
+        
+        return $status;
+    }
+    
+    /**
+     * Get kitchen status badge HTML for display
+     * 
+     * @param WC_Order $order The WooCommerce order object
+     * @return string HTML for kitchen status badge
+     */
+    private function get_kitchen_status_badge($order) {
+        $status = $this->get_kitchen_readiness_status($order);
+        $order_status = $order->get_status();
+        
+        if ($order_status === 'completed') {
+            return '<span class="oj-status-badge completed">✅ ' . __('Completed', 'orders-jet') . '</span>';
+        }
+        
+        if ($order_status === 'pending' && $status['all_ready']) {
+            return '<span class="oj-status-badge ready">✅ ' . __('Ready', 'orders-jet') . '</span>';
+        }
+        
+        if ($status['kitchen_type'] === 'mixed' && $order_status === 'processing') {
+            if ($status['food_ready'] && !$status['beverage_ready']) {
+                return '<span class="oj-status-badge partial">🍕✅ 🥤⏳ ' . __('Waiting for Beverages', 'orders-jet') . '</span>';
+            } elseif (!$status['food_ready'] && $status['beverage_ready']) {
+                return '<span class="oj-status-badge partial">🍕⏳ 🥤✅ ' . __('Waiting for Food', 'orders-jet') . '</span>';
+            } else {
+                return '<span class="oj-status-badge kitchen">🍕⏳ 🥤⏳ ' . __('Both Kitchens Working', 'orders-jet') . '</span>';
+            }
+        } elseif ($order_status === 'processing') {
+            if ($status['kitchen_type'] === 'food') {
+                return '<span class="oj-status-badge kitchen">🍕⏳ ' . __('Food Kitchen', 'orders-jet') . '</span>';
+            } elseif ($status['kitchen_type'] === 'beverages') {
+                return '<span class="oj-status-badge kitchen">🥤⏳ ' . __('Beverage Kitchen', 'orders-jet') . '</span>';
+            }
+        }
+        
+        return '<span class="oj-status-badge kitchen">⏳ ' . __('Kitchen', 'orders-jet') . '</span>';
+    }
+    
+    /**
+     * Get kitchen type badge for order cards
+     * 
+     * @param WC_Order $order The WooCommerce order object
+     * @return string HTML for kitchen type badge
+     */
+    private function get_kitchen_type_badge($order) {
+        $kitchen_type = $order->get_meta('_oj_kitchen_type');
+        if (empty($kitchen_type)) {
+            $kitchen_type = $this->get_order_kitchen_type($order);
+        }
+        
+        switch ($kitchen_type) {
+            case 'food':
+                return '<span class="oj-kitchen-badge food">🍕 ' . __('Food', 'orders-jet') . '</span>';
+            case 'beverages':
+                return '<span class="oj-kitchen-badge beverages">🥤 ' . __('Beverages', 'orders-jet') . '</span>';
+            case 'mixed':
+                return '<span class="oj-kitchen-badge mixed">🍽️ ' . __('Mixed', 'orders-jet') . '</span>';
+            default:
+                return '<span class="oj-kitchen-badge food">🍕 ' . __('Food', 'orders-jet') . '</span>';
         }
     }
     

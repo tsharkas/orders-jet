@@ -51,9 +51,65 @@ function oj_express_get_order_method($order) {
 }
 
 /**
+ * Helper function: Get order kitchen type
+ */
+function oj_express_get_kitchen_type($order) {
+    $kitchen_types = array();
+    
+    foreach ($order->get_items() as $item) {
+        $product_id = $item->get_product_id();
+        $variation_id = $item->get_variation_id();
+        
+        // Check variation first, then main product
+        $check_id = $variation_id > 0 ? $variation_id : $product_id;
+        $kitchen = get_post_meta($check_id, 'Kitchen', true);
+        
+        if (!empty($kitchen)) {
+            $kitchen_types[] = strtolower(trim($kitchen));
+        }
+    }
+    
+    // Remove duplicates and determine final kitchen type
+    $unique_types = array_unique($kitchen_types);
+    
+    if (count($unique_types) === 1) {
+        return $unique_types[0];
+    } elseif (count($unique_types) > 1) {
+        return 'mixed';
+    }
+    
+    // Default fallback to food if no kitchen field is set
+    return 'food';
+}
+
+/**
+ * Helper function: Get kitchen readiness status
+ */
+function oj_express_get_kitchen_status($order) {
+    $kitchen_type = $order->get_meta('_oj_kitchen_type');
+    if (empty($kitchen_type)) {
+        $kitchen_type = oj_express_get_kitchen_type($order);
+    }
+    
+    $food_ready = $order->get_meta('_oj_food_kitchen_ready') === 'yes';
+    $beverage_ready = $order->get_meta('_oj_beverage_kitchen_ready') === 'yes';
+    
+    return array(
+        'kitchen_type' => $kitchen_type,
+        'food_ready' => $food_ready,
+        'beverage_ready' => $beverage_ready,
+        'all_ready' => ($kitchen_type === 'food' && $food_ready) || 
+                      ($kitchen_type === 'beverages' && $beverage_ready) || 
+                      ($kitchen_type === 'mixed' && $food_ready && $beverage_ready)
+    );
+}
+
+/**
  * Helper function: Prepare clean order data
  */
 function oj_express_prepare_order_data($order) {
+    $kitchen_status = oj_express_get_kitchen_status($order);
+    
     return array(
         'id' => $order->get_id(),
         'number' => $order->get_order_number(),
@@ -63,7 +119,9 @@ function oj_express_prepare_order_data($order) {
         'total' => $order->get_total(),
         'date' => $order->get_date_created(),
         'customer' => trim($order->get_billing_first_name() . ' ' . $order->get_billing_last_name()) ?: $order->get_billing_email() ?: __('Guest', 'orders-jet'),
-        'items' => $order->get_items()
+        'items' => $order->get_items(),
+        'kitchen_type' => $kitchen_status['kitchen_type'],
+        'kitchen_status' => $kitchen_status
     );
 }
 
@@ -73,6 +131,7 @@ function oj_express_prepare_order_data($order) {
 function oj_express_update_filter_counts(&$counts, $order_data) {
     $status = $order_data['status'];
     $method = $order_data['method'];
+    $kitchen_type = $order_data['kitchen_type'];
     
     // Count all active orders
     $counts['active']++;
@@ -91,6 +150,15 @@ function oj_express_update_filter_counts(&$counts, $order_data) {
         $counts['takeaway']++;
     } elseif ($method === 'delivery') {
         $counts['delivery']++;
+    }
+    
+    // Count by kitchen type
+    if ($kitchen_type === 'food') {
+        $counts['food_kitchen']++;
+    } elseif ($kitchen_type === 'beverages') {
+        $counts['beverage_kitchen']++;
+    } elseif ($kitchen_type === 'mixed') {
+        $counts['mixed_kitchen']++;
     }
 }
 
@@ -117,7 +185,10 @@ $filter_counts = array(
     'pending' => 0,
     'dinein' => 0,
     'takeaway' => 0,
-    'delivery' => 0
+    'delivery' => 0,
+    'food_kitchen' => 0,
+    'beverage_kitchen' => 0,
+    'mixed_kitchen' => 0
 );
 
 foreach ($active_orders as $order) {
@@ -177,6 +248,14 @@ foreach ($active_orders as $order) {
             🚚 <?php _e('Delivery', 'orders-jet'); ?>
             <span class="oj-filter-count"><?php echo $filter_counts['delivery']; ?></span>
         </button>
+        <button class="oj-filter-btn" data-filter="food-kitchen">
+            🍕 <?php _e('Food Kitchen', 'orders-jet'); ?>
+            <span class="oj-filter-count"><?php echo $filter_counts['food_kitchen']; ?></span>
+        </button>
+        <button class="oj-filter-btn" data-filter="beverage-kitchen">
+            🥤 <?php _e('Beverage Kitchen', 'orders-jet'); ?>
+            <span class="oj-filter-count"><?php echo $filter_counts['beverage_kitchen']; ?></span>
+        </button>
     </div>
 
     <!-- Orders Grid -->
@@ -198,19 +277,45 @@ foreach ($active_orders as $order) {
                 $date_created = $order_data['date'];
                 $customer_name = $order_data['customer'];
                 $items = $order_data['items'];
+                $kitchen_type = $order_data['kitchen_type'];
+                $kitchen_status = $order_data['kitchen_status'];
                 
                 $time_ago = human_time_diff($date_created->getTimestamp(), current_time('timestamp'));
                 $item_count = count($items);
                 
-                // Status badge
+                // Kitchen-aware status badge
                 if ($status === 'pending') {
                     $status_text = __('Ready', 'orders-jet');
                     $status_class = 'ready';
                     $status_icon = '✅';
                 } elseif ($status === 'processing') {
-                    $status_text = __('Kitchen', 'orders-jet');
-                    $status_class = 'cooking';
-                    $status_icon = '👨‍🍳';
+                    if ($kitchen_type === 'mixed') {
+                        if ($kitchen_status['food_ready'] && !$kitchen_status['beverage_ready']) {
+                            $status_text = __('Waiting for Beverages', 'orders-jet');
+                            $status_class = 'partial';
+                            $status_icon = '🍕✅ 🥤⏳';
+                        } elseif (!$kitchen_status['food_ready'] && $kitchen_status['beverage_ready']) {
+                            $status_text = __('Waiting for Food', 'orders-jet');
+                            $status_class = 'partial';
+                            $status_icon = '🍕⏳ 🥤✅';
+                        } else {
+                            $status_text = __('Both Kitchens Working', 'orders-jet');
+                            $status_class = 'kitchen';
+                            $status_icon = '🍕⏳ 🥤⏳';
+                        }
+                    } elseif ($kitchen_type === 'food') {
+                        $status_text = __('Food Kitchen', 'orders-jet');
+                        $status_class = 'kitchen';
+                        $status_icon = '🍕⏳';
+                    } elseif ($kitchen_type === 'beverages') {
+                        $status_text = __('Beverage Kitchen', 'orders-jet');
+                        $status_class = 'kitchen';
+                        $status_icon = '🥤⏳';
+                    } else {
+                        $status_text = __('Kitchen', 'orders-jet');
+                        $status_class = 'kitchen';
+                        $status_icon = '👨‍🍳';
+                    }
                 }
                 
                 // Order type badge
@@ -220,13 +325,24 @@ foreach ($active_orders as $order) {
                     'delivery' => array('icon' => '🚚', 'text' => __('Delivery', 'orders-jet'), 'class' => 'delivery')
                 );
                 $type_badge = $type_badges[$method] ?? $type_badges['takeaway']; // Default to takeaway if method not found
+                
+                // Kitchen type badge
+                $kitchen_badges = array(
+                    'food' => array('icon' => '🍕', 'text' => __('Food', 'orders-jet'), 'class' => 'food'),
+                    'beverages' => array('icon' => '🥤', 'text' => __('Beverages', 'orders-jet'), 'class' => 'beverages'),
+                    'mixed' => array('icon' => '🍽️', 'text' => __('Mixed', 'orders-jet'), 'class' => 'mixed')
+                );
+                $kitchen_badge = $kitchen_badges[$kitchen_type] ?? $kitchen_badges['food'];
                 ?>
                 
                 <div class="oj-order-card" 
                      data-order-id="<?php echo esc_attr($order_id); ?>" 
                      data-status="<?php echo esc_attr($status); ?>"
                      data-method="<?php echo esc_attr($method); ?>"
-                     data-table-number="<?php echo esc_attr($table_number); ?>">
+                     data-table-number="<?php echo esc_attr($table_number); ?>"
+                     data-kitchen-type="<?php echo esc_attr($kitchen_type); ?>"
+                     data-food-ready="<?php echo $kitchen_status['food_ready'] ? 'yes' : 'no'; ?>"
+                     data-beverage-ready="<?php echo $kitchen_status['beverage_ready'] ? 'yes' : 'no'; ?>">
                      
                     <!-- Card Header -->
                     <div class="oj-card-header">
@@ -243,6 +359,9 @@ foreach ($active_orders as $order) {
                             </span>
                             <span class="oj-type-badge <?php echo esc_attr($type_badge['class']); ?>">
                                 <?php echo $type_badge['icon']; ?> <?php echo esc_html($type_badge['text']); ?>
+                            </span>
+                            <span class="oj-kitchen-badge <?php echo esc_attr($kitchen_badge['class']); ?>">
+                                <?php echo $kitchen_badge['icon']; ?> <?php echo esc_html($kitchen_badge['text']); ?>
                             </span>
                         </div>
                     </div>
@@ -277,9 +396,28 @@ foreach ($active_orders as $order) {
                     <!-- Card Actions -->
                     <div class="oj-card-actions">
                         <?php if ($status === 'processing') : ?>
-                            <button class="oj-action-btn primary oj-mark-ready" data-order-id="<?php echo esc_attr($order_id); ?>">
-                                🔥 <?php _e('Mark Ready', 'orders-jet'); ?>
-                            </button>
+                            <?php if ($kitchen_type === 'mixed') : ?>
+                                <?php if (!$kitchen_status['food_ready']) : ?>
+                                    <button class="oj-action-btn primary oj-mark-ready-food" data-order-id="<?php echo esc_attr($order_id); ?>" data-kitchen="food">
+                                        🍕 <?php _e('Food Ready', 'orders-jet'); ?>
+                                    </button>
+                                <?php endif; ?>
+                                <?php if (!$kitchen_status['beverage_ready']) : ?>
+                                    <button class="oj-action-btn primary oj-mark-ready-beverage" data-order-id="<?php echo esc_attr($order_id); ?>" data-kitchen="beverages">
+                                        🥤 <?php _e('Beverages Ready', 'orders-jet'); ?>
+                                    </button>
+                                <?php endif; ?>
+                            <?php else : ?>
+                                <button class="oj-action-btn primary oj-mark-ready" data-order-id="<?php echo esc_attr($order_id); ?>" data-kitchen="<?php echo esc_attr($kitchen_type); ?>">
+                                    <?php if ($kitchen_type === 'food') : ?>
+                                        🍕 <?php _e('Food Ready', 'orders-jet'); ?>
+                                    <?php elseif ($kitchen_type === 'beverages') : ?>
+                                        🥤 <?php _e('Beverages Ready', 'orders-jet'); ?>
+                                    <?php else : ?>
+                                        🔥 <?php _e('Mark Ready', 'orders-jet'); ?>
+                                    <?php endif; ?>
+                                </button>
+                            <?php endif; ?>
                         <?php elseif ($status === 'pending') : ?>
                             <?php if (!empty($table_number)) : ?>
                                 <button class="oj-action-btn primary oj-close-table" data-order-id="<?php echo esc_attr($order_id); ?>" data-table-number="<?php echo esc_attr($table_number); ?>">
@@ -434,6 +572,80 @@ foreach ($active_orders as $order) {
     padding: 0;
     line-height: 1;
 }
+
+/* Kitchen-specific styles */
+.oj-kitchen-badge {
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    margin-left: 4px;
+}
+
+.oj-kitchen-badge.food {
+    background: #ff6b35;
+    color: white;
+}
+
+.oj-kitchen-badge.beverages {
+    background: #4ecdc4;
+    color: white;
+}
+
+.oj-kitchen-badge.mixed {
+    background: #45b7d1;
+    color: white;
+}
+
+/* Kitchen status badges */
+.oj-status-badge.partial {
+    background: #ffeaa7;
+    color: #d63031;
+    font-size: 10px;
+}
+
+.oj-status-badge.kitchen {
+    background: #fdcb6e;
+    color: #e17055;
+}
+
+/* Kitchen-specific action buttons */
+.oj-mark-ready-food,
+.oj-mark-ready-beverage {
+    background: var(--primary-color, #007cba);
+    color: white;
+    font-weight: 600;
+}
+
+.oj-mark-ready-food:hover,
+.oj-mark-ready-beverage:hover {
+    background: var(--primary-hover, #005a87);
+}
+
+.oj-mark-ready-food:disabled,
+.oj-mark-ready-beverage:disabled {
+    background: #28a745;
+    cursor: not-allowed;
+}
+
+/* Kitchen filter buttons */
+.oj-filter-btn[data-filter="food-kitchen"] {
+    border-color: #ff6b35;
+}
+
+.oj-filter-btn[data-filter="food-kitchen"].active {
+    background: #ff6b35;
+    color: white;
+}
+
+.oj-filter-btn[data-filter="beverage-kitchen"] {
+    border-color: #4ecdc4;
+}
+
+.oj-filter-btn[data-filter="beverage-kitchen"].active {
+    background: #4ecdc4;
+    color: white;
+}
 </style>
 
 <!-- Clean JavaScript Implementation -->
@@ -458,6 +670,7 @@ jQuery(document).ready(function($) {
             const $card = $(this);
             const status = $card.data('status');
             const method = $card.data('method');
+            const kitchenType = $card.data('kitchen-type');
             let showCard = false;
             
             switch (filter) {
@@ -479,6 +692,12 @@ jQuery(document).ready(function($) {
                 case 'delivery':
                     showCard = (method === 'delivery');
                     break;
+                case 'food-kitchen':
+                    showCard = (kitchenType === 'food' || kitchenType === 'mixed');
+                    break;
+                case 'beverage-kitchen':
+                    showCard = (kitchenType === 'beverages' || kitchenType === 'mixed');
+                    break;
             }
             
             if (showCard) {
@@ -496,8 +715,10 @@ jQuery(document).ready(function($) {
     // ========================================================================
     
     // Mark Ready - Change processing → pending
-    $(document).on('click', '.oj-mark-ready', function() {
+    // Mark Order Ready - Enhanced with dual kitchen support
+    $(document).on('click', '.oj-mark-ready, .oj-mark-ready-food, .oj-mark-ready-beverage', function() {
         const orderId = $(this).data('order-id');
+        const kitchenType = $(this).data('kitchen') || 'food';
         const $btn = $(this);
         const $card = $btn.closest('.oj-order-card');
         
@@ -509,48 +730,82 @@ jQuery(document).ready(function($) {
             data: {
                 action: 'oj_mark_order_ready',
                 order_id: orderId,
+                kitchen_type: kitchenType,
                 nonce: '<?php echo wp_create_nonce('oj_dashboard_nonce'); ?>'
             },
             success: function(response) {
                 if (response.success && response.data.card_updates) {
                     const updates = response.data.card_updates;
                     
-                    // Update status badge
-                    $card.find('.oj-status-badge')
-                        .removeClass('cooking')
-                        .addClass('ready')
-                        .html('✅ <?php _e('Ready', 'orders-jet'); ?>');
+                    // Update status badge with kitchen-aware content
+                    if (updates.status_badge_html) {
+                        $card.find('.oj-status-badge').replaceWith(updates.status_badge_html);
+                    }
                     
-                    // Update card data attribute
-                    $card.attr('data-status', 'pending');
+                    // Update kitchen type badge if provided
+                    if (updates.kitchen_type_badge_html) {
+                        $card.find('.oj-kitchen-badge').replaceWith(updates.kitchen_type_badge_html);
+                    }
                     
-                    // Update button based on order type
-                    if (updates.button_class === 'oj-close-table') {
-                        const tableNumber = $card.attr('data-table-number');
-                        $btn.removeClass('oj-mark-ready')
-                            .addClass('oj-close-table')
-                            .html('🍽️ <?php _e('Close Table', 'orders-jet'); ?>')
-                            .attr('data-table-number', tableNumber)
-                            .prop('disabled', false);
+                    // Update card data attributes
+                    $card.attr('data-status', updates.new_status);
+                    if (response.data.kitchen_status) {
+                        $card.attr('data-food-ready', response.data.kitchen_status.food_ready ? 'yes' : 'no');
+                        $card.attr('data-beverage-ready', response.data.kitchen_status.beverage_ready ? 'yes' : 'no');
+                    }
+                    
+                    // Handle button updates based on kitchen readiness
+                    if (updates.partial_ready) {
+                        // Mixed order - partial ready, update this specific button
+                        if (kitchenType === 'food') {
+                            $btn.html('🍕✅ <?php _e('Food Ready', 'orders-jet'); ?>').prop('disabled', true);
+                        } else {
+                            $btn.html('🥤✅ <?php _e('Beverages Ready', 'orders-jet'); ?>').prop('disabled', true);
+                        }
+                        showExpressNotification(`✅ ${kitchenType.charAt(0).toUpperCase() + kitchenType.slice(1)} ready! ${updates.button_text}`, 'success');
                     } else {
-                        $btn.removeClass('oj-mark-ready')
-                            .addClass('oj-complete-order')
-                            .html('✅ <?php _e('Complete', 'orders-jet'); ?>')
-                            .prop('disabled', false);
+                        // Fully ready - replace all buttons with completion button
+                        const tableNumber = $card.attr('data-table-number');
+                        let newButton;
+                        if (tableNumber && tableNumber !== '') {
+                            newButton = `<button class="oj-action-btn primary oj-close-table" data-order-id="${orderId}" data-table-number="${tableNumber}">🍽️ <?php _e('Close Table', 'orders-jet'); ?></button>`;
+                        } else {
+                            newButton = `<button class="oj-action-btn primary oj-complete-order" data-order-id="${orderId}">✅ <?php _e('Complete', 'orders-jet'); ?></button>`;
+                        }
+                        
+                        // Replace all kitchen buttons with completion button
+                        $card.find('.oj-card-actions').html(newButton + '<button class="oj-action-btn secondary oj-view-order" data-order-id="' + orderId + '">👁️ <?php _e('Details', 'orders-jet'); ?></button>');
+                        
+                        showExpressNotification('✅ Order fully ready!', 'success');
                     }
                     
                     // Add update animation
                     $card.addClass('oj-card-updated');
                     setTimeout(() => $card.removeClass('oj-card-updated'), 1000);
                     
-                    showExpressNotification('✅ Order marked as ready!', 'success');
                 } else {
-                    $btn.prop('disabled', false).html('🔥 <?php _e('Mark Ready', 'orders-jet'); ?>');
+                    $btn.prop('disabled', false);
+                    // Restore original button text based on kitchen type
+                    if (kitchenType === 'food') {
+                        $btn.html('🍕 <?php _e('Food Ready', 'orders-jet'); ?>');
+                    } else if (kitchenType === 'beverages') {
+                        $btn.html('🥤 <?php _e('Beverages Ready', 'orders-jet'); ?>');
+                    } else {
+                        $btn.html('🔥 <?php _e('Mark Ready', 'orders-jet'); ?>');
+                    }
                     showExpressNotification('❌ Failed to mark order ready', 'error');
                 }
             },
             error: function() {
-                $btn.prop('disabled', false).html('🔥 <?php _e('Mark Ready', 'orders-jet'); ?>');
+                $btn.prop('disabled', false);
+                // Restore original button text
+                if (kitchenType === 'food') {
+                    $btn.html('🍕 <?php _e('Food Ready', 'orders-jet'); ?>');
+                } else if (kitchenType === 'beverages') {
+                    $btn.html('🥤 <?php _e('Beverages Ready', 'orders-jet'); ?>');
+                } else {
+                    $btn.html('🔥 <?php _e('Mark Ready', 'orders-jet'); ?>');
+                }
                 showExpressNotification('❌ Connection error', 'error');
             }
         });
