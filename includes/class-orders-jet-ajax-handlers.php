@@ -50,6 +50,7 @@ class Orders_Jet_AJAX_Handlers {
         add_action('wp_ajax_oj_get_order_invoice', array($this, 'get_order_invoice'));
         add_action('wp_ajax_oj_get_filter_counts', array($this, 'get_filter_counts'));
         add_action('wp_ajax_oj_confirm_payment_received', array($this, 'confirm_payment_received'));
+        add_action('wp_ajax_oj_refresh_dashboard', array($this, 'refresh_dashboard_ajax'));
         
         // NOTE: Phase 1, 2, 3, 4 & 5 refactoring complete:
         // - Phase 1: Removed obsolete functions (4,470 → 3,483 lines)
@@ -1418,8 +1419,96 @@ class Orders_Jet_AJAX_Handlers {
      * @return string 'food', 'beverages', or 'mixed'
      */
     
+    /**
+     * AJAX Dashboard Refresh Handler (JavaScript Optimization)
+     * Provides AJAX-based dashboard refresh instead of full page reload
+     */
+    public function refresh_dashboard_ajax() {
+        // Verify nonce
+        check_ajax_referer('oj_dashboard_nonce', 'nonce');
+        
+        try {
+            // Get current page to determine what to refresh
+            $page = sanitize_text_field($_POST['page'] ?? '');
+            
+            if ($page === 'orders-jet-express') {
+                // Refresh express dashboard
+                $this->refresh_express_dashboard();
+            } else {
+                // Refresh regular dashboard (fallback)
+                $this->refresh_regular_dashboard();
+            }
+            
+        } catch (Exception $e) {
+            error_log('Orders Jet: Dashboard refresh error: ' . $e->getMessage());
+            wp_send_json_error(array(
+                'message' => __('Failed to refresh dashboard', 'orders-jet')
+            ));
+        }
+    }
     
+    /**
+     * Refresh Express Dashboard via AJAX
+     */
+    private function refresh_express_dashboard() {
+        // Initialize services (same as template)
+        $kitchen_service = new Orders_Jet_Kitchen_Service();
+        $order_method_service = new Orders_Jet_Order_Method_Service();
+        
+        // Get active orders (same query as template)
+        $active_orders = wc_get_orders(array(
+            'status' => array('wc-pending', 'wc-processing'),
+            'limit' => 50,
+            'orderby' => 'date',
+            'order' => 'ASC',
+            'return' => 'objects'
+        ));
+        
+        // Prepare orders data (same as template)
+        $orders_data = array();
+        $filter_counts = array(
+            'active' => 0,
+            'processing' => 0,
+            'pending' => 0,
+            'dinein' => 0,
+            'takeaway' => 0,
+            'delivery' => 0,
+            'food_kitchen' => 0,
+            'beverage_kitchen' => 0
+        );
+        
+        foreach ($active_orders as $order) {
+            $order_data = oj_express_prepare_order_data($order, $kitchen_service, $order_method_service);
+            $orders_data[] = $order_data;
+            oj_express_update_filter_counts($filter_counts, $order_data);
+        }
+        
+        // Generate orders HTML
+        ob_start();
+        if (empty($orders_data)) {
+            include ORDERS_JET_PLUGIN_DIR . 'templates/admin/partials/empty-state.php';
+        } else {
+            foreach ($orders_data as $order_data) {
+                include ORDERS_JET_PLUGIN_DIR . 'templates/admin/partials/order-card.php';
+            }
+        }
+        $orders_html = ob_get_clean();
+        
+        wp_send_json_success(array(
+            'orders_html' => $orders_html,
+            'filter_counts' => $filter_counts,
+            'timestamp' => current_time('mysql')
+        ));
+    }
     
-    
-    
+    /**
+     * Refresh Regular Dashboard via AJAX (fallback)
+     */
+    private function refresh_regular_dashboard() {
+        // For now, just return success - can be expanded later
+        wp_send_json_success(array(
+            'message' => __('Dashboard refreshed', 'orders-jet'),
+            'timestamp' => current_time('mysql')
+        ));
+    }
 }

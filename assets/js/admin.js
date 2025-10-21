@@ -41,16 +41,80 @@ jQuery(document).ready(function($) {
     }
     
     function refreshDashboard() {
-        console.log('Orders Jet Admin: Refreshing dashboard...');
+        console.log('Orders Jet Admin: Refreshing dashboard via AJAX...');
         
         // Show subtle refresh indicator
         var $refreshIndicator = $('<div class="oj-refresh-indicator" style="position: fixed; top: 32px; right: 20px; background: #0073aa; color: white; padding: 5px 10px; border-radius: 3px; font-size: 12px; z-index: 9999;">Updating...</div>');
         $('body').append($refreshIndicator);
         
-        // Reload the page after a short delay to show the indicator
-        setTimeout(function() {
-            window.location.reload();
-        }, 500);
+        // Check if we're on express dashboard
+        var isExpressDashboard = window.location.href.indexOf('orders-jet-express') !== -1;
+        
+        if (isExpressDashboard && typeof ojExpressData !== 'undefined') {
+            // Use AJAX refresh for express dashboard
+            refreshExpressDashboardAjax($refreshIndicator);
+        } else {
+            // Fallback to page reload for other dashboards
+            setTimeout(function() {
+                window.location.reload();
+            }, 500);
+        }
+    }
+    
+    function refreshExpressDashboardAjax($indicator) {
+        $.ajax({
+            url: ojExpressData.ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'oj_refresh_dashboard',
+                nonce: ojExpressData.nonces.dashboard,
+                page: 'orders-jet-express'
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Update orders grid
+                    $('.oj-orders-grid').html(response.data.orders_html);
+                    
+                    // Update filter counts
+                    if (response.data.filter_counts) {
+                        updateExpressFilterCounts(response.data.filter_counts);
+                    }
+                    
+                    // Re-apply current filter
+                    var activeFilter = $('.oj-filter-btn.active').data('filter') || 'active';
+                    $('.oj-filter-btn[data-filter="' + activeFilter + '"]').trigger('click');
+                    
+                    console.log('Orders Jet Admin: Dashboard refreshed via AJAX at', response.data.timestamp);
+                } else {
+                    console.error('Orders Jet Admin: AJAX refresh failed:', response.data.message);
+                    // Fallback to page reload
+                    window.location.reload();
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Orders Jet Admin: AJAX refresh error:', error);
+                // Fallback to page reload
+                window.location.reload();
+            },
+            complete: function() {
+                // Remove refresh indicator
+                $indicator.fadeOut(300, function() {
+                    $(this).remove();
+                });
+            }
+        });
+    }
+    
+    function updateExpressFilterCounts(counts) {
+        // Update filter button counts
+        $('.oj-filter-btn[data-filter="active"] .oj-count').text(counts.active || 0);
+        $('.oj-filter-btn[data-filter="processing"] .oj-count').text(counts.processing || 0);
+        $('.oj-filter-btn[data-filter="pending"] .oj-count').text(counts.pending || 0);
+        $('.oj-filter-btn[data-filter="dinein"] .oj-count').text(counts.dinein || 0);
+        $('.oj-filter-btn[data-filter="takeaway"] .oj-count').text(counts.takeaway || 0);
+        $('.oj-filter-btn[data-filter="delivery"] .oj-count').text(counts.delivery || 0);
+        $('.oj-filter-btn[data-filter="food_kitchen"] .oj-count').text(counts.food_kitchen || 0);
+        $('.oj-filter-btn[data-filter="beverage_kitchen"] .oj-count').text(counts.beverage_kitchen || 0);
     }
     
     // Manual refresh button
