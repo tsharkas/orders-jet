@@ -349,19 +349,16 @@ foreach ($active_orders as $order) {
                      data-food-ready="<?php echo $kitchen_status['food_ready'] ? 'yes' : 'no'; ?>"
                      data-beverage-ready="<?php echo $kitchen_status['beverage_ready'] ? 'yes' : 'no'; ?>">
                      
-                    <!-- Card Header -->
-                    <div class="oj-card-header">
-                        <div class="oj-order-info">
-                            <h3 class="oj-order-number">#<?php echo esc_html($order_number); ?></h3>
+                    <!-- Row 1: Order number + Type badges -->
+                    <div class="oj-card-row-1">
+                        <div class="oj-order-header">
+                            <span class="oj-view-icon">👁️</span>
                             <?php if (!empty($table_number)) : ?>
-                                <span class="oj-table-number">Table <?php echo esc_html($table_number); ?></span>
+                                <span class="oj-table-ref"><?php echo esc_html($table_number); ?></span>
                             <?php endif; ?>
-                            <span class="oj-order-time"><?php echo esc_html($time_ago); ?> <?php _e('ago', 'orders-jet'); ?></span>
+                            <span class="oj-order-number">#<?php echo esc_html($order_number); ?></span>
                         </div>
-                        <div class="oj-order-badges">
-                            <span class="oj-status-badge <?php echo esc_attr($status_class); ?>">
-                                <?php echo $status_icon; ?> <?php echo esc_html($status_text); ?>
-                            </span>
+                        <div class="oj-type-badges">
                             <span class="oj-type-badge <?php echo esc_attr($type_badge['class']); ?>">
                                 <?php echo $type_badge['icon']; ?> <?php echo esc_html($type_badge['text']); ?>
                             </span>
@@ -370,31 +367,38 @@ foreach ($active_orders as $order) {
                             </span>
                         </div>
                     </div>
-                    
-                    <!-- Card Body -->
-                    <div class="oj-card-body">
-                        <div class="oj-customer-info">
-                            <span class="oj-customer-name"><?php echo esc_html($customer_name); ?></span>
-                            <span class="oj-order-total"><?php echo wc_price($total); ?></span>
-                        </div>
-                        
-                        <div class="oj-order-summary">
-                            <span class="oj-item-count"><?php echo esc_html($item_count); ?> <?php echo _n('item', 'items', $item_count, 'orders-jet'); ?></span>
-                        </div>
-                        
-                        <!-- Quick Items Preview -->
-                        <div class="oj-items-preview">
+
+                    <!-- Row 2: Time + Status -->
+                    <div class="oj-card-row-2">
+                        <span class="oj-order-time"><?php echo esc_html($time_ago); ?> <?php _e('ago', 'orders-jet'); ?></span>
+                        <span class="oj-status-badge <?php echo esc_attr($status_class); ?>">
+                            <?php echo $status_icon; ?> <?php echo esc_html($status_text); ?>
+                        </span>
+                    </div>
+
+                    <!-- Row 3: Customer + Price -->
+                    <div class="oj-card-row-3">
+                        <span class="oj-customer-name"><?php echo esc_html($customer_name); ?></span>
+                        <span class="oj-order-total"><?php echo wc_price($total); ?></span>
+                    </div>
+
+                    <!-- Row 4: Item count -->
+                    <div class="oj-card-row-4">
+                        <span class="oj-item-count"><?php echo esc_html($item_count); ?> <?php echo _n('item', 'items', $item_count, 'orders-jet'); ?></span>
+                    </div>
+
+                    <!-- Row 5: Item details -->
+                    <div class="oj-card-row-5">
+                        <div class="oj-items-list">
                             <?php 
-                            $preview_items = array_slice($items, 0, 3);
-                            foreach ($preview_items as $item) :
+                            $items_text = array();
+                            foreach ($items as $item) :
                                 $product_name = $item->get_name();
                                 $quantity = $item->get_quantity();
+                                $items_text[] = esc_html($quantity) . 'x ' . esc_html($product_name);
+                            endforeach;
+                            echo implode(' ', $items_text);
                             ?>
-                                <span class="oj-item-preview"><?php echo esc_html($quantity); ?>x <?php echo esc_html($product_name); ?></span>
-                            <?php endforeach; ?>
-                            <?php if ($item_count > 3) : ?>
-                                <span class="oj-more-items">+<?php echo ($item_count - 3); ?> <?php _e('more', 'orders-jet'); ?></span>
-                            <?php endif; ?>
                         </div>
                     </div>
                     
@@ -547,6 +551,99 @@ foreach ($active_orders as $order) {
 
 .oj-modal-close:hover {
     color: #333;
+}
+
+/* New Row-Based Order Card Layout */
+.oj-card-row-1, .oj-card-row-2, .oj-card-row-3 {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    padding: 0 4px;
+}
+
+.oj-card-row-4, .oj-card-row-5 {
+    margin-bottom: 8px;
+    padding: 0 4px;
+}
+
+.oj-order-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+}
+
+.oj-view-icon {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.oj-table-ref {
+    font-size: 14px;
+    color: #666;
+}
+
+.oj-order-number {
+    font-size: 16px;
+    font-weight: bold;
+    color: #333;
+}
+
+.oj-type-badges {
+    display: flex;
+    gap: 6px;
+}
+
+.oj-type-badge, .oj-kitchen-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: 500;
+}
+
+.oj-order-time {
+    font-size: 13px;
+    color: #666;
+}
+
+.oj-status-badge {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-weight: 500;
+}
+
+.oj-customer-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+}
+
+.oj-order-total {
+    font-size: 14px;
+    font-weight: bold;
+    color: #2c5aa0;
+}
+
+.oj-item-count {
+    font-size: 13px;
+    color: #666;
+}
+
+.oj-items-list {
+    font-size: 12px;
+    color: #555;
+    line-height: 1.3;
+}
+
+.oj-combined-badge {
+    background: #e74c3c;
+    color: white;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: 500;
 }
 
 .oj-success-notification {
@@ -1190,31 +1287,45 @@ jQuery(document).ready(function($) {
                  data-status="pending" 
                  data-method="dinein" 
                  data-table-number="${combinedOrder.table_number}">
-                <div class="oj-card-header">
-                    <div class="oj-order-info">
-                        <h3 class="oj-order-number">#${combinedOrder.order_number}</h3>
-                        <span class="oj-table-number">Table ${combinedOrder.table_number}</span>
-                        <span class="oj-order-time">${combinedOrder.date}</span>
+                 
+                <!-- Row 1: Order number + Type badges -->
+                <div class="oj-card-row-1">
+                    <div class="oj-order-header">
+                        <span class="oj-view-icon">👁️</span>
+                        <span class="oj-table-ref">${combinedOrder.table_number}</span>
+                        <span class="oj-order-number">#${combinedOrder.order_number}</span>
                     </div>
-                    <div class="oj-order-badges">
-                        <span class="oj-status-badge ready">✅ <?php _e('Ready', 'orders-jet'); ?></span>
+                    <div class="oj-type-badges">
                         <span class="oj-type-badge dinein">🍽️ <?php _e('Dine-in', 'orders-jet'); ?></span>
-                        <span class="oj-combined-badge">🔗 <?php _e('Combined Order', 'orders-jet'); ?></span>
+                        <span class="oj-combined-badge">🔗 <?php _e('Combined', 'orders-jet'); ?></span>
                     </div>
                 </div>
-                <div class="oj-card-body">
-                    <div class="oj-customer-info">
-                        <span class="oj-customer-name">Table ${combinedOrder.table_number}</span>
-                        <span class="oj-order-total">${combinedOrder.total}</span>
-                    </div>
-                    <div class="oj-order-summary">
-                        <span class="oj-item-count">${combinedOrder.item_count} <?php _e('items', 'orders-jet'); ?></span>
-                    </div>
-                    <div class="oj-items-preview">
-                        ${combinedOrder.items.slice(0, 3).map(item => `<span class="oj-item-preview">${item.quantity}x ${item.name}</span>`).join('')}
-                        ${combinedOrder.items.length > 3 ? `<span class="oj-more-items">+${combinedOrder.items.length - 3} <?php _e('more', 'orders-jet'); ?></span>` : ''}
+
+                <!-- Row 2: Time + Status -->
+                <div class="oj-card-row-2">
+                    <span class="oj-order-time">${combinedOrder.date}</span>
+                    <span class="oj-status-badge ready">✅ <?php _e('Ready', 'orders-jet'); ?></span>
+                </div>
+
+                <!-- Row 3: Customer + Price -->
+                <div class="oj-card-row-3">
+                    <span class="oj-customer-name">Table ${combinedOrder.table_number} <?php _e('Guest', 'orders-jet'); ?></span>
+                    <span class="oj-order-total">${combinedOrder.total}</span>
+                </div>
+
+                <!-- Row 4: Item count -->
+                <div class="oj-card-row-4">
+                    <span class="oj-item-count">${combinedOrder.item_count} <?php _e('items', 'orders-jet'); ?></span>
+                </div>
+
+                <!-- Row 5: Item details -->
+                <div class="oj-card-row-5">
+                    <div class="oj-items-list">
+                        ${combinedOrder.items.map(item => `${item.quantity}x ${item.name}`).join(' ')}
                     </div>
                 </div>
+                
+                <!-- Row 6: Action buttons -->
                 <div class="oj-card-actions">
                     <button class="oj-action-btn primary oj-print-invoice" data-order-id="${combinedOrder.order_id}" data-invoice-url="${combinedOrder.invoice_url}">
                         🖨️ <?php _e('Print Invoice', 'orders-jet'); ?>
@@ -1228,3 +1339,4 @@ jQuery(document).ready(function($) {
     }
 });
 </script>
+
