@@ -28,8 +28,16 @@ jQuery(document).ready(function($) {
     var dashboardRefreshInterval;
     
     // Check if we're on a dashboard page
-    if (window.location.href.indexOf('orders-jet') !== -1) {
+    console.log('Orders Jet Admin: Checking URL for dashboard page...');
+    console.log('Orders Jet Admin: Current URL:', window.location.href);
+    var isDashboardPage = window.location.href.indexOf('orders-jet') !== -1;
+    console.log('Orders Jet Admin: Is dashboard page:', isDashboardPage);
+    
+    if (isDashboardPage) {
+        console.log('Orders Jet Admin: Starting auto-refresh...');
         startDashboardAutoRefresh();
+    } else {
+        console.log('Orders Jet Admin: Not a dashboard page, auto-refresh disabled');
     }
     
     function startDashboardAutoRefresh() {
