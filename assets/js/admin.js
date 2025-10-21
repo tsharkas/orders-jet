@@ -9,7 +9,13 @@ jQuery(document).ready(function($) {
     // Debug: Check if admin variables are loaded (temporary for testing)
     console.log('Orders Jet Admin: Script loaded');
     console.log('Orders Jet Admin: OrdersJetAdmin object:', typeof OrdersJetAdmin !== 'undefined' ? 'FOUND' : 'NOT FOUND');
+    if (typeof OrdersJetAdmin !== 'undefined') {
+        console.log('Orders Jet Admin: OrdersJetAdmin content:', OrdersJetAdmin);
+    }
     console.log('Orders Jet Admin: ojExpressData object:', typeof ojExpressData !== 'undefined' ? 'FOUND' : 'NOT FOUND');
+    if (typeof ojExpressData !== 'undefined') {
+        console.log('Orders Jet Admin: ojExpressData content:', ojExpressData);
+    }
     console.log('Orders Jet Admin: oj_admin object:', typeof oj_admin !== 'undefined' ? 'FOUND' : 'NOT FOUND');
     
     // Use OrdersJetAdmin on dashboard pages, fallback to oj_admin on table management pages
@@ -53,8 +59,9 @@ jQuery(document).ready(function($) {
         
         console.log('Orders Jet Admin: Express dashboard detected:', isExpressDashboard);
         console.log('Orders Jet Admin: ojExpressData available:', typeof ojExpressData !== 'undefined');
+        console.log('Orders Jet Admin: OrdersJetAdmin available:', typeof OrdersJetAdmin !== 'undefined');
         
-        if (isExpressDashboard && typeof ojExpressData !== 'undefined') {
+        if (isExpressDashboard && (typeof ojExpressData !== 'undefined' || typeof OrdersJetAdmin !== 'undefined')) {
             console.log('Orders Jet Admin: Using AJAX refresh');
             // Use AJAX refresh for express dashboard
             refreshExpressDashboardAjax($refreshIndicator);
@@ -68,12 +75,17 @@ jQuery(document).ready(function($) {
     }
     
     function refreshExpressDashboardAjax($indicator) {
+        // Use ojExpressData if available, fallback to OrdersJetAdmin
+        var ajaxConfig = typeof ojExpressData !== 'undefined' ? ojExpressData : OrdersJetAdmin;
+        
+        console.log('Orders Jet Admin: Using AJAX config:', ajaxConfig);
+        
         $.ajax({
-            url: ojExpressData.ajaxUrl,
+            url: ajaxConfig.ajaxUrl,
             type: 'POST',
             data: {
                 action: 'oj_refresh_dashboard',
-                nonce: ojExpressData.nonces.dashboard,
+                nonce: ajaxConfig.nonces.dashboard,
                 page: 'orders-jet-express'
             },
             success: function(response) {
