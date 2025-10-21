@@ -850,6 +850,13 @@ jQuery(document).ready(function($) {
                         $card.find('.oj-status-badge').replaceWith(updates.status_badge_html);
                     }
                     
+                    // Update yellow status badge with dynamic kitchen status
+                    if (updates.status_text && updates.status_icon && updates.status_class) {
+                        var $statusBadge = $card.find('.oj-status-badge');
+                        $statusBadge.html(updates.status_icon + ' ' + updates.status_text);
+                        $statusBadge.removeClass('ready partial kitchen completed').addClass(updates.status_class);
+                    }
+                    
                     // Update kitchen type badge if provided
                     if (updates.kitchen_type_badge_html) {
                         $card.find('.oj-kitchen-badge').replaceWith(updates.kitchen_type_badge_html);

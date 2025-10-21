@@ -212,6 +212,9 @@ class Orders_Jet_Kitchen_Management_Handler {
         // Get updated kitchen status for response
         $kitchen_status = $this->kitchen_service->get_kitchen_readiness_status($order);
         
+        // Get status text and icon for yellow badge update
+        $status_info = $this->get_status_badge_info($order, $order_kitchen_type);
+        
         return array(
             'message' => $success_message,
             'order_id' => $order_id,
@@ -228,8 +231,77 @@ class Orders_Jet_Kitchen_Management_Handler {
                 'button_text' => $button_text,
                 'button_class' => $button_class,
                 'table_number' => $table_number,
-                'partial_ready' => $partial_ready
+                'partial_ready' => $partial_ready,
+                // Add status info for yellow badge update
+                'status_text' => $status_info['text'],
+                'status_icon' => $status_info['icon'],
+                'status_class' => $status_info['class']
             )
+        );
+    }
+    
+    /**
+     * Get status badge info for yellow badge update
+     */
+    private function get_status_badge_info($order, $order_kitchen_type) {
+        $order_status = $order->get_status();
+        
+        if ($order_status === 'pending') {
+            return array(
+                'text' => __('Ready', 'orders-jet'),
+                'class' => 'ready',
+                'icon' => '✅'
+            );
+        } elseif ($order_status === 'processing') {
+            if ($order_kitchen_type === 'mixed') {
+                $food_ready = $order->get_meta('_oj_food_kitchen_ready') === 'yes';
+                $beverage_ready = $order->get_meta('_oj_beverage_kitchen_ready') === 'yes';
+                
+                if ($food_ready && !$beverage_ready) {
+                    return array(
+                        'text' => __('Waiting for Bev.', 'orders-jet'),
+                        'class' => 'partial',
+                        'icon' => '🍕✅ 🥤⏳'
+                    );
+                } elseif (!$food_ready && $beverage_ready) {
+                    return array(
+                        'text' => __('Waiting for Food', 'orders-jet'),
+                        'class' => 'partial',
+                        'icon' => '🍕⏳ 🥤✅'
+                    );
+                } else {
+                    return array(
+                        'text' => __('Both Kitchens', 'orders-jet'),
+                        'class' => 'partial',
+                        'icon' => '🍕⏳ 🥤⏳'
+                    );
+                }
+            } elseif ($order_kitchen_type === 'food') {
+                return array(
+                    'text' => __('Waiting for Food', 'orders-jet'),
+                    'class' => 'partial',
+                    'icon' => '🍕⏳'
+                );
+            } elseif ($order_kitchen_type === 'beverages') {
+                return array(
+                    'text' => __('Waiting for Bev.', 'orders-jet'),
+                    'class' => 'partial',
+                    'icon' => '🥤⏳'
+                );
+            } else {
+                return array(
+                    'text' => __('Kitchen', 'orders-jet'),
+                    'class' => 'kitchen',
+                    'icon' => '👨‍🍳'
+                );
+            }
+        }
+        
+        // Default fallback
+        return array(
+            'text' => __('Kitchen', 'orders-jet'),
+            'class' => 'kitchen',
+            'icon' => '👨‍🍳'
         );
     }
     
