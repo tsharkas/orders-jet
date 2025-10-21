@@ -29,8 +29,8 @@ class Orders_Jet_AJAX_Handlers {
         $this->kitchen_service = new Orders_Jet_Kitchen_Service();
         $this->notification_service = new Orders_Jet_Notification_Service();
         
-        // Initialize handler factory (Phase 3-7 refactoring)
-        // File size reduced from 4,470 → 1,450 lines (68% reduction)
+        // Initialize handler factory (Phase 3-8 refactoring - FINAL PHASE COMPLETE!)
+        // File size reduced from 4,470 → 1,417 lines (68.3% reduction)
         $this->handler_factory = new Orders_Jet_Handler_Factory(
             $this->tax_service,
             $this->kitchen_service,
@@ -79,7 +79,7 @@ class Orders_Jet_AJAX_Handlers {
             $result = $handler->process_submission($_POST);
             
             wp_send_json_success($result);
-            
+        
         } catch (Exception $e) {
             error_log('Orders Jet: Order submission error: ' . $e->getMessage());
             error_log('Orders Jet: Stack trace: ' . $e->getTraceAsString());
@@ -161,7 +161,7 @@ class Orders_Jet_AJAX_Handlers {
             $result = $handler->get_details($_POST);
             
             wp_send_json_success($result);
-            
+        
         } catch (Exception $e) {
             error_log('Orders Jet: Error in get_product_details: ' . $e->getMessage());
             error_log('Orders Jet: Error trace: ' . $e->getTraceAsString());
@@ -174,8 +174,8 @@ class Orders_Jet_AJAX_Handlers {
      */
     public function get_table_orders() {
         try {
-            check_ajax_referer('oj_table_order', 'nonce');
-            
+        check_ajax_referer('oj_table_order', 'nonce');
+        
             $handler = $this->handler_factory->get_table_query_handler();
             $result = $handler->get_orders($_POST);
             
@@ -265,14 +265,14 @@ class Orders_Jet_AJAX_Handlers {
      */
     public function mark_order_ready() {
         try {
-            // Check nonce for security
-            check_ajax_referer('oj_dashboard_nonce', 'nonce');
-
+        // Check nonce for security
+        check_ajax_referer('oj_dashboard_nonce', 'nonce');
+        
             $handler = $this->handler_factory->get_kitchen_management_handler();
             $result = $handler->mark_order_ready($_POST);
 
             wp_send_json_success($result);
-
+            
         } catch (Exception $e) {
             error_log('Orders Jet Kitchen: Error marking order ready: ' . $e->getMessage());
             error_log('Orders Jet Kitchen: Stack trace: ' . $e->getTraceAsString());
@@ -296,8 +296,8 @@ class Orders_Jet_AJAX_Handlers {
      */
     public function complete_individual_order() {
         try {
-            check_ajax_referer('oj_dashboard_nonce', 'nonce');
-
+        check_ajax_referer('oj_dashboard_nonce', 'nonce');
+        
             $handler = $this->handler_factory->get_individual_order_completion_handler();
             $result = $handler->complete_order($_POST);
 
@@ -1031,8 +1031,8 @@ class Orders_Jet_AJAX_Handlers {
      */
     public function close_table_group() {
         try {
-            check_ajax_referer('oj_table_order', 'nonce');
-            
+        check_ajax_referer('oj_table_order', 'nonce');
+        
             $handler = $this->handler_factory->get_table_closure_handler();
             $result = $handler->process_closure($_POST);
             
@@ -1046,9 +1046,9 @@ class Orders_Jet_AJAX_Handlers {
                 $processing_order_numbers = array(); // Would need to extract from message or modify handler
                 wp_send_json_error(array(
                     'message' => $message,
-                    'action_required' => 'confirm_force_close',
-                    'show_confirmation' => true
-                ));
+                        'action_required' => 'confirm_force_close',
+                        'show_confirmation' => true
+                    ));
             } elseif (strpos($message, 'mixed orders are not fully ready') !== false) {
                 // Kitchen blocking error
                 wp_send_json_error(array(
@@ -1057,12 +1057,12 @@ class Orders_Jet_AJAX_Handlers {
                 ));
             } else {
                 // Regular error
-                error_log('Orders Jet: Table group closure error: ' . $e->getMessage());
-                error_log('Orders Jet: Stack trace: ' . $e->getTraceAsString());
-                
-                wp_send_json_error(array(
-                    'message' => __('Table closure failed: ' . $e->getMessage(), 'orders-jet')
-                ));
+            error_log('Orders Jet: Table group closure error: ' . $e->getMessage());
+            error_log('Orders Jet: Stack trace: ' . $e->getTraceAsString());
+            
+            wp_send_json_error(array(
+                'message' => __('Table closure failed: ' . $e->getMessage(), 'orders-jet')
+            ));
             }
         }
     }
@@ -1078,46 +1078,8 @@ class Orders_Jet_AJAX_Handlers {
      */
     public function get_order_invoice() {
         try {
-            $order_id = intval($_GET['order_id'] ?? 0);
-            $order_type = sanitize_text_field($_GET['type'] ?? '');
-            $print_mode = isset($_GET['print']);
-            $nonce = sanitize_text_field($_GET['nonce'] ?? '');
-            
-            if (!$order_id) {
-                wp_die(__('Invalid order ID', 'orders-jet'));
-            }
-            
-            // Verify nonce
-            if (!wp_verify_nonce($nonce, 'oj_get_invoice')) {
-                wp_die(__('Security check failed', 'orders-jet'));
-            }
-            
-            // Check permissions
-            if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_woocommerce')) {
-                wp_die(__('Permission denied', 'orders-jet'));
-            }
-            
-            $order = wc_get_order($order_id);
-            if (!$order) {
-                wp_die(__('Order not found', 'orders-jet'));
-            }
-            
-            // Generate invoice HTML
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Orders Jet: Generating invoice for order #' . $order_id);
-            }
-            
-            $invoice_html = $this->generate_single_order_invoice_html($order, $print_mode);
-            
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Orders Jet: Invoice HTML generated successfully for order #' . $order_id);
-            }
-            
-            // Set proper headers
-            header('Content-Type: text/html; charset=utf-8');
-            
-            echo $invoice_html;
-            exit;
+            $handler = $this->handler_factory->get_invoice_generation_handler();
+            $handler->generate_invoice($_GET);
             
         } catch (Exception $e) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
@@ -1430,12 +1392,12 @@ class Orders_Jet_AJAX_Handlers {
         try {
             // Check nonce for security
             check_ajax_referer('oj_dashboard_nonce', 'nonce');
-
+            
             $handler = $this->handler_factory->get_kitchen_management_handler();
             $result = $handler->confirm_payment_received($_POST);
 
             wp_send_json_success($result);
-
+            
         } catch (Exception $e) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
                 error_log('Orders Jet: Error confirming payment: ' . $e->getMessage());

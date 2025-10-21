@@ -104,6 +104,16 @@ class Orders_Jet_Handler_Factory {
     }
     
     /**
+     * Get Invoice Generation Handler instance
+     */
+    public function get_invoice_generation_handler() {
+        if (!isset(self::$instances['invoice_generation'])) {
+            self::$instances['invoice_generation'] = new Orders_Jet_Invoice_Generation_Handler();
+        }
+        return self::$instances['invoice_generation'];
+    }
+    
+    /**
      * Clear all cached instances (useful for testing)
      */
     public static function clear_instances() {
