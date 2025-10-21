@@ -6,9 +6,17 @@
 jQuery(document).ready(function($) {
     'use strict';
     
+    // Debug: Check if admin variables are loaded (temporary for testing)
+    console.log('Orders Jet Admin: Script loaded');
+    console.log('Orders Jet Admin: OrdersJetAdmin object:', typeof OrdersJetAdmin !== 'undefined' ? 'FOUND' : 'NOT FOUND');
+    console.log('Orders Jet Admin: ojExpressData object:', typeof ojExpressData !== 'undefined' ? 'FOUND' : 'NOT FOUND');
+    console.log('Orders Jet Admin: oj_admin object:', typeof oj_admin !== 'undefined' ? 'FOUND' : 'NOT FOUND');
+    
     // Use OrdersJetAdmin on dashboard pages, fallback to oj_admin on table management pages
     var adminConfig = typeof OrdersJetAdmin !== 'undefined' ? OrdersJetAdmin : 
                       (typeof oj_admin !== 'undefined' ? oj_admin : null);
+    
+    console.log('Orders Jet Admin: Using config:', adminConfig);
     
     // Auto-refresh dashboards every 30 seconds
     var dashboardRefreshInterval;
@@ -23,6 +31,8 @@ jQuery(document).ready(function($) {
         dashboardRefreshInterval = setInterval(function() {
             refreshDashboard();
         }, 30000);
+        
+        console.log('Orders Jet Admin: Auto-refresh started (30s interval)');
     }
     
     function stopDashboardAutoRefresh() {
@@ -32,6 +42,8 @@ jQuery(document).ready(function($) {
     }
     
     function refreshDashboard() {
+        console.log('Orders Jet Admin: Refreshing dashboard...');
+        
         // Show subtle refresh indicator
         var $refreshIndicator = $('<div class="oj-refresh-indicator" style="position: fixed; top: 32px; right: 20px; background: #0073aa; color: white; padding: 5px 10px; border-radius: 3px; font-size: 12px; z-index: 9999;">Updating...</div>');
         $('body').append($refreshIndicator);
@@ -39,10 +51,15 @@ jQuery(document).ready(function($) {
         // Check if we're on express dashboard
         var isExpressDashboard = window.location.href.indexOf('orders-jet-express') !== -1;
         
+        console.log('Orders Jet Admin: Express dashboard detected:', isExpressDashboard);
+        console.log('Orders Jet Admin: ojExpressData available:', typeof ojExpressData !== 'undefined');
+        
         if (isExpressDashboard && typeof ojExpressData !== 'undefined') {
+            console.log('Orders Jet Admin: Using AJAX refresh');
             // Use AJAX refresh for express dashboard
             refreshExpressDashboardAjax($refreshIndicator);
         } else {
+            console.log('Orders Jet Admin: Falling back to page reload');
             // Fallback to page reload for other dashboards
             setTimeout(function() {
                 window.location.reload();
@@ -72,6 +89,8 @@ jQuery(document).ready(function($) {
                     // Re-apply current filter
                     var activeFilter = $('.oj-filter-btn.active').data('filter') || 'active';
                     $('.oj-filter-btn[data-filter="' + activeFilter + '"]').trigger('click');
+                    
+                    console.log('Orders Jet Admin: Dashboard refreshed via AJAX at', response.data.timestamp);
                 } else {
                     // Fallback to page reload
                     window.location.reload();
