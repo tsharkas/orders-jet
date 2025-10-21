@@ -29,8 +29,8 @@ class Orders_Jet_AJAX_Handlers {
         $this->kitchen_service = new Orders_Jet_Kitchen_Service();
         $this->notification_service = new Orders_Jet_Notification_Service();
         
-        // Initialize handler factory (Phase 3-6 refactoring)
-        // File size reduced from 4,470 → 1,607 lines (64% reduction)
+        // Initialize handler factory (Phase 3-7 refactoring)
+        // File size reduced from 4,470 → 1,450 lines (68% reduction)
         $this->handler_factory = new Orders_Jet_Handler_Factory(
             $this->tax_service,
             $this->kitchen_service,
@@ -264,144 +264,22 @@ class Orders_Jet_AJAX_Handlers {
      * Mark order as ready (Kitchen Dashboard)
      */
     public function mark_order_ready() {
-        // Check nonce for security
-        check_ajax_referer('oj_dashboard_nonce', 'nonce');
-        
-        // Check user permissions
-        if (!current_user_can('access_oj_kitchen_dashboard') && !current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => __('You do not have permission to perform this action.', 'orders-jet')));
-        }
-        
-        $order_id = intval($_POST['order_id']);
-        $kitchen_type = sanitize_text_field($_POST['kitchen_type'] ?? 'food'); // Which kitchen is marking ready
-        
-        if (!$order_id) {
-            wp_send_json_error(array('message' => __('Order ID is required.', 'orders-jet')));
-        }
-        
-        // Get the order
-        $order = wc_get_order($order_id);
-        
-        if (!$order) {
-            wp_send_json_error(array('message' => __('Order not found.', 'orders-jet')));
-        }
-        
-        // Get table number (if any) - this works for both table and pickup orders
-        $table_number = $order->get_meta('_oj_table_number');
-        
-        // Check current status
-        $current_status = $order->get_status();
-        if (!in_array($current_status, array('pending', 'processing'))) {
-            wp_send_json_error(array('message' => sprintf(__('Order cannot be marked ready from status: %s', 'orders-jet'), $current_status)));
-        }
-        
         try {
-            $order_type = !empty($table_number) ? 'table' : 'pickup';
-            
-            // Get or determine kitchen type for this order
-            $order_kitchen_type = $order->get_meta('_oj_kitchen_type');
-            if (empty($order_kitchen_type)) {
-                $order_kitchen_type = $this->kitchen_service->get_order_kitchen_type($order);
-                $order->update_meta_data('_oj_kitchen_type', $order_kitchen_type);
-            }
-            
-            // Handle dual kitchen logic
-            if ($order_kitchen_type === 'mixed') {
-                // Mark specific kitchen as ready
-                if ($kitchen_type === 'food') {
-                    $order->update_meta_data('_oj_food_kitchen_ready', 'yes');
-                    $order->add_order_note(sprintf(
-                        __('Food items marked as ready by kitchen staff (%s)', 'orders-jet'), 
-                        wp_get_current_user()->display_name
-                    ));
-                } else {
-                    $order->update_meta_data('_oj_beverage_kitchen_ready', 'yes');
-                    $order->add_order_note(sprintf(
-                        __('Beverage items marked as ready by kitchen staff (%s)', 'orders-jet'), 
-                        wp_get_current_user()->display_name
-                    ));
-                }
-                
-                // Check if both kitchens are ready
-                $food_ready = $order->get_meta('_oj_food_kitchen_ready') === 'yes';
-                $beverage_ready = $order->get_meta('_oj_beverage_kitchen_ready') === 'yes';
-                
-                if ($food_ready && $beverage_ready) {
-                    // All kitchens ready - mark as pending (ready for completion)
-                    $order->set_status('pending');
-                    $order->add_order_note(__('All kitchen items ready - order ready for completion', 'orders-jet'));
-                    $button_text = !empty($table_number) ? 'Close Table' : 'Complete';
-                    $button_class = !empty($table_number) ? 'oj-close-table' : 'oj-complete-order';
-                    $success_message = sprintf(__('Order #%d fully ready! All kitchens complete.', 'orders-jet'), $order_id);
-                } else {
-                    // Partial ready - stay in processing
-                    $order->set_status('processing');
-                    $waiting_for = ($food_ready !== 'yes') ? __('Food Kitchen', 'orders-jet') : __('Beverage Kitchen', 'orders-jet');
-                    $button_text = sprintf(__('Waiting for %s', 'orders-jet'), $waiting_for);
-                    $button_class = 'oj-waiting-kitchen';
-                    $success_message = sprintf(__('%s ready! Waiting for %s.', 'orders-jet'), 
-                        ucfirst($kitchen_type), $waiting_for);
-                }
-            } else {
-                // Single kitchen order - normal flow
-                if ($order_kitchen_type === 'food') {
-                    $order->update_meta_data('_oj_food_kitchen_ready', 'yes');
-                } else {
-                    $order->update_meta_data('_oj_beverage_kitchen_ready', 'yes');
-                }
-                
-                $order->set_status('pending');
-                $order->add_order_note(sprintf(
-                    __('Order marked as ready by kitchen staff (%s) - %s order', 'orders-jet'), 
-                    wp_get_current_user()->display_name,
-                    ucfirst($order_type)
-                ));
-                
-                $button_text = !empty($table_number) ? 'Close Table' : 'Complete';
-                $button_class = !empty($table_number) ? 'oj-close-table' : 'oj-complete-order';
-                $success_message = !empty($table_number) 
-                    ? sprintf(__('Table order #%d marked as ready!', 'orders-jet'), $order_id)
-                    : sprintf(__('Pickup order #%d marked as ready!', 'orders-jet'), $order_id);
-            }
-            
-            // Save the order
-            $order->save();
-            
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Orders Jet Kitchen: Order #' . $order_id . ' (' . $order_type . ') kitchen ready update by user #' . get_current_user_id());
-            }
-            
-            // Send notifications if fully ready
-            if ($order->get_status() === 'pending') {
-                $this->notification_service->send_ready_notifications($order, $table_number);
-            }
-            
-            // Get updated kitchen status for response
-            $kitchen_status = $this->kitchen_service->get_kitchen_readiness_status($order);
-            
-            wp_send_json_success(array(
-                'message' => $success_message,
-                'order_id' => $order_id,
-                'table_number' => $table_number,
-                'order_type' => $order_type,
-                'kitchen_type' => $order_kitchen_type,
-                'kitchen_status' => $kitchen_status,
-                'new_status' => $order->get_status(),
-                'card_updates' => array(
-                    'order_id' => $order_id,
-                    'new_status' => $order->get_status(),
-                    'status_badge_html' => $this->kitchen_service->get_kitchen_status_badge($order),
-                    'kitchen_type_badge_html' => $this->kitchen_service->get_kitchen_type_badge($order),
-                    'button_text' => $button_text,
-                    'button_class' => $button_class,
-                    'table_number' => $table_number,
-                    'partial_ready' => ($order_kitchen_type === 'mixed' && $order->get_status() === 'processing')
-                )
-            ));
-            
+            // Check nonce for security
+            check_ajax_referer('oj_dashboard_nonce', 'nonce');
+
+            $handler = $this->handler_factory->get_kitchen_management_handler();
+            $result = $handler->mark_order_ready($_POST);
+
+            wp_send_json_success($result);
+
         } catch (Exception $e) {
             error_log('Orders Jet Kitchen: Error marking order ready: ' . $e->getMessage());
-            wp_send_json_error(array('message' => __('Failed to mark order as ready. Please try again.', 'orders-jet')));
+            error_log('Orders Jet Kitchen: Stack trace: ' . $e->getTraceAsString());
+
+            wp_send_json_error(array(
+                'message' => __('Failed to mark order as ready: ' . $e->getMessage(), 'orders-jet')
+            ));
         }
     }
     
@@ -1552,47 +1430,18 @@ class Orders_Jet_AJAX_Handlers {
         try {
             // Check nonce for security
             check_ajax_referer('oj_dashboard_nonce', 'nonce');
-            
-            // Check permissions
-            if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_woocommerce')) {
-                wp_send_json_error(array('message' => __('Permission denied', 'orders-jet')));
-            }
-            
-            $order_id = intval($_POST['order_id'] ?? 0);
-            
-            if (!$order_id) {
-                wp_send_json_error(array('message' => __('Invalid order ID', 'orders-jet')));
-            }
-            
-            $order = wc_get_order($order_id);
-            if (!$order) {
-                wp_send_json_error(array('message' => __('Order not found', 'orders-jet')));
-            }
-            
-            // Add order note for payment confirmation
-            $order->add_order_note(__('Payment confirmed by manager', 'orders-jet'));
-            
-            // Update order status to completed (if not already)
-            if ($order->get_status() !== 'completed') {
-                $order->set_status('completed');
-                $order->save();
-            }
-            
-            if (defined('WP_DEBUG') && WP_DEBUG) {
-                error_log('Orders Jet: Payment confirmed for order #' . $order_id);
-            }
-            
-            wp_send_json_success(array(
-                'message' => sprintf(__('Payment confirmed for order #%d', 'orders-jet'), $order_id),
-                'order_id' => $order_id,
-                'status' => 'payment_confirmed'
-            ));
-            
+
+            $handler = $this->handler_factory->get_kitchen_management_handler();
+            $result = $handler->confirm_payment_received($_POST);
+
+            wp_send_json_success($result);
+
         } catch (Exception $e) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
                 error_log('Orders Jet: Error confirming payment: ' . $e->getMessage());
+                error_log('Orders Jet: Stack trace: ' . $e->getTraceAsString());
             }
-            wp_send_json_error(array('message' => __('Error confirming payment', 'orders-jet')));
+            wp_send_json_error(array('message' => __('Error confirming payment: ' . $e->getMessage(), 'orders-jet')));
         }
     }
     

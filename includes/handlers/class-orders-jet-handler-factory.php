@@ -91,6 +91,19 @@ class Orders_Jet_Handler_Factory {
     }
     
     /**
+     * Get Kitchen Management Handler instance
+     */
+    public function get_kitchen_management_handler() {
+        if (!isset(self::$instances['kitchen_management'])) {
+            self::$instances['kitchen_management'] = new Orders_Jet_Kitchen_Management_Handler(
+                $this->kitchen_service,
+                $this->notification_service
+            );
+        }
+        return self::$instances['kitchen_management'];
+    }
+    
+    /**
      * Clear all cached instances (useful for testing)
      */
     public static function clear_instances() {
