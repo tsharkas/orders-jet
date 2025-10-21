@@ -10,10 +10,17 @@ jQuery(document).ready(function($) {
     'use strict';
     
     // ========================================================================
+    // PERFORMANCE OPTIMIZATION - Cache frequently used elements
+    // ========================================================================
+    
+    var $document = $(document);
+    var $body = $('body');
+    
+    // ========================================================================
     // AJAX FILTERING - Client-side for instant response
     // ========================================================================
     
-    $('.oj-filter-btn').on('click', function() {
+    $document.on('click', '.oj-filter-btn', function() {
         const filter = $(this).data('filter');
         const $cards = $('.oj-order-card');
         
@@ -70,7 +77,7 @@ jQuery(document).ready(function($) {
     
     // Mark Ready - Change processing → pending
     // Mark Order Ready - Enhanced with dual kitchen support
-    $(document).on('click', '.oj-mark-ready, .oj-mark-ready-food, .oj-mark-ready-beverage', function() {
+    $document.on('click', '.oj-mark-ready, .oj-mark-ready-food, .oj-mark-ready-beverage', function() {
         const orderId = $(this).data('order-id');
         const kitchenType = $(this).data('kitchen') || 'food';
         const $btn = $(this);
@@ -432,21 +439,22 @@ jQuery(document).ready(function($) {
             </div>
         `);
         
-        $('body').append(modal);
+        $body.append(modal);
         
-        modal.find('.oj-payment-btn').on('click', function() {
+        // Use event delegation for modal events
+        $(document).on('click', '.oj-payment-modal .oj-payment-btn', function() {
             const method = $(this).data('method');
-            modal.remove();
+            $(this).closest('.oj-payment-modal').remove();
             callback(method);
         });
         
-        modal.find('.oj-modal-close').on('click', function() {
-            modal.remove();
+        $(document).on('click', '.oj-payment-modal .oj-modal-close', function() {
+            $(this).closest('.oj-payment-modal').remove();
         });
         
-        modal.on('click', function(e) {
+        $(document).on('click', '.oj-payment-modal', function(e) {
             if (e.target === this) {
-                modal.remove();
+                $(this).remove();
             }
         });
     }
@@ -459,10 +467,11 @@ jQuery(document).ready(function($) {
             </div>
         `);
         
-        $('body').append(notification);
+        $body.append(notification);
         
-        notification.find('.oj-notification-close').on('click', function() {
-            notification.remove();
+        // Use event delegation for notification close
+        $(document).on('click', '.oj-success-notification .oj-notification-close', function() {
+            $(this).closest('.oj-success-notification').remove();
         });
         
         setTimeout(() => notification.remove(), 5000);

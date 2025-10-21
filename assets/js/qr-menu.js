@@ -345,13 +345,12 @@ jQuery(document).ready(function($) {
         bindCheckoutEvents: function() {
             var $modal = $('#oj-checkout-modal');
             
-            // Close modal
-            $modal.find('.oj-modal-close, .oj-cancel-checkout').on('click', function() {
-                $modal.remove();
+            // Use event delegation for modal events
+            $(document).on('click', '.oj-checkout-modal .oj-modal-close, .oj-checkout-modal .oj-cancel-checkout', function() {
+                $(this).closest('.oj-checkout-modal').remove();
             });
             
-            // Confirm order
-            $modal.find('.oj-confirm-order').on('click', function() {
+            $(document).on('click', '.oj-checkout-modal .oj-confirm-order', function() {
                 OrdersJetQRMenu.submitOrder();
             });
         },
