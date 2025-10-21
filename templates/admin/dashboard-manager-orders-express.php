@@ -331,13 +331,9 @@ foreach ($active_orders as $order) {
                 );
                 $type_badge = $type_badges[$method] ?? $type_badges['takeaway']; // Default to takeaway if method not found
                 
-                // Kitchen type badge
-                $kitchen_badges = array(
-                    'food' => array('icon' => '🍕', 'text' => __('Food', 'orders-jet'), 'class' => 'food'),
-                    'beverages' => array('icon' => '🥤', 'text' => __('Beverages', 'orders-jet'), 'class' => 'beverages'),
-                    'mixed' => array('icon' => '🍽️', 'text' => __('Mixed', 'orders-jet'), 'class' => 'mixed')
-                );
-                $kitchen_badge = $kitchen_badges[$kitchen_type] ?? $kitchen_badges['food'];
+                // Kitchen type badge - Use dynamic service for mixed orders
+                $kitchen_service = new Orders_Jet_Kitchen_Service();
+                $kitchen_badge_html = $kitchen_service->get_kitchen_type_badge($order);
                 ?>
                 
                 <div class="oj-order-card" 
@@ -362,9 +358,7 @@ foreach ($active_orders as $order) {
                             <span class="oj-type-badge <?php echo esc_attr($type_badge['class']); ?>">
                                 <?php echo $type_badge['icon']; ?> <?php echo esc_html($type_badge['text']); ?>
                             </span>
-                            <span class="oj-kitchen-badge <?php echo esc_attr($kitchen_badge['class']); ?>">
-                                <?php echo $kitchen_badge['icon']; ?> <?php echo esc_html($kitchen_badge['text']); ?>
-                            </span>
+                            <?php echo $kitchen_badge_html; ?>
                         </div>
                     </div>
 
