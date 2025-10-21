@@ -4428,7 +4428,7 @@ class Orders_Jet_AJAX_Handlers {
             } elseif (!$status['food_ready'] && $status['beverage_ready']) {
                 return '<span class="oj-status-badge partial">🍕⏳ 🥤✅ ' . __('Waiting for Food', 'orders-jet') . '</span>';
             } else {
-                return '<span class="oj-status-badge kitchen">🍕⏳ 🥤⏳ ' . __('Both Kitchens Working', 'orders-jet') . '</span>';
+                return '<span class="oj-status-badge kitchen">🍕⏳ 🥤⏳ ' . __('Both Kitchens', 'orders-jet') . '</span>';
             }
         } elseif ($order_status === 'processing') {
             if ($status['kitchen_type'] === 'food') {

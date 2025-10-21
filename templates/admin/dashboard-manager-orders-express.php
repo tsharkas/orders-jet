@@ -230,7 +230,7 @@ foreach ($active_orders as $order) {
     <!-- Filter Tabs -->
     <div class="oj-filters">
         <button class="oj-filter-btn active" data-filter="active">
-            🔥 <?php _e('Active Orders', 'orders-jet'); ?>
+            🔥 <?php _e('Active', 'orders-jet'); ?>
             <span class="oj-filter-count"><?php echo $filter_counts['active']; ?></span>
         </button>
         <button class="oj-filter-btn" data-filter="processing">
@@ -254,11 +254,11 @@ foreach ($active_orders as $order) {
             <span class="oj-filter-count"><?php echo $filter_counts['delivery']; ?></span>
         </button>
         <button class="oj-filter-btn" data-filter="food-kitchen">
-            🍕 <?php _e('Food Kitchen', 'orders-jet'); ?>
+            🍕 <?php _e('Food', 'orders-jet'); ?>
             <span class="oj-filter-count"><?php echo $filter_counts['food_kitchen']; ?></span>
         </button>
         <button class="oj-filter-btn" data-filter="beverage-kitchen">
-            🥤 <?php _e('Beverage Kitchen', 'orders-jet'); ?>
+            🥤 <?php _e('Beverage', 'orders-jet'); ?>
             <span class="oj-filter-count"><?php echo $filter_counts['beverage_kitchen']; ?></span>
         </button>
     </div>
@@ -352,7 +352,7 @@ foreach ($active_orders as $order) {
                     <!-- Row 1: Order number + Type badges -->
                     <div class="oj-card-row-1">
                         <div class="oj-order-header">
-                            <span class="oj-view-icon">👁️</span>
+                            <span class="oj-view-icon oj-view-order" data-order-id="<?php echo esc_attr($order_id); ?>" title="<?php _e('View Order Details', 'orders-jet'); ?>">👁️</span>
                             <?php if (!empty($table_number)) : ?>
                                 <span class="oj-table-ref"><?php echo esc_html($table_number); ?></span>
                             <?php endif; ?>
@@ -413,7 +413,7 @@ foreach ($active_orders as $order) {
                                 <?php endif; ?>
                                 <?php if (!$kitchen_status['beverage_ready']) : ?>
                                     <button class="oj-action-btn primary oj-mark-ready-beverage" data-order-id="<?php echo esc_attr($order_id); ?>" data-kitchen="beverages">
-                                        🥤 <?php _e('Beverages Ready', 'orders-jet'); ?>
+                                        🥤 <?php _e('Bev. Ready', 'orders-jet'); ?>
                                     </button>
                                 <?php endif; ?>
                             <?php else : ?>
@@ -421,7 +421,7 @@ foreach ($active_orders as $order) {
                                     <?php if ($kitchen_type === 'food') : ?>
                                         🍕 <?php _e('Food Ready', 'orders-jet'); ?>
                                     <?php elseif ($kitchen_type === 'beverages') : ?>
-                                        🥤 <?php _e('Beverages Ready', 'orders-jet'); ?>
+                                        🥤 <?php _e('Bev. Ready', 'orders-jet'); ?>
                                     <?php else : ?>
                                         🔥 <?php _e('Mark Ready', 'orders-jet'); ?>
                                     <?php endif; ?>
@@ -438,10 +438,6 @@ foreach ($active_orders as $order) {
                                 </button>
                             <?php endif; ?>
                         <?php endif; ?>
-                        
-                        <button class="oj-action-btn secondary oj-view-order" data-order-id="<?php echo esc_attr($order_id); ?>">
-                            👁️ <?php _e('Details', 'orders-jet'); ?>
-                        </button>
                     </div>
                 </div>
                 
@@ -577,6 +573,16 @@ foreach ($active_orders as $order) {
 .oj-view-icon {
     font-size: 12px;
     opacity: 0.7;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 2px;
+    border-radius: 3px;
+}
+
+.oj-view-icon:hover {
+    opacity: 1;
+    background: rgba(0, 123, 186, 0.1);
+    transform: scale(1.1);
 }
 
 .oj-table-ref {
@@ -862,7 +868,7 @@ jQuery(document).ready(function($) {
                         if (kitchenType === 'food') {
                             $btn.html('🍕✅ <?php _e('Food Ready', 'orders-jet'); ?>').prop('disabled', true);
                         } else {
-                            $btn.html('🥤✅ <?php _e('Beverages Ready', 'orders-jet'); ?>').prop('disabled', true);
+                            $btn.html('🥤✅ <?php _e('Bev. Ready', 'orders-jet'); ?>').prop('disabled', true);
                         }
                         showExpressNotification(`✅ ${kitchenType.charAt(0).toUpperCase() + kitchenType.slice(1)} ready! ${updates.button_text}`, 'success');
                         
@@ -879,7 +885,7 @@ jQuery(document).ready(function($) {
                         }
                         
                         // Replace all kitchen buttons with completion button
-                        $card.find('.oj-card-actions').html(newButton + '<button class="oj-action-btn secondary oj-view-order" data-order-id="' + orderId + '">👁️ <?php _e('Details', 'orders-jet'); ?></button>');
+                        $card.find('.oj-card-actions').html(newButton);
                         
                         showExpressNotification('✅ Order fully ready!', 'success');
                     }
@@ -897,7 +903,7 @@ jQuery(document).ready(function($) {
                     if (kitchenType === 'food') {
                         $btn.html('🍕 <?php _e('Food Ready', 'orders-jet'); ?>');
                     } else if (kitchenType === 'beverages') {
-                        $btn.html('🥤 <?php _e('Beverages Ready', 'orders-jet'); ?>');
+                        $btn.html('🥤 <?php _e('Bev. Ready', 'orders-jet'); ?>');
                     } else {
                         $btn.html('🔥 <?php _e('Mark Ready', 'orders-jet'); ?>');
                     }
@@ -910,7 +916,7 @@ jQuery(document).ready(function($) {
                 if (kitchenType === 'food') {
                     $btn.html('🍕 <?php _e('Food Ready', 'orders-jet'); ?>');
                 } else if (kitchenType === 'beverages') {
-                    $btn.html('🥤 <?php _e('Beverages Ready', 'orders-jet'); ?>');
+                    $btn.html('🥤 <?php _e('Bev. Ready', 'orders-jet'); ?>');
                 } else {
                     $btn.html('🔥 <?php _e('Mark Ready', 'orders-jet'); ?>');
                 }
@@ -1291,7 +1297,7 @@ jQuery(document).ready(function($) {
                 <!-- Row 1: Order number + Type badges -->
                 <div class="oj-card-row-1">
                     <div class="oj-order-header">
-                        <span class="oj-view-icon">👁️</span>
+                        <span class="oj-view-icon oj-view-order" data-order-id="${combinedOrder.order_id}" title="<?php _e('View Order Details', 'orders-jet'); ?>">👁️</span>
                         <span class="oj-table-ref">${combinedOrder.table_number}</span>
                         <span class="oj-order-number">#${combinedOrder.order_number}</span>
                     </div>
@@ -1329,9 +1335,6 @@ jQuery(document).ready(function($) {
                 <div class="oj-card-actions">
                     <button class="oj-action-btn primary oj-print-invoice" data-order-id="${combinedOrder.order_id}" data-invoice-url="${combinedOrder.invoice_url}">
                         🖨️ <?php _e('Print Invoice', 'orders-jet'); ?>
-                    </button>
-                    <button class="oj-action-btn secondary oj-view-order" data-order-id="${combinedOrder.order_id}">
-                        👁️ <?php _e('Details', 'orders-jet'); ?>
                     </button>
                 </div>
             </div>
