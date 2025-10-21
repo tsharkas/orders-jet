@@ -69,6 +69,16 @@ class Orders_Jet_Handler_Factory {
     }
     
     /**
+     * Get Dashboard Analytics Handler instance
+     */
+    public function get_dashboard_analytics_handler() {
+        if (!isset(self::$instances['dashboard_analytics'])) {
+            self::$instances['dashboard_analytics'] = new Orders_Jet_Dashboard_Analytics_Handler();
+        }
+        return self::$instances['dashboard_analytics'];
+    }
+    
+    /**
      * Clear all cached instances (useful for testing)
      */
     public static function clear_instances() {
