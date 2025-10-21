@@ -59,6 +59,16 @@ class Orders_Jet_Handler_Factory {
     }
     
     /**
+     * Get Product Details Handler instance
+     */
+    public function get_product_details_handler() {
+        if (!isset(self::$instances['product_details'])) {
+            self::$instances['product_details'] = new Orders_Jet_Product_Details_Handler();
+        }
+        return self::$instances['product_details'];
+    }
+    
+    /**
      * Clear all cached instances (useful for testing)
      */
     public static function clear_instances() {

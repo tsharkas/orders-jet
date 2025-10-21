@@ -116,10 +116,11 @@ class Orders_Jet_Integration {
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/services/class-orders-jet-kitchen-service.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/services/class-orders-jet-notification-service.php';
         
-        // Handler classes (Phase 3 refactoring)
+        // Handler classes (Phase 3 & 4 refactoring)
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/handlers/class-orders-jet-order-submission-handler.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/handlers/class-orders-jet-table-closure-handler.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/handlers/class-orders-jet-table-query-handler.php';
+        include_once ORDERS_JET_PLUGIN_DIR . 'includes/handlers/class-orders-jet-product-details-handler.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/handlers/class-orders-jet-handler-factory.php';
         
         // Core classes - only include what's actually used
