@@ -296,7 +296,7 @@ foreach ($active_orders as $order) {
                 } elseif ($status === 'processing') {
                     if ($kitchen_type === 'mixed') {
                         if ($kitchen_status['food_ready'] && !$kitchen_status['beverage_ready']) {
-                            $status_text = __('Waiting for Beverages', 'orders-jet');
+                            $status_text = __('Waiting for Bev.', 'orders-jet');
                             $status_class = 'partial';
                             $status_icon = '🍕✅ 🥤⏳';
                         } elseif (!$kitchen_status['food_ready'] && $kitchen_status['beverage_ready']) {
@@ -304,17 +304,17 @@ foreach ($active_orders as $order) {
                             $status_class = 'partial';
                             $status_icon = '🍕⏳ 🥤✅';
                         } else {
-                            $status_text = __('Both Kitchens Working', 'orders-jet');
-                            $status_class = 'kitchen';
+                            $status_text = __('Both Kitchens', 'orders-jet');
+                            $status_class = 'partial';
                             $status_icon = '🍕⏳ 🥤⏳';
                         }
                     } elseif ($kitchen_type === 'food') {
-                        $status_text = __('Food Kitchen', 'orders-jet');
-                        $status_class = 'kitchen';
+                        $status_text = __('Waiting for Food', 'orders-jet');
+                        $status_class = 'partial';
                         $status_icon = '🍕⏳';
                     } elseif ($kitchen_type === 'beverages') {
-                        $status_text = __('Beverage Kitchen', 'orders-jet');
-                        $status_class = 'kitchen';
+                        $status_text = __('Waiting for Bev.', 'orders-jet');
+                        $status_class = 'partial';
                         $status_icon = '🥤⏳';
                     } else {
                         $status_text = __('Kitchen', 'orders-jet');
