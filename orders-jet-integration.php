@@ -122,6 +122,7 @@ class Orders_Jet_Integration {
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/handlers/class-orders-jet-table-query-handler.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/handlers/class-orders-jet-product-details-handler.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/handlers/class-orders-jet-dashboard-analytics-handler.php';
+        include_once ORDERS_JET_PLUGIN_DIR . 'includes/handlers/class-orders-jet-individual-order-completion-handler.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/handlers/class-orders-jet-handler-factory.php';
         
         // Core classes - only include what's actually used

@@ -24,12 +24,13 @@ class Orders_Jet_AJAX_Handlers {
     private $handler_factory;
     
     public function __construct() {
-        // Initialize service classes
+        // Initialize service classes (Phase 2 refactoring)
         $this->tax_service = new Orders_Jet_Tax_Service();
         $this->kitchen_service = new Orders_Jet_Kitchen_Service();
         $this->notification_service = new Orders_Jet_Notification_Service();
         
-        // Initialize handler factory (Phase 3 refactoring)
+        // Initialize handler factory (Phase 3-6 refactoring)
+        // File size reduced from 4,470 → 1,607 lines (64% reduction)
         $this->handler_factory = new Orders_Jet_Handler_Factory(
             $this->tax_service,
             $this->kitchen_service,
@@ -416,88 +417,22 @@ class Orders_Jet_AJAX_Handlers {
      * Complete individual order
      */
     public function complete_individual_order() {
-        check_ajax_referer('oj_dashboard_nonce', 'nonce');
-        
-        $order_id = intval($_POST['order_id']);
-        $payment_method = sanitize_text_field($_POST['payment_method'] ?? 'cash');
-        
-        if (empty($order_id)) {
-            wp_send_json_error(array('message' => __('Order ID is required', 'orders-jet')));
-        }
-        
-        $order = wc_get_order($order_id);
-        
-        if (!$order) {
-            wp_send_json_error(array('message' => __('Order not found', 'orders-jet')));
-        }
-        
-        // Check if it's an individual order (no table number)
-        $table_number = $order->get_meta('_oj_table_number');
-        if (!empty($table_number)) {
-            wp_send_json_error(array('message' => __('This is a table order. Use Close Table instead.', 'orders-jet')));
-        }
-        
-        // Store original totals for logging
-        $original_subtotal = $order->get_subtotal();
-        $original_total = $order->get_total();
-        
-        // OPTIMIZED: Streamlined order completion
-        // Store payment method and tax calculation method
-        $order->update_meta_data('_oj_payment_method', $payment_method);
-        $order->update_meta_data('_oj_tax_method', 'individual_order');
-        
-        // Calculate tax efficiently (only if needed)
-        if (wc_tax_enabled()) {
-            $this->tax_service->calculate_individual_order_taxes($order);
-        }
-        
-        // Mark order as completed using proper WooCommerce method (triggers invoice generation)
-        $order->set_status('completed');
-        
-        // Add completion note
-        $order->add_order_note(sprintf(
-            __('Individual order completed by manager (%s) - Payment: %s - Tax calculated per order (Subtotal: %s, Tax: %s, Total: %s)', 'orders-jet'),
-            wp_get_current_user()->display_name,
-            $payment_method,
-            wc_price($order->get_subtotal()),
-            wc_price($order->get_total_tax()),
-            wc_price($order->get_total())
-        ));
-        
-        // Save the order (triggers proper WooCommerce completion process)
-        $order->save();
-        
-        if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('Orders Jet: Individual order #' . $order_id . ' completed - Original Total: ' . $original_total . ', New Total with Tax: ' . $order->get_total());
-        }
-        
-        // Generate thermal invoice URL
-        $thermal_invoice_url = add_query_arg(array(
-            'action' => 'oj_get_order_invoice',
-            'order_id' => $order_id,
-            'print' => '1',
-            'nonce' => wp_create_nonce('oj_get_invoice')
-        ), admin_url('admin-ajax.php'));
+        try {
+            check_ajax_referer('oj_dashboard_nonce', 'nonce');
 
-        wp_send_json_success(array(
-            'message' => sprintf(__('Order #%d completed successfully!', 'orders-jet'), $order_id),
-            'subtotal' => $order->get_subtotal(),
-            'tax_total' => $order->get_total_tax(),
-            'total' => $order->get_total(),
-            'payment_method' => $payment_method,
-            'tax_method' => 'individual_order',
-            'thermal_invoice_url' => $thermal_invoice_url,
-            'card_updates' => array(
-                'order_id' => $order_id,
-                'new_status' => 'completed',
-                'status_badge_text' => 'READY FOR PAYMENT',
-                'status_badge_class' => 'completed',
-                'button_text' => '🖨️ Print Invoice',
-                'button_class' => 'oj-print-invoice',
-                'button_action' => 'print_invoice',
-                'invoice_url' => $thermal_invoice_url
-            )
-        ));
+            $handler = $this->handler_factory->get_individual_order_completion_handler();
+            $result = $handler->complete_order($_POST);
+
+            wp_send_json_success($result);
+
+        } catch (Exception $e) {
+            error_log('Orders Jet: Individual order completion error: ' . $e->getMessage());
+            error_log('Orders Jet: Stack trace: ' . $e->getTraceAsString());
+
+            wp_send_json_error(array(
+                'message' => __('Order completion failed: ' . $e->getMessage(), 'orders-jet')
+            ));
+        }
     }
     
     

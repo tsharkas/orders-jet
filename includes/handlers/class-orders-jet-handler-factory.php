@@ -79,6 +79,18 @@ class Orders_Jet_Handler_Factory {
     }
     
     /**
+     * Get Individual Order Completion Handler instance
+     */
+    public function get_individual_order_completion_handler() {
+        if (!isset(self::$instances['individual_order_completion'])) {
+            self::$instances['individual_order_completion'] = new Orders_Jet_Individual_Order_Completion_Handler(
+                $this->tax_service
+            );
+        }
+        return self::$instances['individual_order_completion'];
+    }
+    
+    /**
      * Clear all cached instances (useful for testing)
      */
     public static function clear_instances() {
