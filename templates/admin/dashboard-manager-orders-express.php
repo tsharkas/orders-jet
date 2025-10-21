@@ -244,6 +244,9 @@ foreach ($active_orders as $order) {
                 $time_ago = human_time_diff($date_created->getTimestamp(), current_time('timestamp'));
                 $item_count = count($items);
                 
+                // Get the WooCommerce order object for service calls (Fix: Badge scope issue)
+                $order = wc_get_order($order_id);
+                
                 // Get status badge using kitchen service (Phase 3: Service Integration)
                 $status_badge_html = $kitchen_service->get_kitchen_status_badge($order);
                 
