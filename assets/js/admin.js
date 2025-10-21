@@ -6,15 +6,9 @@
 jQuery(document).ready(function($) {
     'use strict';
     
-    // Debug: Check if admin variables are loaded
-    console.log('Orders Jet Admin: Script loaded');
-    console.log('Orders Jet Admin: oj_admin object:', typeof oj_admin !== 'undefined' ? oj_admin : 'NOT FOUND');
-    console.log('Orders Jet Admin: OrdersJetAdmin object:', typeof OrdersJetAdmin !== 'undefined' ? OrdersJetAdmin : 'NOT FOUND');
-    
     // Use OrdersJetAdmin on dashboard pages, fallback to oj_admin on table management pages
     var adminConfig = typeof OrdersJetAdmin !== 'undefined' ? OrdersJetAdmin : 
                       (typeof oj_admin !== 'undefined' ? oj_admin : null);
-    console.log('Orders Jet Admin: Using config:', adminConfig);
     
     // Auto-refresh dashboards every 30 seconds
     var dashboardRefreshInterval;
@@ -29,20 +23,15 @@ jQuery(document).ready(function($) {
         dashboardRefreshInterval = setInterval(function() {
             refreshDashboard();
         }, 30000);
-        
-        console.log('Orders Jet Admin: Auto-refresh started (30s interval)');
     }
     
     function stopDashboardAutoRefresh() {
         if (dashboardRefreshInterval) {
             clearInterval(dashboardRefreshInterval);
-            console.log('Orders Jet Admin: Auto-refresh stopped');
         }
     }
     
     function refreshDashboard() {
-        console.log('Orders Jet Admin: Refreshing dashboard via AJAX...');
-        
         // Show subtle refresh indicator
         var $refreshIndicator = $('<div class="oj-refresh-indicator" style="position: fixed; top: 32px; right: 20px; background: #0073aa; color: white; padding: 5px 10px; border-radius: 3px; font-size: 12px; z-index: 9999;">Updating...</div>');
         $('body').append($refreshIndicator);
@@ -83,16 +72,12 @@ jQuery(document).ready(function($) {
                     // Re-apply current filter
                     var activeFilter = $('.oj-filter-btn.active').data('filter') || 'active';
                     $('.oj-filter-btn[data-filter="' + activeFilter + '"]').trigger('click');
-                    
-                    console.log('Orders Jet Admin: Dashboard refreshed via AJAX at', response.data.timestamp);
                 } else {
-                    console.error('Orders Jet Admin: AJAX refresh failed:', response.data.message);
                     // Fallback to page reload
                     window.location.reload();
                 }
             },
             error: function(xhr, status, error) {
-                console.error('Orders Jet Admin: AJAX refresh error:', error);
                 // Fallback to page reload
                 window.location.reload();
             },

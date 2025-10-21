@@ -19,9 +19,7 @@ jQuery(document).ready(function($) {
         },
         
         init: function(options) {
-            console.log('OrdersJetQRMenu: Initializing with options:', options);
             this.config = $.extend(this.config, options);
-            console.log('OrdersJetQRMenu: Final config:', this.config);
             this.bindEvents();
             this.loadCart();
             this.loadOrders();
@@ -104,14 +102,10 @@ jQuery(document).ready(function($) {
             var currentValue = parseInt($input.val()) || 1;
             var newValue = currentValue;
             
-            console.log('OrdersJetQRMenu: Quantity button clicked, current value:', currentValue);
-            
             if ($button.hasClass('oj-quantity-plus')) {
                 newValue = currentValue + 1; // Remove artificial limit
-                console.log('OrdersJetQRMenu: Plus clicked, new value:', newValue);
             } else if ($button.hasClass('oj-quantity-minus')) {
                 newValue = Math.max(currentValue - 1, 1);
-                console.log('OrdersJetQRMenu: Minus clicked, new value:', newValue);
             }
             
             $input.val(newValue);
@@ -129,14 +123,11 @@ jQuery(document).ready(function($) {
         
         addToCart: function(e) {
             e.preventDefault();
-            console.log('OrdersJetQRMenu: Add to cart clicked');
             var $button = $(this);
             var productId = $button.data('product-id');
             var $menuItem = $button.closest('.oj-menu-item');
             var quantity = parseInt($menuItem.find('.oj-quantity-input').val());
             var variationId = $menuItem.find('.oj-variation-select').val();
-            
-            console.log('OrdersJetQRMenu: Product ID:', productId, 'Quantity:', quantity, 'Variation ID:', variationId);
             
             // Get product details
             var productName = $menuItem.find('.oj-menu-item-title').text();

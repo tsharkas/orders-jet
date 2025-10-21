@@ -62,8 +62,6 @@ jQuery(document).ready(function($) {
                 $card.fadeOut(300);
             }
         });
-        
-        console.log('Express filter applied:', filter);
     });
     
     // ========================================================================

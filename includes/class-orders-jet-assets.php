@@ -65,9 +65,7 @@ class Orders_Jet_Assets {
         // Add inline script to ensure initialization
         wp_add_inline_script('orders-jet-qr-menu', '
             jQuery(document).ready(function($) {
-                console.log("Orders Jet: Scripts loaded, checking for OrdersJetQRMenu...");
                 if (typeof OrdersJetQRMenu !== "undefined") {
-                    console.log("Orders Jet: OrdersJetQRMenu found, initializing...");
                     // Initialize with table data
                     var tableNumber = "' . sanitize_text_field($_GET['table']) . '";
                     var tableId = null; // Will be set by template
@@ -77,8 +75,6 @@ class Orders_Jet_Assets {
                         ajaxUrl: "' . admin_url('admin-ajax.php') . '",
                         nonce: "' . wp_create_nonce('oj_table_nonce') . '"
                     });
-                } else {
-                    console.error("Orders Jet: OrdersJetQRMenu not found!");
                 }
             });
         ');
