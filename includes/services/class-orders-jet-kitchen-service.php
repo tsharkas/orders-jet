@@ -166,9 +166,30 @@ class Orders_Jet_Kitchen_Service {
             case 'beverages':
                 return '<span class="oj-kitchen-badge beverages">🥤 ' . __('Beverages', 'orders-jet') . '</span>';
             case 'mixed':
-                return '<span class="oj-kitchen-badge mixed">🍽️ ' . __('Mixed', 'orders-jet') . '</span>';
+                return $this->get_mixed_kitchen_badge($order);
             default:
                 return '<span class="oj-kitchen-badge food">🍕 ' . __('Food', 'orders-jet') . '</span>';
+        }
+    }
+    
+    /**
+     * Get dynamic kitchen badge for mixed orders showing current readiness status
+     * 
+     * @param WC_Order $order The WooCommerce order object
+     * @return string HTML for mixed kitchen badge with current status
+     */
+    private function get_mixed_kitchen_badge($order) {
+        $food_ready = $order->get_meta('_oj_food_kitchen_ready') === 'yes';
+        $beverage_ready = $order->get_meta('_oj_beverage_kitchen_ready') === 'yes';
+        
+        if ($food_ready && $beverage_ready) {
+            return '<span class="oj-kitchen-badge mixed-ready">🍽️✅ ' . __('Both Ready', 'orders-jet') . '</span>';
+        } elseif ($food_ready && !$beverage_ready) {
+            return '<span class="oj-kitchen-badge mixed-partial">🍕✅🥤⏳ ' . __('Food Ready, Waiting Bev', 'orders-jet') . '</span>';
+        } elseif (!$food_ready && $beverage_ready) {
+            return '<span class="oj-kitchen-badge mixed-partial">🍕⏳🥤✅ ' . __('Bev Ready, Waiting Food', 'orders-jet') . '</span>';
+        } else {
+            return '<span class="oj-kitchen-badge mixed">🍽️⏳ ' . __('Both Kitchens', 'orders-jet') . '</span>';
         }
     }
     
