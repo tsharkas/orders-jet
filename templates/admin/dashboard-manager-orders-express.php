@@ -27,8 +27,19 @@ wp_enqueue_style('oj-dashboard-express', ORDERS_JET_PLUGIN_URL . 'assets/css/das
 $kitchen_service = new Orders_Jet_Kitchen_Service();
 $order_method_service = new Orders_Jet_Order_Method_Service();
 
+// Enqueue admin.js for auto-refresh functionality (JavaScript Optimization)
+wp_enqueue_script('orders-jet-admin', ORDERS_JET_PLUGIN_URL . 'assets/js/admin.js', array('jquery'), ORDERS_JET_VERSION, true);
+
+// Localize admin script for auto-refresh functionality
+wp_localize_script('orders-jet-admin', 'OrdersJetAdmin', array(
+    'ajaxUrl' => admin_url('admin-ajax.php'),
+    'nonces' => array(
+        'dashboard' => wp_create_nonce('oj_dashboard_nonce')
+    )
+));
+
 // Enqueue and localize JavaScript (Phase 2: JavaScript Localization)
-wp_enqueue_script('oj-dashboard-express', ORDERS_JET_PLUGIN_URL . 'assets/js/dashboard-express.js', array('jquery'), ORDERS_JET_VERSION, true);
+wp_enqueue_script('oj-dashboard-express', ORDERS_JET_PLUGIN_URL . 'assets/js/dashboard-express.js', array('jquery', 'orders-jet-admin'), ORDERS_JET_VERSION, true);
 wp_localize_script('oj-dashboard-express', 'ojExpressData', array(
     'ajaxUrl' => admin_url('admin-ajax.php'),
     'adminUrl' => admin_url('post.php'),
