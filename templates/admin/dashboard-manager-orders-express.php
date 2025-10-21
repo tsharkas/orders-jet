@@ -857,11 +857,6 @@ jQuery(document).ready(function($) {
                         $statusBadge.removeClass('ready partial kitchen completed').addClass(updates.status_class);
                     }
                     
-                    // Update kitchen type badge if provided
-                    if (updates.kitchen_type_badge_html) {
-                        $card.find('.oj-kitchen-badge').replaceWith(updates.kitchen_type_badge_html);
-                    }
-                    
                     // Update card data attributes
                     $card.attr('data-status', updates.new_status);
                     if (response.data.kitchen_status) {

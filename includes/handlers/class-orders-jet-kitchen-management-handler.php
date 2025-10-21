@@ -227,7 +227,6 @@ class Orders_Jet_Kitchen_Management_Handler {
                 'order_id' => $order_id,
                 'new_status' => $order->get_status(),
                 'status_badge_html' => $this->kitchen_service->get_kitchen_status_badge($order),
-                'kitchen_type_badge_html' => $this->kitchen_service->get_kitchen_type_badge($order),
                 'button_text' => $button_text,
                 'button_class' => $button_class,
                 'table_number' => $table_number,
