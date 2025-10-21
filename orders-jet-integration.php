@@ -111,6 +111,11 @@ class Orders_Jet_Integration {
      * Include required files
      */
     private function includes(): void {
+        // Service classes (Phase 2 refactoring)
+        include_once ORDERS_JET_PLUGIN_DIR . 'includes/services/class-orders-jet-tax-service.php';
+        include_once ORDERS_JET_PLUGIN_DIR . 'includes/services/class-orders-jet-kitchen-service.php';
+        include_once ORDERS_JET_PLUGIN_DIR . 'includes/services/class-orders-jet-notification-service.php';
+        
         // Core classes - only include what's actually used
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-delivery-time-manager.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-user-roles.php';

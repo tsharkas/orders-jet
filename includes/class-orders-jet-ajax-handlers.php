@@ -11,7 +11,19 @@ if (!defined('ABSPATH')) {
 
 class Orders_Jet_AJAX_Handlers {
     
+    /**
+     * Service instances (Phase 2 refactoring)
+     */
+    private $tax_service;
+    private $kitchen_service;
+    private $notification_service;
+    
     public function __construct() {
+        // Initialize service classes
+        $this->tax_service = new Orders_Jet_Tax_Service();
+        $this->kitchen_service = new Orders_Jet_Kitchen_Service();
+        $this->notification_service = new Orders_Jet_Notification_Service();
+        
         // AJAX handlers for logged in users
         add_action('wp_ajax_oj_submit_table_order', array($this, 'submit_table_order'));
         add_action('wp_ajax_oj_get_table_status', array($this, 'get_table_status'));
@@ -26,11 +38,10 @@ class Orders_Jet_AJAX_Handlers {
         add_action('wp_ajax_oj_get_filter_counts', array($this, 'get_filter_counts'));
         add_action('wp_ajax_oj_confirm_payment_received', array($this, 'confirm_payment_received'));
         
-        // NOTE: Obsolete functions still exist in this file but are no longer registered:
-        // close_table(), mark_order_delivered(), confirm_pickup_payment(), get_table_summary(),
-        // complete_table_cash(), get_completed_orders_for_pdf(), generate_guest_pdf(),
-        // generate_admin_pdf(), generate_table_pdf(), bulk_action(), search_order_invoice(),
-        // download_order_invoice(), get_order_details(), load_more_orders() - These can be removed in future cleanup.
+        // NOTE: Phase 1 & 2 refactoring complete:
+        // - Phase 1: Removed obsolete functions (4,470 → 3,483 lines)
+        // - Phase 2: Extracted service classes (3,483 → 3,121 lines)
+        // - Total reduction: 1,349 lines (30% smaller, better organized)
         
         // AJAX handlers for non-logged in users (guests)
         add_action('wp_ajax_nopriv_oj_submit_table_order', array($this, 'submit_table_order'));
@@ -346,7 +357,7 @@ class Orders_Jet_AJAX_Handlers {
         
         // SAFEGUARD: Validate tax isolation
         $expected_behavior = !empty($table_number) ? 'deferred' : 'calculated';
-        $this->validate_tax_isolation($order, $expected_behavior);
+        $this->tax_service->validate_tax_isolation($order, $expected_behavior);
         
         // Update table status to occupied (CRITICAL FIX: Always try to update)
         if ($table_id > 0) {
@@ -366,7 +377,7 @@ class Orders_Jet_AJAX_Handlers {
         
         // Send notification to staff (only if method exists)
         if (method_exists($this, 'send_order_notification')) {
-            $this->send_order_notification($order);
+            $this->notification_service->send_order_notification($order);
         }
         
         // Clear any WooCommerce cache for this order
@@ -472,28 +483,6 @@ class Orders_Jet_AJAX_Handlers {
     /**
      * Send order notification to staff
      */
-    private function send_order_notification($order) {
-        // Get restaurant email (you can customize this)
-        $restaurant_email = get_option('admin_email');
-        $table_number = $order->get_meta('_oj_table_number');
-        
-        $subject = sprintf(__('New Order from Table %s', 'orders-jet'), $table_number);
-        $message = sprintf(__('A new order has been placed from Table %s. Order #%s', 'orders-jet'), $table_number, $order->get_order_number());
-        
-        // Add order details
-        $message .= "\n\n" . __('Order Details:', 'orders-jet') . "\n";
-        $message .= __('Order Number:', 'orders-jet') . ' ' . $order->get_order_number() . "\n";
-        $message .= __('Table:', 'orders-jet') . ' ' . $table_number . "\n";
-        $message .= __('Total:', 'orders-jet') . ' ' . $order->get_formatted_order_total() . "\n";
-        
-        if ($order->get_customer_note()) {
-            $message .= __('Special Requests:', 'orders-jet') . ' ' . $order->get_customer_note() . "\n";
-        }
-        
-        $message .= "\n" . __('View Order:', 'orders-jet') . ' ' . admin_url('post.php?post=' . $order->get_id() . '&action=edit');
-        
-        wp_mail($restaurant_email, $subject, $message);
-    }
     
     /**
      * Get product details including add-ons and food information
@@ -1173,188 +1162,6 @@ class Orders_Jet_AJAX_Handlers {
         ));
     }
     
-    /**
-     * Close table and generate invoice
-     */
-    public function close_table() {
-        check_ajax_referer('oj_table_order', 'nonce');
-        
-        $table_number = sanitize_text_field($_POST['table_number']);
-        $payment_method = sanitize_text_field($_POST['payment_method']);
-        
-        if (empty($table_number)) {
-            wp_send_json_error(array('message' => __('Table number is required', 'orders-jet')));
-        }
-        
-        // Get table ID
-        $table_id = oj_get_table_id_by_number($table_number);
-        if (!$table_id) {
-            wp_send_json_error(array('message' => __('Table not found', 'orders-jet')));
-        }
-        
-        // Get all orders for this table using proper WooCommerce statuses
-        $args = array(
-            'post_type' => 'shop_order',
-            'post_status' => array(
-                'wc-pending',
-                'wc-processing', 
-                'wc-pending',
-                'wc-completed',
-                'wc-cancelled',
-                'wc-refunded',
-                'wc-failed'
-            ),
-            'meta_query' => array(
-                array(
-                    'key' => '_oj_table_number',
-                    'value' => $table_number,
-                    'compare' => '='
-                )
-            ),
-            'posts_per_page' => -1
-        );
-        
-        $orders = get_posts($args);
-        $total_amount = 0;
-        
-        error_log('Orders Jet: Close table - Found ' . count($orders) . ' orders for table ' . $table_number);
-        
-        // If no orders found with get_posts, try WooCommerce native method
-        if (count($orders) == 0 && function_exists('wc_get_orders')) {
-            error_log('Orders Jet: Close table - Trying WooCommerce native method...');
-            
-            $wc_orders = wc_get_orders(array(
-                'status' => array('pending', 'processing', 'pending', 'completed', 'cancelled', 'refunded', 'failed'),
-                'meta_key' => '_oj_table_number',
-                'meta_value' => $table_number,
-                'limit' => -1
-            ));
-            
-            error_log('Orders Jet: Close table - WooCommerce native method found ' . count($wc_orders) . ' orders');
-            
-            if (count($wc_orders) > 0) {
-                // Convert WC_Order objects to post objects for consistency
-                $orders = array();
-                foreach ($wc_orders as $wc_order) {
-                    $post = get_post($wc_order->get_id());
-                    if ($post) {
-                        $orders[] = $post;
-                    }
-                }
-                error_log('Orders Jet: Close table - Converted ' . count($orders) . ' WooCommerce orders to post objects');
-            }
-        }
-        
-        foreach ($orders as $order_post) {
-            $order = wc_get_order($order_post->ID);
-            if ($order) {
-                $status = $order->get_status();
-                $total = $order->get_total();
-                $table_meta = $order->get_meta('_oj_table_number');
-                error_log('Orders Jet: Close table - Order #' . $order->get_id() . ' - Status: "' . $status . '" - Total: ' . $total . ' - Table Meta: "' . $table_meta . '"');
-                
-                // Include orders that are processing or pending (not completed yet)
-                if (in_array($status, array('processing', 'pending', 'pending'))) {
-                    $total_amount += $total;
-                    error_log('Orders Jet: Close table - Added order #' . $order->get_id() . ' to total. New total: ' . $total_amount);
-                } else {
-                    error_log('Orders Jet: Close table - Skipped order #' . $order->get_id() . ' because status "' . $status . '" is not pending/processing/pending');
-                }
-            } else {
-                error_log('Orders Jet: Close table - Failed to get order object for post ID: ' . $order_post->ID);
-            }
-        }
-        
-        error_log('Orders Jet: Close table - Final total amount for pending orders: ' . $total_amount);
-        
-        if ($total_amount == 0) {
-            wp_send_json_error(array('message' => __('No pending orders found for this table', 'orders-jet')));
-        }
-        
-        // Update table status to available
-        update_post_meta($table_id, '_oj_table_status', 'available');
-        
-        // Generate a session ID for this table closure
-        $session_id = 'session_' . $table_number . '_' . time();
-        
-        // Mark all pending/processing orders as completed and collect order IDs
-        $completed_order_ids = array();
-        $table_subtotal = 0;
-        
-        // First pass: Complete orders WITHOUT calculating individual taxes and accumulate subtotals
-        foreach ($orders as $order_post) {
-            $order = wc_get_order($order_post->ID);
-            if ($order && in_array($order->get_status(), array('processing', 'pending', 'pending'))) {
-                
-                // For table orders: Do NOT calculate individual taxes
-                // Just accumulate the subtotals (without tax)
-                $order_subtotal = $order->get_subtotal();
-                if ($order_subtotal <= 0) {
-                    // Fallback: calculate subtotal from line items if not set
-                    $order_subtotal = 0;
-                    foreach ($order->get_items() as $item) {
-                        $order_subtotal += $item->get_subtotal();
-                    }
-                }
-                $table_subtotal += $order_subtotal;
-                
-                $order->set_status('completed');
-                $order->update_meta_data('_oj_session_id', $session_id);
-                $order->update_meta_data('_oj_payment_method', $payment_method);
-                $order->update_meta_data('_oj_table_closed', current_time('mysql'));
-                
-                // Mark this as a table order for tax calculation reference
-                $order->update_meta_data('_oj_tax_method', 'combined_invoice');
-                
-                $order->save();
-                $completed_order_ids[] = $order->get_id();
-                error_log('Orders Jet: Marked table order #' . $order->get_id() . ' as completed - Subtotal: ' . $order_subtotal);
-            }
-        }
-        
-        // TABLE ORDERS: Calculate tax on the combined invoice total
-        $table_tax_data = $this->calculate_table_invoice_taxes($table_subtotal, $completed_order_ids);
-        
-        // Store table-level tax information for invoice generation
-        $table_invoice_data = array(
-            'subtotal' => $table_subtotal,
-            'service_tax' => $table_tax_data['service_tax'],
-            'vat_tax' => $table_tax_data['vat_tax'],
-            'total_tax' => $table_tax_data['total_tax'],
-            'grand_total' => $table_tax_data['grand_total'],
-            'order_ids' => $completed_order_ids,
-            'payment_method' => $payment_method,
-            'table_number' => $table_number,
-            'session_id' => $session_id,
-            'closed_at' => current_time('mysql')
-        );
-        
-        // Store the combined tax data for the table session
-        update_option('oj_table_tax_' . $session_id, $table_invoice_data);
-        
-        error_log('Orders Jet: Table #' . $table_number . ' - Combined invoice tax calculation complete - Subtotal: ' . $table_subtotal . ', Total Tax: ' . $table_tax_data['total_tax'] . ', Grand Total: ' . $table_tax_data['grand_total']);
-        
-        // Generate invoice URL using direct file access with session ID
-        $invoice_url = add_query_arg(array(
-            'table' => $table_number,
-            'payment_method' => $payment_method,
-            'session' => $session_id
-        ), ORDERS_JET_PLUGIN_URL . 'table-invoice.php');
-        
-        wp_send_json_success(array(
-            'message' => __('Table closed successfully', 'orders-jet'),
-            'total' => $total_amount,
-            'subtotal' => $table_tax_data['subtotal'] ?? $table_subtotal,
-            'service_tax' => $table_tax_data['service_tax'] ?? 0,
-            'vat_tax' => $table_tax_data['vat_tax'] ?? 0,
-            'total_tax' => $table_tax_data['total_tax'] ?? 0,
-            'grand_total' => $table_tax_data['grand_total'] ?? $table_subtotal,
-            'payment_method' => $payment_method,
-            'invoice_url' => $invoice_url,
-            'order_ids' => $completed_order_ids,
-            'tax_method' => 'combined_invoice'
-        ));
-    }
     
     /**
      * Check if this is a new session for the table
@@ -1466,7 +1273,7 @@ class Orders_Jet_AJAX_Handlers {
             // Get or determine kitchen type for this order
             $order_kitchen_type = $order->get_meta('_oj_kitchen_type');
             if (empty($order_kitchen_type)) {
-                $order_kitchen_type = $this->get_order_kitchen_type($order);
+                $order_kitchen_type = $this->kitchen_service->get_order_kitchen_type($order);
                 $order->update_meta_data('_oj_kitchen_type', $order_kitchen_type);
             }
             
@@ -1538,11 +1345,11 @@ class Orders_Jet_AJAX_Handlers {
             
             // Send notifications if fully ready
             if ($order->get_status() === 'pending') {
-                $this->send_ready_notifications($order, $table_number);
+                $this->notification_service->send_ready_notifications($order, $table_number);
             }
             
             // Get updated kitchen status for response
-            $kitchen_status = $this->get_kitchen_readiness_status($order);
+            $kitchen_status = $this->kitchen_service->get_kitchen_readiness_status($order);
             
             wp_send_json_success(array(
                 'message' => $success_message,
@@ -1555,8 +1362,8 @@ class Orders_Jet_AJAX_Handlers {
                 'card_updates' => array(
                     'order_id' => $order_id,
                     'new_status' => $order->get_status(),
-                    'status_badge_html' => $this->get_kitchen_status_badge($order),
-                    'kitchen_type_badge_html' => $this->get_kitchen_type_badge($order),
+                    'status_badge_html' => $this->kitchen_service->get_kitchen_status_badge($order),
+                    'kitchen_type_badge_html' => $this->kitchen_service->get_kitchen_type_badge($order),
                     'button_text' => $button_text,
                     'button_class' => $button_class,
                     'table_number' => $table_number,
@@ -1573,261 +1380,10 @@ class Orders_Jet_AJAX_Handlers {
     /**
      * Send notifications when order is ready
      */
-    private function send_ready_notifications($order, $table_number) {
-        // Store notification in transient for manager/waiter dashboards to pick up
-        $notification = array(
-            'type' => 'order_ready',
-            'order_id' => $order->get_id(),
-            'table_number' => $table_number,
-            'message' => sprintf(__('Table %s - Order #%d is ready for pickup!', 'orders-jet'), $table_number, $order->get_id()),
-            'timestamp' => current_time('timestamp'),
-            'staff_name' => wp_get_current_user()->display_name
-        );
-        
-        // Store notification for 5 minutes (manager/waiter dashboards will pick it up)
-        $existing_notifications = get_transient('oj_ready_notifications') ?: array();
-        $existing_notifications[] = $notification;
-        
-        // Keep only last 10 notifications
-        if (count($existing_notifications) > 10) {
-            $existing_notifications = array_slice($existing_notifications, -10);
-        }
-        
-        set_transient('oj_ready_notifications', $existing_notifications, 300); // 5 minutes
-        
-        error_log('Orders Jet Kitchen: Ready notification stored for Table ' . $table_number . ' Order #' . $order->get_id());
-    }
     
-    /**
-     * Mark order as delivered (Manager Dashboard)
-     */
-    public function mark_order_delivered() {
-        // Check nonce for security
-        check_ajax_referer('oj_dashboard_nonce', 'nonce');
-        
-        // Check user permissions
-        if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => __('You do not have permission to perform this action.', 'orders-jet')));
-        }
-        
-        $order_id = intval($_POST['order_id']);
-        
-        if (!$order_id) {
-            wp_send_json_error(array('message' => __('Order ID is required.', 'orders-jet')));
-        }
-        
-        // Get the order
-        $order = wc_get_order($order_id);
-        
-        if (!$order) {
-            wp_send_json_error(array('message' => __('Order not found.', 'orders-jet')));
-        }
-        
-        // Check if this is a table order
-        $table_number = $order->get_meta('_oj_table_number');
-        if (!$table_number) {
-            wp_send_json_error(array('message' => __('This is not a table order.', 'orders-jet')));
-        }
-        
-        // Check current status (should be pending)
-        $current_status = $order->get_status();
-        if ($current_status !== 'pending') {
-            wp_send_json_error(array('message' => sprintf(__('Order cannot be marked delivered from status: %s', 'orders-jet'), $current_status)));
-        }
-        
-        try {
-            // Mark order as delivered (completed status)
-            $order->set_status('completed');
-            
-            // Add order note
-            $order->add_order_note(sprintf(
-                __('Order marked as delivered by staff (%s)', 'orders-jet'), 
-                wp_get_current_user()->display_name
-            ));
-            
-            // Save the order
-            $order->save();
-            
-            error_log('Orders Jet Manager: Order #' . $order_id . ' marked as delivered (completed) by user #' . get_current_user_id());
-            
-            wp_send_json_success(array(
-                'message' => sprintf(__('Order #%d marked as delivered!', 'orders-jet'), $order_id),
-                'order_id' => $order_id,
-                'table_number' => $table_number,
-                'new_status' => 'completed'
-            ));
-            
-        } catch (Exception $e) {
-            error_log('Orders Jet Manager: Error marking order delivered: ' . $e->getMessage());
-            wp_send_json_error(array('message' => __('Failed to mark order as delivered. Please try again.', 'orders-jet')));
-        }
-    }
     
-    /**
-     * Confirm payment for pickup orders
-     */
-    public function confirm_pickup_payment() {
-        // Check nonce for security
-        check_ajax_referer('oj_dashboard_nonce', 'nonce');
-        
-        // Check user permissions
-        if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => __('You do not have permission to perform this action.', 'orders-jet')));
-        }
-        
-        $order_id = intval($_POST['order_id']);
-        
-        if (!$order_id) {
-            wp_send_json_error(array('message' => __('Order ID is required.', 'orders-jet')));
-        }
-        
-        try {
-            $order = wc_get_order($order_id);
-            
-            if (!$order) {
-                wp_send_json_error(array('message' => __('Order not found.', 'orders-jet')));
-            }
-            
-            // Only allow payment confirmation for pending orders
-            if ($order->get_status() !== 'pending') {
-                wp_send_json_error(array('message' => sprintf(__('Order cannot be completed from status: %s (must be pending)', 'orders-jet'), $order->get_status())));
-            }
-            
-            // Confirm this is a pickup order (not a table order)
-            $table_number = $order->get_meta('_oj_table_number');
-            if (!empty($table_number)) {
-                wp_send_json_error(array('message' => __('Table orders should be paid through the table invoice system.', 'orders-jet')));
-            }
-            
-            // Mark order as completed
-            $order->set_status('completed');
-            $order->add_order_note(sprintf(
-                __('Pickup payment confirmed and order completed by staff (%s)', 'orders-jet'), 
-                wp_get_current_user()->display_name
-            ));
-            
-            // Save the order
-            $order->save();
-            
-            error_log('Orders Jet Manager: Pickup order #' . $order_id . ' payment confirmed and completed by user #' . get_current_user_id());
-            
-            wp_send_json_success(array(
-                'message' => sprintf(__('Payment confirmed! Order #%d completed.', 'orders-jet'), $order_id),
-                'order_id' => $order_id,
-                'new_status' => 'completed'
-            ));
-            
-        } catch (Exception $e) {
-            error_log('Orders Jet Manager: Error confirming pickup payment: ' . $e->getMessage());
-            wp_send_json_error(array('message' => __('Failed to confirm payment. Please try again.', 'orders-jet')));
-        }
-    }
     
-    /**
-     * Get table summary for smart close table
-     */
-    public function get_table_summary() {
-        check_ajax_referer('oj_dashboard_nonce', 'nonce');
-        
-        $table_number = sanitize_text_field($_POST['table']);
-        
-        if (empty($table_number)) {
-            wp_send_json_error(array('message' => __('Table number is required', 'orders-jet')));
-        }
-        
-        // Get all served orders for this table (both pending and pending)
-        $orders = wc_get_orders(array(
-            'status' => array('pending', 'pending'),
-            'limit' => -1,
-            'meta_query' => array(
-                array(
-                    'key' => '_oj_table_number',
-                    'value' => $table_number,
-                    'compare' => '='
-                )
-            )
-        ));
-        
-        if (empty($orders)) {
-            wp_send_json_error(array('message' => __('No orders found for this table', 'orders-jet')));
-        }
-        
-        $order_data = array();
-        $total_amount = 0;
-        
-        foreach ($orders as $order) {
-            $order_data[] = array(
-                'id' => $order->get_id(),
-                'total' => wc_price($order->get_total()),
-                'items_count' => count($order->get_items())
-            );
-            $total_amount += $order->get_total();
-        }
-        
-        // Get available payment gateways
-        $available_gateways = WC()->payment_gateways->get_available_payment_gateways();
-        $has_online_gateways = !empty($available_gateways);
-        
-        wp_send_json_success(array(
-            'table' => $table_number,
-            'orders' => $order_data,
-            'total' => $total_amount,
-            'total_formatted' => wc_price($total_amount),
-            'has_online_gateways' => $has_online_gateways,
-            'invoice_url' => site_url("/wp-content/plugins/orders-jet-integration/table-invoice.php?table=$table_number")
-        ));
-    }
     
-    /**
-     * Complete table with cash payment
-     */
-    public function complete_table_cash() {
-        check_ajax_referer('oj_dashboard_nonce', 'nonce');
-        
-        $table_number = sanitize_text_field($_POST['table']);
-        $payment_method = sanitize_text_field($_POST['payment_method']);
-        
-        if (empty($table_number)) {
-            wp_send_json_error(array('message' => __('Table number is required', 'orders-jet')));
-        }
-        
-        // Get all served orders for this table (both pending and pending)
-        $orders = wc_get_orders(array(
-            'status' => array('pending', 'pending'),
-            'limit' => -1,
-            'meta_query' => array(
-                array(
-                    'key' => '_oj_table_number',
-                    'value' => $table_number,
-                    'compare' => '='
-                )
-            )
-        ));
-        
-        if (empty($orders)) {
-            wp_send_json_error(array('message' => __('No orders found for this table', 'orders-jet')));
-        }
-        
-        $completed_orders = array();
-        
-        foreach ($orders as $order) {
-            // Mark order as completed
-            $order->set_status('completed');
-            $order->add_order_note(sprintf(
-                __('Table %s closed with cash payment by manager (%s)', 'orders-jet'),
-                $table_number,
-                wp_get_current_user()->display_name
-            ));
-            $order->save();
-            
-            $completed_orders[] = $order->get_id();
-        }
-        
-        wp_send_json_success(array(
-            'message' => sprintf(__('Table %s closed successfully! %d orders completed.', 'orders-jet'), $table_number, count($completed_orders)),
-            'completed_orders' => $completed_orders
-        ));
-    }
     
     /**
      * Complete individual order
@@ -1865,7 +1421,7 @@ class Orders_Jet_AJAX_Handlers {
         
         // Calculate tax efficiently (only if needed)
         if (wc_tax_enabled()) {
-            $this->calculate_individual_order_taxes($order);
+            $this->tax_service->calculate_individual_order_taxes($order);
         }
         
         // Mark order as completed using proper WooCommerce method (triggers invoice generation)
@@ -1917,241 +1473,9 @@ class Orders_Jet_AJAX_Handlers {
         ));
     }
     
-    /**
-     * Get completed orders for PDF generation (for guests)
-     */
-    public function get_completed_orders_for_pdf() {
-        check_ajax_referer('oj_table_nonce', 'nonce');
-        
-        $table_number = sanitize_text_field($_POST['table_number']);
-        
-        if (empty($table_number)) {
-            wp_send_json_error(array('message' => __('Table number is required', 'orders-jet')));
-        }
-        
-        // Get completed orders for this table
-        $wc_orders = wc_get_orders(array(
-            'status' => 'completed',
-            'meta_key' => '_oj_table_number',
-            'meta_value' => $table_number,
-            'limit' => -1,
-            'orderby' => 'date',
-            'order' => 'DESC'
-        ));
-        
-        $order_ids = array();
-        foreach ($wc_orders as $order) {
-            $order_ids[] = $order->get_id();
-        }
-        
-        if (empty($order_ids)) {
-            wp_send_json_error(array('message' => __('No completed orders found for this table', 'orders-jet')));
-        }
-        
-        wp_send_json_success(array(
-            'order_ids' => $order_ids,
-            'table_number' => $table_number
-        ));
-    }
     
-    /**
-     * Generate PDF invoice for guests (public access with validation)
-     */
-    public function generate_guest_pdf() {
-        // Verify nonce for security
-        if (!wp_verify_nonce($_GET['nonce'] ?? '', 'oj_guest_pdf')) {
-            wp_die(__('Security check failed', 'orders-jet'));
-        }
-        
-        $order_id = intval($_GET['order_id'] ?? 0);
-        $table_number = sanitize_text_field($_GET['table'] ?? '');
-        $document_type = sanitize_text_field($_GET['document_type'] ?? 'invoice');
-        $output = sanitize_text_field($_GET['output'] ?? 'pdf');
-        $force_download = isset($_GET['force_download']);
-        
-        if (!$order_id || !$table_number) {
-            wp_die(__('Invalid order or table information', 'orders-jet'));
-        }
-        
-        // Verify the order belongs to the specified table
-        $order = wc_get_order($order_id);
-        if (!$order) {
-            wp_die(__('Order not found', 'orders-jet'));
-        }
-        
-        $order_table = $order->get_meta('_oj_table_number');
-        if ($order_table !== $table_number) {
-            wp_die(__('Order does not belong to this table', 'orders-jet'));
-        }
-        
-        // Verify the order is completed
-        if ($order->get_status() !== 'completed') {
-            wp_die(__('Order is not completed', 'orders-jet'));
-        }
-        
-        // Check if PDF Invoices plugin is available
-        if (!function_exists('wcpdf_get_document')) {
-            wp_die(__('PDF invoice functionality is not available', 'orders-jet'));
-        }
-        
-        try {
-            // Get the PDF document
-            $document = wcpdf_get_document($document_type, $order);
-            
-            if (!$document) {
-                wp_die(__('Could not generate PDF document', 'orders-jet'));
-            }
-            
-            // Set appropriate headers
-            if ($output === 'html') {
-                header('Content-Type: text/html; charset=utf-8');
-                echo $document->get_html();
-            } else {
-                // PDF output
-                $pdf_data = $document->get_pdf();
-                $filename = $document->get_filename();
-                
-                header('Content-Type: application/pdf');
-                header('Content-Length: ' . strlen($pdf_data));
-                
-                if ($force_download) {
-                    header('Content-Disposition: attachment; filename="' . $filename . '"');
-                } else {
-                    header('Content-Disposition: inline; filename="' . $filename . '"');
-                }
-                
-                echo $pdf_data;
-            }
-            
-            exit;
-            
-        } catch (Exception $e) {
-            error_log('Orders Jet: PDF generation error: ' . $e->getMessage());
-            wp_die(__('Error generating PDF: ', 'orders-jet') . $e->getMessage());
-        }
-    }
     
-    /**
-     * Generate PDF invoice for admin users (with proper authentication)
-     */
-    public function generate_admin_pdf() {
-        // Verify nonce for security
-        if (!wp_verify_nonce($_GET['nonce'] ?? '', 'oj_admin_pdf')) {
-            wp_die(__('Security check failed', 'orders-jet'));
-        }
-        
-        // Check if user has admin capabilities
-        if (!current_user_can('manage_woocommerce') && !current_user_can('access_oj_manager_dashboard')) {
-            wp_die(__('You do not have permission to access this resource', 'orders-jet'));
-        }
-        
-        $order_id = intval($_GET['order_id'] ?? 0);
-        $document_type = sanitize_text_field($_GET['document_type'] ?? 'invoice');
-        $output = sanitize_text_field($_GET['output'] ?? 'pdf');
-        $force_download = isset($_GET['force_download']);
-        
-        if (!$order_id) {
-            wp_die(__('Invalid order ID', 'orders-jet'));
-        }
-        
-        // Verify the order exists
-        $order = wc_get_order($order_id);
-        if (!$order) {
-            wp_die(__('Order not found', 'orders-jet'));
-        }
-        
-        // Check if PDF Invoices plugin is available
-        if (!function_exists('wcpdf_get_document')) {
-            wp_die(__('PDF invoice functionality is not available', 'orders-jet'));
-        }
-        
-        try {
-            // Get the PDF document using the plugin's function
-            $document = wcpdf_get_document($document_type, $order);
-            
-            if (!$document) {
-                wp_die(__('Could not generate PDF document', 'orders-jet'));
-            }
-            
-            // Set appropriate headers
-            if ($output === 'html') {
-                header('Content-Type: text/html; charset=utf-8');
-                echo $document->get_html();
-            } else {
-                // PDF output
-                $pdf_data = $document->get_pdf();
-                $filename = $document->get_filename();
-                
-                header('Content-Type: application/pdf');
-                header('Content-Length: ' . strlen($pdf_data));
-                
-                if ($force_download) {
-                    header('Content-Disposition: attachment; filename="' . $filename . '"');
-                } else {
-                    header('Content-Disposition: inline; filename="' . $filename . '"');
-                }
-                
-                echo $pdf_data;
-            }
-            
-            exit;
-            
-        } catch (Exception $e) {
-            error_log('Orders Jet: Admin PDF generation error: ' . $e->getMessage());
-            wp_die(__('Error generating PDF: ', 'orders-jet') . $e->getMessage());
-        }
-    }
     
-    /**
-     * Generate combined PDF invoice for table orders (admin users)
-     */
-    public function generate_table_pdf() {
-        // Verify nonce for security
-        if (!wp_verify_nonce($_GET['nonce'] ?? '', 'oj_admin_pdf')) {
-            wp_die(__('Security check failed', 'orders-jet'));
-        }
-        
-        // Check if user has admin capabilities
-        if (!current_user_can('manage_woocommerce') && !current_user_can('access_oj_manager_dashboard')) {
-            wp_die(__('You do not have permission to access this resource', 'orders-jet'));
-        }
-        
-        $table_number = sanitize_text_field($_GET['table_number'] ?? '');
-        $order_ids = sanitize_text_field($_GET['order_ids'] ?? '');
-        $output = sanitize_text_field($_GET['output'] ?? 'pdf');
-        $force_download = isset($_GET['force_download']);
-        
-        if (!$table_number || !$order_ids) {
-            wp_die(__('Invalid table number or order IDs', 'orders-jet'));
-        }
-        
-        // Parse order IDs
-        $order_id_array = explode(',', $order_ids);
-        $order_id_array = array_map('intval', $order_id_array);
-        
-        if (empty($order_id_array)) {
-            wp_die(__('No valid order IDs provided', 'orders-jet'));
-        }
-        
-        try {
-            // Generate combined table invoice HTML
-            $invoice_html = $this->generate_table_invoice_html($table_number, $order_id_array);
-            
-            if ($output === 'html') {
-                header('Content-Type: text/html; charset=utf-8');
-                echo $invoice_html;
-            } else {
-                // Generate PDF from HTML
-                $this->generate_pdf_from_html($invoice_html, $table_number, $force_download);
-            }
-            
-            exit;
-            
-        } catch (Exception $e) {
-            error_log('Orders Jet: Table PDF generation error: ' . $e->getMessage());
-            wp_die(__('Error generating table PDF: ', 'orders-jet') . $e->getMessage());
-        }
-    }
     
     /**
      * Generate combined table invoice HTML
@@ -2815,181 +2139,6 @@ class Orders_Jet_AJAX_Handlers {
         echo $print_html;
     }
     
-    /**
-     * Handle bulk actions on orders
-     */
-    public function bulk_action() {
-        check_ajax_referer('oj_bulk_action', 'nonce');
-        
-        if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => __('Permission denied', 'orders-jet')));
-        }
-        
-        $bulk_action = sanitize_text_field($_POST['bulk_action']);
-        $order_ids = array_map('intval', $_POST['order_ids']);
-        
-        if (empty($order_ids)) {
-            wp_send_json_error(array('message' => __('No orders selected', 'orders-jet')));
-        }
-        
-        $success_count = 0;
-        $error_count = 0;
-        $processed_orders = array();
-        
-        foreach ($order_ids as $order_id) {
-            $order = wc_get_order($order_id);
-            if (!$order) {
-                $error_count++;
-                error_log('Orders Jet: Bulk Action - Order not found: ' . $order_id);
-                continue;
-            }
-            
-            $current_status = $order->get_status();
-            $order_number = $order->get_order_number();
-            
-            $table_number = $order->get_meta('_oj_table_number');
-            $is_table_order = !empty($table_number);
-            
-            switch ($bulk_action) {
-                case 'mark_ready':
-                    if ($current_status === 'processing') {
-                        $order->set_status('pending');
-                        $order->add_order_note(__('Order marked as ready via bulk action', 'orders-jet'));
-                        $order->save();
-                        $success_count++;
-                        $processed_orders[] = $order_number;
-                        error_log('Orders Jet: Bulk Action - Marked order #' . $order_number . ' as ready');
-                    } else {
-                        $error_count++;
-                        error_log('Orders Jet: Bulk Action - Cannot mark order #' . $order_number . ' as ready. Current status: ' . $current_status);
-                    }
-                    break;
-                    
-                case 'complete_pickup_orders':
-                    // CRITICAL: Only allow pickup orders to be completed individually
-                    if ($is_table_order) {
-                        $error_count++;
-                        error_log('Orders Jet: Bulk Action - BLOCKED: Attempted to complete table order #' . $order_number . ' individually. Table: ' . $table_number);
-                        continue 2; // Skip to next order
-                    }
-                    
-                    if (in_array($current_status, ['processing', 'pending'])) {
-                        $order->set_status('completed');
-                        $order->add_order_note(__('Pickup order completed via bulk action', 'orders-jet'));
-                        $order->save();
-                        $success_count++;
-                        $processed_orders[] = $order_number;
-                        error_log('Orders Jet: Bulk Action - Completed pickup order #' . $order_number);
-                    } else {
-                        $error_count++;
-                        error_log('Orders Jet: Bulk Action - Cannot complete pickup order #' . $order_number . '. Current status: ' . $current_status);
-                    }
-                    break;
-                    
-                case 'close_tables':
-                    // CRITICAL: Only allow table orders for this action
-                    if (!$is_table_order) {
-                        $error_count++;
-                        error_log('Orders Jet: Bulk Action - BLOCKED: Attempted to close table for pickup order #' . $order_number);
-                        continue 2; // Skip to next order
-                    }
-                    
-                    // Group table orders by table number for proper closing
-                    if (!isset($table_groups)) {
-                        $table_groups = array();
-                    }
-                    
-                    if (!isset($table_groups[$table_number])) {
-                        $table_groups[$table_number] = array();
-                    }
-                    
-                    $table_groups[$table_number][] = $order_id;
-                    break;
-                    
-                case 'cancel_orders':
-                    if (in_array($current_status, ['processing', 'pending'])) {
-                        $order->set_status('cancelled');
-                        $order->add_order_note(__('Order cancelled via bulk action', 'orders-jet'));
-                        $order->save();
-                        $success_count++;
-                        $processed_orders[] = $order_number;
-                        error_log('Orders Jet: Bulk Action - Cancelled order #' . $order_number);
-                    } else {
-                        $error_count++;
-                        error_log('Orders Jet: Bulk Action - Cannot cancel order #' . $order_number . '. Current status: ' . $current_status);
-                    }
-                    break;
-                    
-                default:
-                    $error_count++;
-                    error_log('Orders Jet: Bulk Action - Unknown action: ' . $bulk_action);
-            }
-        }
-        
-        // Handle table closing if that was the action
-        if ($bulk_action === 'close_tables' && isset($table_groups)) {
-            foreach ($table_groups as $table_num => $table_order_ids) {
-                $table_success = $this->close_table_orders($table_num, $table_order_ids);
-                if ($table_success) {
-                    $success_count += count($table_order_ids);
-                    $processed_orders = array_merge($processed_orders, $table_order_ids);
-                    error_log('Orders Jet: Bulk Action - Closed table ' . $table_num . ' with ' . count($table_order_ids) . ' orders');
-                } else {
-                    $error_count += count($table_order_ids);
-                    error_log('Orders Jet: Bulk Action - Failed to close table ' . $table_num);
-                }
-            }
-        }
-        
-        // Prepare response message
-        $action_names = array(
-            'mark_ready' => __('marked as ready', 'orders-jet'),
-            'complete_pickup_orders' => __('completed', 'orders-jet'),
-            'close_tables' => __('closed', 'orders-jet'),
-            'cancel_orders' => __('cancelled', 'orders-jet')
-        );
-        
-        $action_name = isset($action_names[$bulk_action]) ? $action_names[$bulk_action] : $bulk_action;
-        
-        if ($success_count > 0) {
-            $message = sprintf(
-                _n(
-                    '%d order %s successfully.',
-                    '%d orders %s successfully.',
-                    $success_count,
-                    'orders-jet'
-                ),
-                $success_count,
-                $action_name
-            );
-            
-            if ($error_count > 0) {
-                $message .= ' ' . sprintf(
-                    _n(
-                        '%d order failed to process.',
-                        '%d orders failed to process.',
-                        $error_count,
-                        'orders-jet'
-                    ),
-                    $error_count
-                );
-            }
-        } else {
-            $message = sprintf(
-                __('No orders could be %s. Please check order statuses.', 'orders-jet'),
-                $action_name
-            );
-        }
-        
-        error_log('Orders Jet: Bulk Action Summary - Action: ' . $bulk_action . ', Success: ' . $success_count . ', Errors: ' . $error_count);
-        
-        wp_send_json_success(array(
-            'message' => $message,
-            'success_count' => $success_count,
-            'error_count' => $error_count,
-            'processed_orders' => $processed_orders
-        ));
-    }
     
     /**
      * Close table orders properly (used by bulk actions)
@@ -3034,207 +2183,8 @@ class Orders_Jet_AJAX_Handlers {
         }
     }
     
-    /**
-     * Search order for invoice (minimal AJAX handler)
-     */
-    public function search_order_invoice() {
-        check_ajax_referer('oj_search_invoice', 'nonce');
-        
-        if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_options')) {
-            wp_send_json_error(array('message' => __('Permission denied', 'orders-jet')));
-        }
-        
-        $order_number = sanitize_text_field($_POST['order_number']);
-        
-        if (empty($order_number)) {
-            wp_send_json_error(array('message' => __('Please enter an order number', 'orders-jet')));
-        }
-        
-        // Try to find order by ID or order number
-        $order = wc_get_order($order_number);
-        
-        // If not found by ID, try searching by order number
-        if (!$order) {
-            $orders = wc_get_orders(array(
-                'meta_query' => array(
-                    array(
-                        'key' => '_order_number',
-                        'value' => $order_number,
-                        'compare' => '='
-                    )
-                ),
-                'limit' => 1
-            ));
-            
-            if (!empty($orders)) {
-                $order = $orders[0];
-            }
-        }
-        
-        if (!$order) {
-            wp_send_json_error(array('message' => __('Order not found', 'orders-jet')));
-        }
-        
-        if ($order->get_status() !== 'completed') {
-            wp_send_json_error(array('message' => __('Order is not completed yet', 'orders-jet')));
-        }
-        
-        $table_number = $order->get_meta('_oj_table_number');
-        
-        wp_send_json_success(array(
-            'id' => $order->get_id(),
-            'type' => !empty($table_number) ? 'table' : 'pickup',
-            'table' => $table_number ?: '',
-            'status' => $order->get_status(),
-            'total' => $order->get_total()
-        ));
-    }
     
-    /**
-     * Calculate taxes for individual orders (per order basis)
-     */
-    private function calculate_individual_order_taxes($order) {
-        if (!$order) return;
-        
-        $tax_enabled = wc_tax_enabled();
-        if (!$tax_enabled) {
-            error_log('Orders Jet: Taxes not enabled in WooCommerce');
-            return;
-        }
-        
-        // Set customer location for tax calculation (use store location)
-        $store_country = WC()->countries->get_base_country();
-        $store_state = WC()->countries->get_base_state();
-        
-        // Set order addresses for tax calculation
-        $order->set_billing_country($store_country);
-        $order->set_billing_state($store_state);
-        $order->set_shipping_country($store_country);
-        $order->set_shipping_state($store_state);
-        
-        // Calculate taxes for each item in this individual order
-        foreach ($order->get_items() as $item_id => $item) {
-            $product = $item->get_product();
-            if (!$product) continue;
-            
-            // Get tax class for the product
-            $tax_class = $product->get_tax_class();
-            
-            // Get tax rates for this product
-            $tax_rates = WC_Tax::find_rates(array(
-                'country' => $store_country,
-                'state' => $store_state,
-                'city' => '',
-                'postcode' => '',
-                'tax_class' => $tax_class
-            ));
-            
-            if (!empty($tax_rates)) {
-                $line_subtotal = $item->get_subtotal();
-                $line_total = $item->get_total();
-                
-                // Calculate taxes
-                $line_subtotal_taxes = WC_Tax::calc_tax($line_subtotal, $tax_rates, false);
-                $line_taxes = WC_Tax::calc_tax($line_total, $tax_rates, false);
-                
-                // Set item taxes
-                $item->set_taxes(array(
-                    'subtotal' => $line_subtotal_taxes,
-                    'total' => $line_taxes
-                ));
-                
-                $item->save();
-                
-                error_log('Orders Jet: Applied individual order taxes to item ' . $item->get_name() . ' - Tax: ' . array_sum($line_taxes));
-            }
-        }
-        
-        // Recalculate order totals (this will sum up all item taxes)
-        $order->calculate_totals();
-        
-        // Log tax calculation results
-        error_log('Orders Jet: Individual Order #' . $order->get_id() . ' - Tax calculated per order - Subtotal: ' . $order->get_subtotal() . ', Tax: ' . $order->get_total_tax() . ', Total: ' . $order->get_total());
-    }
     
-    /**
-     * Calculate taxes for table orders (per combined invoice total)
-     */
-    private function calculate_table_invoice_taxes($subtotal, $order_ids) {
-        if (!wc_tax_enabled()) {
-            error_log('Orders Jet: Taxes not enabled - returning zero tax amounts');
-            return array(
-                'service_tax' => 0,
-                'vat_tax' => 0,
-                'total_tax' => 0,
-                'grand_total' => $subtotal
-            );
-        }
-        
-        // Get tax rates for standard tax class
-        $store_country = WC()->countries->get_base_country();
-        $store_state = WC()->countries->get_base_state();
-        
-        $tax_rates = WC_Tax::find_rates(array(
-            'country' => $store_country,
-            'state' => $store_state,
-            'city' => '',
-            'postcode' => '',
-            'tax_class' => '' // Standard tax class
-        ));
-        
-        // Initialize tax amounts
-        $service_tax = 0;
-        $vat_tax = 0;
-        $running_total = $subtotal;
-        
-        // Sort tax rates by priority to ensure correct compound calculation
-        uasort($tax_rates, function($a, $b) {
-            return intval($a['priority']) - intval($b['priority']);
-        });
-        
-        foreach ($tax_rates as $rate_id => $rate) {
-            $rate_percent = floatval($rate['rate']);
-            $is_compound = $rate['compound'] === 'yes';
-            $priority = intval($rate['priority']);
-            
-            error_log('Orders Jet: Processing tax rate - Rate: ' . $rate_percent . '%, Compound: ' . ($is_compound ? 'Yes' : 'No') . ', Priority: ' . $priority);
-            
-            if ($rate_percent == 12.0) {
-                // Service tax (12%, Priority 1)
-                $service_tax = ($running_total * $rate_percent) / 100;
-                error_log('Orders Jet: Service Tax (12%) calculated: ' . $service_tax . ' on base: ' . $running_total);
-                
-                if ($is_compound) {
-                    $running_total += $service_tax;
-                    error_log('Orders Jet: Service tax is compound - new running total: ' . $running_total);
-                }
-            } elseif ($rate_percent == 14.0) {
-                // VAT tax (14%, Priority 2, should be compound)
-                if ($is_compound) {
-                    // Compound: calculate on subtotal + previous taxes
-                    $vat_tax = ($running_total * $rate_percent) / 100;
-                    error_log('Orders Jet: VAT (14% compound) calculated: ' . $vat_tax . ' on base: ' . $running_total);
-                } else {
-                    // Non-compound: calculate on original subtotal only
-                    $vat_tax = ($subtotal * $rate_percent) / 100;
-                    error_log('Orders Jet: VAT (14% non-compound) calculated: ' . $vat_tax . ' on base: ' . $subtotal);
-                }
-            }
-        }
-        
-        $total_tax = $service_tax + $vat_tax;
-        $grand_total = $subtotal + $total_tax;
-        
-        error_log('Orders Jet: Table Invoice Tax Calculation Complete - Subtotal: ' . $subtotal . ', Service Tax (12%): ' . $service_tax . ', VAT (14% compound): ' . $vat_tax . ', Total Tax: ' . $total_tax . ', Grand Total: ' . $grand_total);
-        
-        return array(
-            'service_tax' => $service_tax,
-            'vat_tax' => $vat_tax,
-            'total_tax' => $total_tax,
-            'grand_total' => $grand_total,
-            'order_ids' => $order_ids
-        );
-    }
     
     /**
      * Close table group and create consolidated order (NEW APPROACH)
@@ -3298,7 +2248,7 @@ class Orders_Jet_AJAX_Handlers {
             foreach ($table_orders as $order) {
                 $kitchen_type = $order->get_meta('_oj_kitchen_type');
                 if (empty($kitchen_type)) {
-                    $kitchen_type = $this->get_order_kitchen_type($order);
+                    $kitchen_type = $this->kitchen_service->get_order_kitchen_type($order);
                     $order->update_meta_data('_oj_kitchen_type', $kitchen_type);
                     $order->save();
                 }
@@ -3516,7 +2466,7 @@ class Orders_Jet_AJAX_Handlers {
             
             // SAFEGUARD: Validate consolidated order tax calculation (debug only)
             if (defined('WP_DEBUG') && WP_DEBUG) {
-                $this->validate_tax_isolation($consolidated_order, 'consolidated');
+                $this->tax_service->validate_tax_isolation($consolidated_order, 'consolidated');
             }
             
             // 8. OPTIMIZED: Permanently delete child orders efficiently
@@ -3657,126 +2607,7 @@ class Orders_Jet_AJAX_Handlers {
      * Validate tax calculation isolation (SAFEGUARD FUNCTION)
      * Ensures tax changes only affect the intended order types
      */
-    private function validate_tax_isolation($order, $expected_tax_behavior) {
-        $order_id = $order->get_id();
-        $table_number = $order->get_meta('_oj_table_number');
-        $tax_deferred = $order->get_meta('_oj_tax_deferred');
-        $total_tax = $order->get_total_tax();
-        
-        if ($expected_tax_behavior === 'deferred') {
-            // Table orders should have zero tax and deferred flag
-            if (!empty($table_number) && $tax_deferred === 'yes' && $total_tax == 0) {
-                error_log("Orders Jet: ✅ Tax isolation VALIDATED - Order #{$order_id} (Table {$table_number}) has tax deferred correctly");
-                return true;
-            } else {
-                error_log("Orders Jet: ❌ Tax isolation FAILED - Order #{$order_id} should have deferred tax but doesn't");
-                return false;
-            }
-        } elseif ($expected_tax_behavior === 'calculated') {
-            // Pickup orders should have calculated tax
-            if (empty($table_number) && $tax_deferred !== 'yes') {
-                error_log("Orders Jet: ✅ Tax isolation VALIDATED - Order #{$order_id} (Pickup) has tax calculated correctly: {$total_tax}");
-                return true;
-            } else {
-                error_log("Orders Jet: ❌ Tax isolation FAILED - Order #{$order_id} should have calculated tax but doesn't");
-                return false;
-            }
-        } elseif ($expected_tax_behavior === 'consolidated') {
-            // Consolidated orders should have calculated tax
-            $is_consolidated = $order->get_meta('_oj_consolidated_order');
-            if ($is_consolidated === 'yes') {
-                error_log("Orders Jet: ✅ Tax isolation VALIDATED - Consolidated Order #{$order_id} has tax calculated correctly: {$total_tax}");
-                return true;
-            } else {
-                error_log("Orders Jet: ❌ Tax isolation FAILED - Order #{$order_id} should be consolidated but isn't");
-                return false;
-            }
-        }
-        
-        return false;
-    }
     
-    /**
-     * Get order details for modal display
-     */
-    public function get_order_details() {
-        check_ajax_referer('oj_order_details', 'nonce');
-        
-        $order_id = intval($_POST['order_id']);
-        
-        if (empty($order_id)) {
-            wp_send_json_error(array('message' => __('Order ID is required', 'orders-jet')));
-        }
-        
-        $order = wc_get_order($order_id);
-        
-        if (!$order) {
-            wp_send_json_error(array('message' => __('Order not found', 'orders-jet')));
-        }
-        
-        try {
-            // Get order basic info
-            $table_number = $order->get_meta('_oj_table_number');
-            $order_type = !empty($table_number) ? 'Table ' . $table_number : 'Pickup';
-            
-            $order_data = array(
-                'id' => $order->get_id(),
-                'customer' => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
-                'type' => $order_type,
-                'status' => ucfirst($order->get_status()),
-                'date' => $order->get_date_created()->format('Y-m-d H:i'),
-                'table' => $table_number,
-                'subtotal' => $order->get_subtotal(),
-                'tax' => $order->get_total_tax(),
-                'total' => $order->get_total(),
-                'formatted_subtotal' => wc_price($order->get_subtotal()),
-                'formatted_tax' => wc_price($order->get_total_tax()),
-                'formatted_total' => wc_price($order->get_total())
-            );
-            
-            // Get order items
-            $items = array();
-            foreach ($order->get_items() as $item_id => $item) {
-                $product = $item->get_product();
-                if (!$product) continue;
-                
-                // Get item notes
-                $notes = $item->get_meta('_oj_item_notes');
-                
-                // Get add-ons
-                $addons_data = $item->get_meta('_oj_addons_data');
-                $addons_text = '';
-                if (!empty($addons_data) && is_array($addons_data)) {
-                    $addon_names = array();
-                    foreach ($addons_data as $addon) {
-                        if (isset($addon['name']) && isset($addon['price'])) {
-                            $addon_names[] = $addon['name'] . ' (+' . wc_price($addon['price']) . ')';
-                        }
-                    }
-                    $addons_text = implode(', ', $addon_names);
-                }
-                
-                $items[] = array(
-                    'name' => $item->get_name(),
-                    'quantity' => $item->get_quantity(),
-                    'price' => wc_price($product->get_price()),
-                    'total' => $item->get_total(),
-                    'formatted_total' => wc_price($item->get_total()),
-                    'notes' => $notes,
-                    'addons' => $addons_text
-                );
-            }
-            
-            wp_send_json_success(array(
-                'order' => $order_data,
-                'items' => $items
-            ));
-            
-        } catch (Exception $e) {
-            error_log('Orders Jet: Error getting order details: ' . $e->getMessage());
-            wp_send_json_error(array('message' => __('Failed to load order details', 'orders-jet')));
-        }
-    }
     
     /**
      * Get order invoice (for view/print)
@@ -3833,40 +2664,6 @@ class Orders_Jet_AJAX_Handlers {
         }
     }
     
-    /**
-     * Download order invoice as PDF
-     */
-    public function download_order_invoice() {
-        try {
-            $order_id = intval($_GET['order_id'] ?? 0);
-            $order_type = sanitize_text_field($_GET['type'] ?? '');
-            
-            if (!$order_id) {
-                wp_die(__('Invalid order ID', 'orders-jet'));
-            }
-            
-            // Check permissions
-            if (!current_user_can('access_oj_manager_dashboard') && !current_user_can('manage_woocommerce')) {
-                wp_die(__('Permission denied', 'orders-jet'));
-            }
-            
-            $order = wc_get_order($order_id);
-            if (!$order) {
-                wp_die(__('Order not found', 'orders-jet'));
-            }
-            
-            // Generate invoice HTML
-            $invoice_html = $this->generate_single_order_invoice_html($order, false);
-            
-            // Generate PDF
-            $this->generate_pdf_from_html($invoice_html, 'order-' . $order_id, true);
-            exit;
-            
-        } catch (Exception $e) {
-            error_log('Orders Jet: Error downloading invoice: ' . $e->getMessage());
-            wp_die(__('Error downloading invoice: ', 'orders-jet') . $e->getMessage());
-        }
-    }
     
     /**
      * Generate HTML for single order invoice (thermal printer optimized)
@@ -4319,151 +3116,9 @@ class Orders_Jet_AJAX_Handlers {
      * @param WC_Order $order The WooCommerce order object
      * @return string 'food', 'beverages', or 'mixed'
      */
-    private function get_order_kitchen_type($order) {
-        $kitchen_types = array();
-        
-        foreach ($order->get_items() as $item) {
-            $product_id = $item->get_product_id();
-            $variation_id = $item->get_variation_id();
-            
-            // Check variation first, then fall back to main product
-            $kitchen = '';
-            if ($variation_id > 0) {
-                $kitchen = get_post_meta($variation_id, 'Kitchen', true);
-            }
-            // Fall back to main product if variation doesn't have Kitchen field
-            if (empty($kitchen)) {
-                $kitchen = get_post_meta($product_id, 'Kitchen', true);
-            }
-            
-            if (!empty($kitchen)) {
-                $kitchen_types[] = strtolower(trim($kitchen));
-            }
-        }
-        
-        // Remove duplicates and determine final kitchen type
-        $unique_types = array_unique($kitchen_types);
-        
-        if (count($unique_types) === 1) {
-            return $unique_types[0];
-        } elseif (count($unique_types) > 1) {
-            return 'mixed';
-        }
-        
-        // Default fallback to food if no kitchen field is set
-        return 'food';
-    }
     
-    /**
-     * Get kitchen readiness status for an order
-     * 
-     * @param WC_Order $order The WooCommerce order object
-     * @return array Kitchen readiness information
-     */
-    private function get_kitchen_readiness_status($order) {
-        $kitchen_type = $order->get_meta('_oj_kitchen_type');
-        if (empty($kitchen_type)) {
-            // Determine and store kitchen type if not set
-            $kitchen_type = $this->get_order_kitchen_type($order);
-            $order->update_meta_data('_oj_kitchen_type', $kitchen_type);
-            $order->save();
-        }
-        
-        $food_ready = $order->get_meta('_oj_food_kitchen_ready') === 'yes';
-        $beverage_ready = $order->get_meta('_oj_beverage_kitchen_ready') === 'yes';
-        
-        $status = array(
-            'kitchen_type' => $kitchen_type,
-            'food_ready' => $food_ready,
-            'beverage_ready' => $beverage_ready,
-            'all_ready' => false,
-            'waiting_for' => array()
-        );
-        
-        // Determine overall readiness
-        if ($kitchen_type === 'food') {
-            $status['all_ready'] = $food_ready;
-            if (!$food_ready) {
-                $status['waiting_for'][] = 'food';
-            }
-        } elseif ($kitchen_type === 'beverages') {
-            $status['all_ready'] = $beverage_ready;
-            if (!$beverage_ready) {
-                $status['waiting_for'][] = 'beverages';
-            }
-        } elseif ($kitchen_type === 'mixed') {
-            $status['all_ready'] = $food_ready && $beverage_ready;
-            if (!$food_ready) {
-                $status['waiting_for'][] = 'food';
-            }
-            if (!$beverage_ready) {
-                $status['waiting_for'][] = 'beverages';
-            }
-        }
-        
-        return $status;
-    }
     
-    /**
-     * Get kitchen status badge HTML for display
-     * 
-     * @param WC_Order $order The WooCommerce order object
-     * @return string HTML for kitchen status badge
-     */
-    private function get_kitchen_status_badge($order) {
-        $status = $this->get_kitchen_readiness_status($order);
-        $order_status = $order->get_status();
-        
-        if ($order_status === 'completed') {
-            return '<span class="oj-status-badge completed">✅ ' . __('Completed', 'orders-jet') . '</span>';
-        }
-        
-        if ($order_status === 'pending' && $status['all_ready']) {
-            return '<span class="oj-status-badge ready">✅ ' . __('Ready', 'orders-jet') . '</span>';
-        }
-        
-        if ($status['kitchen_type'] === 'mixed' && $order_status === 'processing') {
-            if ($status['food_ready'] && !$status['beverage_ready']) {
-                return '<span class="oj-status-badge partial">🍕✅ 🥤⏳ ' . __('Waiting for Bev.', 'orders-jet') . '</span>';
-            } elseif (!$status['food_ready'] && $status['beverage_ready']) {
-                return '<span class="oj-status-badge partial">🍕⏳ 🥤✅ ' . __('Waiting for Food', 'orders-jet') . '</span>';
-            } else {
-                return '<span class="oj-status-badge partial">🍕⏳ 🥤⏳ ' . __('Both Kitchens', 'orders-jet') . '</span>';
-            }
-        } elseif ($order_status === 'processing') {
-            if ($status['kitchen_type'] === 'food') {
-                return '<span class="oj-status-badge partial">🍕⏳ ' . __('Waiting for Food', 'orders-jet') . '</span>';
-            } elseif ($status['kitchen_type'] === 'beverages') {
-                return '<span class="oj-status-badge partial">🥤⏳ ' . __('Waiting for Bev.', 'orders-jet') . '</span>';
-            }
-        }
-        
-        return '<span class="oj-status-badge kitchen">⏳ ' . __('Kitchen', 'orders-jet') . '</span>';
-    }
     
-    /**
-     * Get kitchen type badge for order cards
-     * 
-     * @param WC_Order $order The WooCommerce order object
-     * @return string HTML for kitchen type badge
-     */
-    private function get_kitchen_type_badge($order) {
-        $kitchen_type = $order->get_meta('_oj_kitchen_type');
-        if (empty($kitchen_type)) {
-            $kitchen_type = $this->get_order_kitchen_type($order);
-        }
-        
-        switch ($kitchen_type) {
-            case 'food':
-                return '<span class="oj-kitchen-badge food">🍕 ' . __('Food', 'orders-jet') . '</span>';
-            case 'beverages':
-                return '<span class="oj-kitchen-badge beverages">🥤 ' . __('Beverages', 'orders-jet') . '</span>';
-            case 'mixed':
-                return '<span class="oj-kitchen-badge mixed">🍽️ ' . __('Mixed', 'orders-jet') . '</span>';
-            default:
-                return '<span class="oj-kitchen-badge food">🍕 ' . __('Food', 'orders-jet') . '</span>';
-        }
-    }
     
     
 }
