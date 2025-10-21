@@ -67,10 +67,20 @@ wp_localize_script('oj-dashboard-express', 'ojExpressData', array(
 ));
 
 /**
- * Helper function: Prepare clean order data using services (Phase 3: Service Integration)
+ * Helper function: Prepare clean order data using services (Phase 4A: Performance Critical)
  */
 function oj_express_prepare_order_data($order, $kitchen_service, $order_method_service) {
     $kitchen_status = $kitchen_service->get_kitchen_readiness_status($order);
+    
+    // Pre-process items text for performance (Phase 4A)
+    $items = $order->get_items();
+    $items_text = array();
+    foreach ($items as $item) {
+        $product_name = $item->get_name();
+        $quantity = $item->get_quantity();
+        $items_text[] = esc_html($quantity) . 'x ' . esc_html($product_name);
+    }
+    $items_display = implode(' ', $items_text);
     
     return array(
         'id' => $order->get_id(),
@@ -81,43 +91,68 @@ function oj_express_prepare_order_data($order, $kitchen_service, $order_method_s
         'total' => $order->get_total(),
         'date' => $order->get_date_created(),
         'customer' => trim($order->get_billing_first_name() . ' ' . $order->get_billing_last_name()) ?: $order->get_billing_email() ?: __('Guest', 'orders-jet'),
-        'items' => $order->get_items(),
+        'items' => $items,
+        'items_display' => $items_display, // Pre-processed for performance
+        'item_count' => count($items),     // Pre-calculated for performance
         'kitchen_type' => $kitchen_status['kitchen_type'],
-        'kitchen_status' => $kitchen_status
+        'kitchen_status' => $kitchen_status,
+        'order_object' => $order          // Pass order object to avoid re-querying (Phase 4A)
     );
 }
 
 /**
- * Helper function: Process badge data from services (Phase 4B: Code Structure)
+ * Helper function: Get optimized badge data directly from services (Phase 4A: Performance Critical)
  */
-function oj_express_process_badge_data($order, $kitchen_service, $order_method_service) {
-    // Get badge HTML from services
-    $status_badge_html = $kitchen_service->get_kitchen_status_badge($order);
-    $type_badge_html = $order_method_service->get_order_method_badge($order);
-    $kitchen_badge_html = $kitchen_service->get_kitchen_type_badge($order);
+function oj_express_get_optimized_badge_data($order, $kitchen_service, $order_method_service) {
+    // Get structured data directly instead of parsing HTML (Phase 4A Performance)
+    $kitchen_status = $kitchen_service->get_kitchen_readiness_status($order);
+    $order_method = $order_method_service->get_order_method($order);
+    $kitchen_type = $kitchen_status['kitchen_type'];
+    $order_status = $order->get_status();
     
-    // Extract status data
-    preg_match('/class="[^"]*oj-status-badge\s+([^"]*)"[^>]*>([^<]*)\s*([^<]*)</', $status_badge_html, $status_matches);
-    $status_data = array(
-        'class' => $status_matches[1] ?? 'kitchen',
-        'icon' => trim($status_matches[2] ?? '👨‍🍳'),
-        'text' => trim($status_matches[3] ?? __('Kitchen', 'orders-jet'))
-    );
+    // Status badge data (optimized logic)
+    if ($order_status === 'pending') {
+        $status_data = array(
+            'class' => 'ready',
+            'icon' => '✅',
+            'text' => __('Ready', 'orders-jet')
+        );
+    } elseif ($order_status === 'processing') {
+        if ($kitchen_type === 'mixed') {
+            if ($kitchen_status['food_ready'] && !$kitchen_status['beverage_ready']) {
+                $status_data = array('class' => 'partial', 'icon' => '🍕✅ 🥤⏳', 'text' => __('Waiting for Bev.', 'orders-jet'));
+            } elseif (!$kitchen_status['food_ready'] && $kitchen_status['beverage_ready']) {
+                $status_data = array('class' => 'partial', 'icon' => '🍕⏳ 🥤✅', 'text' => __('Waiting for Food', 'orders-jet'));
+            } else {
+                $status_data = array('class' => 'partial', 'icon' => '🍕⏳ 🥤⏳', 'text' => __('Both Kitchens', 'orders-jet'));
+            }
+        } elseif ($kitchen_type === 'food') {
+            $status_data = array('class' => 'partial', 'icon' => '🍕⏳', 'text' => __('Waiting for Food', 'orders-jet'));
+        } elseif ($kitchen_type === 'beverages') {
+            $status_data = array('class' => 'partial', 'icon' => '🥤⏳', 'text' => __('Waiting for Bev.', 'orders-jet'));
+        } else {
+            $status_data = array('class' => 'kitchen', 'icon' => '👨‍🍳', 'text' => __('Kitchen', 'orders-jet'));
+        }
+    } else {
+        $status_data = array('class' => 'kitchen', 'icon' => '👨‍🍳', 'text' => __('Kitchen', 'orders-jet'));
+    }
     
-    // Extract type badge data
-    preg_match('/class="[^"]*oj-type-badge\s+([^"]*)"[^>]*>([^<]*)\s*([^<]*)</', $type_badge_html, $type_matches);
+    // Type badge data (optimized logic)
+    $type_icons = array('dinein' => '🍽️', 'takeaway' => '📦', 'delivery' => '🚚');
+    $type_texts = array('dinein' => __('Dine-in', 'orders-jet'), 'takeaway' => __('Takeaway', 'orders-jet'), 'delivery' => __('Delivery', 'orders-jet'));
     $type_data = array(
-        'class' => $type_matches[1] ?? $order->get_meta('exwf_odmethod') ?: 'takeaway',
-        'icon' => trim($type_matches[2] ?? '📦'),
-        'text' => trim($type_matches[3] ?? 'Takeaway')
+        'class' => $order_method,
+        'icon' => $type_icons[$order_method] ?? '📦',
+        'text' => $type_texts[$order_method] ?? __('Takeaway', 'orders-jet')
     );
     
-    // Extract kitchen badge data
-    preg_match('/class="[^"]*oj-kitchen-badge\s+([^"]*)"[^>]*>([^<]*)\s*([^<]*)</', $kitchen_badge_html, $kitchen_matches);
+    // Kitchen badge data (optimized logic)
+    $kitchen_icons = array('food' => '🍕', 'beverages' => '🥤', 'mixed' => '🍽️');
+    $kitchen_texts = array('food' => __('Food', 'orders-jet'), 'beverages' => __('Beverages', 'orders-jet'), 'mixed' => __('Mixed', 'orders-jet'));
     $kitchen_data = array(
-        'class' => $kitchen_matches[1] ?? 'food',
-        'icon' => trim($kitchen_matches[2] ?? '🍕'),
-        'text' => trim($kitchen_matches[3] ?? 'Food')
+        'class' => $kitchen_type,
+        'icon' => $kitchen_icons[$kitchen_type] ?? '🍕',
+        'text' => $kitchen_texts[$kitchen_type] ?? __('Food', 'orders-jet')
     );
     
     return array(
@@ -125,6 +160,15 @@ function oj_express_process_badge_data($order, $kitchen_service, $order_method_s
         'type' => $type_data,
         'kitchen' => $kitchen_data
     );
+}
+
+/**
+ * Helper function: Process badge data from services (Phase 4B: Code Structure) - DEPRECATED
+ * Kept for backward compatibility, use oj_express_get_optimized_badge_data() instead
+ */
+function oj_express_process_badge_data($order, $kitchen_service, $order_method_service) {
+    // Redirect to optimized version (Phase 4A)
+    return oj_express_get_optimized_badge_data($order, $kitchen_service, $order_method_service);
 }
 
 /**

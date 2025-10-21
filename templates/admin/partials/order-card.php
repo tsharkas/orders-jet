@@ -31,13 +31,14 @@ $kitchen_type = $order_data['kitchen_type'];
 $kitchen_status = $order_data['kitchen_status'];
 
 $time_ago = human_time_diff($date_created->getTimestamp(), current_time('timestamp'));
-$item_count = count($items);
 
-// Get the WooCommerce order object for service calls (Fix: Badge scope issue)
-$order = wc_get_order($order_id);
+// Use pre-processed data for performance (Phase 4A: Performance Critical)
+$item_count = $order_data['item_count'];        // Pre-calculated
+$items_display = $order_data['items_display'];  // Pre-processed
+$order = $order_data['order_object'];           // No database query needed!
 
-// Process badge data using helper function (Phase 4B: Code Structure)
-$badge_data = oj_express_process_badge_data($order, $kitchen_service, $order_method_service);
+// Process badge data using optimized helper function (Phase 4A: Performance Critical)
+$badge_data = oj_express_get_optimized_badge_data($order, $kitchen_service, $order_method_service);
 $status_class = $badge_data['status']['class'];
 $status_icon = $badge_data['status']['icon'];
 $status_text = $badge_data['status']['text'];
@@ -98,15 +99,7 @@ $action_buttons_html = oj_express_get_action_buttons($order_data, $kitchen_statu
     <!-- Row 5: Item details -->
     <div class="oj-card-row-5">
         <div class="oj-items-list">
-            <?php 
-            $items_text = array();
-            foreach ($items as $item) :
-                $product_name = $item->get_name();
-                $quantity = $item->get_quantity();
-                $items_text[] = esc_html($quantity) . 'x ' . esc_html($product_name);
-            endforeach;
-            echo implode(' ', $items_text);
-            ?>
+            <?php echo $items_display; // Pre-processed for performance (Phase 4A) ?>
         </div>
     </div>
     
