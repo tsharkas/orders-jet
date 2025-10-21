@@ -115,6 +115,7 @@ class Orders_Jet_Integration {
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/services/class-orders-jet-tax-service.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/services/class-orders-jet-kitchen-service.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/services/class-orders-jet-notification-service.php';
+        include_once ORDERS_JET_PLUGIN_DIR . 'includes/services/class-orders-jet-order-method-service.php';
         
         // Handler classes (Phase 3, 4 & 5 refactoring)
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/handlers/class-orders-jet-order-submission-handler.php';

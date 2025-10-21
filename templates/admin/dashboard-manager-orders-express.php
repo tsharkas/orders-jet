@@ -23,6 +23,10 @@ wp_enqueue_style('oj-manager-orders-cards', ORDERS_JET_PLUGIN_URL . 'assets/css/
 // Enqueue Express Dashboard specific styles (Phase 1: CSS Extraction)
 wp_enqueue_style('oj-dashboard-express', ORDERS_JET_PLUGIN_URL . 'assets/css/dashboard-express.css', array('oj-manager-orders-cards'), ORDERS_JET_VERSION);
 
+// Initialize services for template use (Phase 3: Service Integration)
+$kitchen_service = new Orders_Jet_Kitchen_Service();
+$order_method_service = new Orders_Jet_Order_Method_Service();
+
 // Enqueue and localize JavaScript (Phase 2: JavaScript Localization)
 wp_enqueue_script('oj-dashboard-express', ORDERS_JET_PLUGIN_URL . 'assets/js/dashboard-express.js', array('jquery'), ORDERS_JET_VERSION, true);
 wp_localize_script('oj-dashboard-express', 'ojExpressData', array(
@@ -63,106 +67,16 @@ wp_localize_script('oj-dashboard-express', 'ojExpressData', array(
 ));
 
 /**
- * Helper function: Get order method - EXACT copy from main orders page
+ * Helper function: Prepare clean order data using services (Phase 3: Service Integration)
  */
-function oj_express_get_order_method($order) {
-    $order_method = $order->get_meta('exwf_odmethod');
-    
-    // If no exwf_odmethod, determine from other meta with better logic
-    if (empty($order_method)) {
-        $table_number_check = $order->get_meta('_oj_table_number');
-        
-        if (!empty($table_number_check)) {
-            $order_method = 'dinein';
-        } else {
-            // Check if it's a delivery order by looking at shipping vs billing
-            $billing_address = $order->get_billing_address_1();
-            $shipping_address = $order->get_shipping_address_1();
-            
-            // If shipping address exists and differs from billing, likely delivery
-            if (!empty($shipping_address) && $shipping_address !== $billing_address) {
-                $order_method = 'delivery';
-            } else {
-                // Default to takeaway
-                $order_method = 'takeaway';
-            }
-        }
-    }
-    
-    return $order_method;
-}
-
-/**
- * Helper function: Get order kitchen type
- */
-function oj_express_get_kitchen_type($order) {
-    $kitchen_types = array();
-    
-    foreach ($order->get_items() as $item) {
-        $product_id = $item->get_product_id();
-        $variation_id = $item->get_variation_id();
-        
-        // Check variation first, then fall back to main product
-        $kitchen = '';
-        if ($variation_id > 0) {
-            $kitchen = get_post_meta($variation_id, 'Kitchen', true);
-        }
-        // Fall back to main product if variation doesn't have Kitchen field
-        if (empty($kitchen)) {
-            $kitchen = get_post_meta($product_id, 'Kitchen', true);
-        }
-        
-        if (!empty($kitchen)) {
-            $kitchen_types[] = strtolower(trim($kitchen));
-        }
-    }
-    
-    // Remove duplicates and determine final kitchen type
-    $unique_types = array_unique($kitchen_types);
-    
-    if (count($unique_types) === 1) {
-        return $unique_types[0];
-    } elseif (count($unique_types) > 1) {
-        return 'mixed';
-    }
-    
-    // Default fallback to food if no kitchen field is set
-    return 'food';
-}
-
-/**
- * Helper function: Get kitchen readiness status
- */
-function oj_express_get_kitchen_status($order) {
-    $kitchen_type = $order->get_meta('_oj_kitchen_type');
-    if (empty($kitchen_type)) {
-        $kitchen_type = oj_express_get_kitchen_type($order);
-    }
-    
-    $food_ready = $order->get_meta('_oj_food_kitchen_ready') === 'yes';
-    $beverage_ready = $order->get_meta('_oj_beverage_kitchen_ready') === 'yes';
-    
-    return array(
-        'kitchen_type' => $kitchen_type,
-        'food_ready' => $food_ready,
-        'beverage_ready' => $beverage_ready,
-        'all_ready' => ($kitchen_type === 'food' && $food_ready) || 
-                      ($kitchen_type === 'beverages' && $beverage_ready) || 
-                      ($kitchen_type === 'mixed' && $food_ready && $beverage_ready)
-    );
-}
-
-/**
- * Helper function: Prepare clean order data
- */
-function oj_express_prepare_order_data($order) {
-    $kitchen_status = oj_express_get_kitchen_status($order);
+function oj_express_prepare_order_data($order, $kitchen_service, $order_method_service) {
+    $kitchen_status = $kitchen_service->get_kitchen_readiness_status($order);
     
     return array(
         'id' => $order->get_id(),
         'number' => $order->get_order_number(),
         'status' => $order->get_status(),
-        'method' => oj_express_get_order_method($order),
+        'method' => $order_method_service->get_order_method($order),
         'table' => $order->get_meta('_oj_table_number'),
         'total' => $order->get_total(),
         'date' => $order->get_date_created(),
@@ -174,7 +88,7 @@ function oj_express_prepare_order_data($order) {
 }
 
 /**
- * Helper function: Update filter counts
+ * Helper function: Update filter counts (unchanged logic)
  */
 function oj_express_update_filter_counts(&$counts, $order_data) {
     $status = $order_data['status'];
@@ -239,7 +153,7 @@ $filter_counts = array(
 );
 
 foreach ($active_orders as $order) {
-    $order_data = oj_express_prepare_order_data($order);
+    $order_data = oj_express_prepare_order_data($order, $kitchen_service, $order_method_service);
     $orders_data[] = $order_data;
     oj_express_update_filter_counts($filter_counts, $order_data);
 }
@@ -330,56 +244,35 @@ foreach ($active_orders as $order) {
                 $time_ago = human_time_diff($date_created->getTimestamp(), current_time('timestamp'));
                 $item_count = count($items);
                 
-                // Kitchen-aware status badge
-                if ($status === 'pending') {
-                    $status_text = __('Ready', 'orders-jet');
-                    $status_class = 'ready';
-                    $status_icon = '✅';
-                } elseif ($status === 'processing') {
-                    if ($kitchen_type === 'mixed') {
-                        if ($kitchen_status['food_ready'] && !$kitchen_status['beverage_ready']) {
-                            $status_text = __('Waiting for Bev.', 'orders-jet');
-                            $status_class = 'partial';
-                            $status_icon = '🍕✅ 🥤⏳';
-                        } elseif (!$kitchen_status['food_ready'] && $kitchen_status['beverage_ready']) {
-                            $status_text = __('Waiting for Food', 'orders-jet');
-                            $status_class = 'partial';
-                            $status_icon = '🍕⏳ 🥤✅';
-                        } else {
-                            $status_text = __('Both Kitchens', 'orders-jet');
-                            $status_class = 'partial';
-                            $status_icon = '🍕⏳ 🥤⏳';
-                        }
-                    } elseif ($kitchen_type === 'food') {
-                        $status_text = __('Waiting for Food', 'orders-jet');
-                        $status_class = 'partial';
-                        $status_icon = '🍕⏳';
-                    } elseif ($kitchen_type === 'beverages') {
-                        $status_text = __('Waiting for Bev.', 'orders-jet');
-                        $status_class = 'partial';
-                        $status_icon = '🥤⏳';
-                    } else {
-                        $status_text = __('Kitchen', 'orders-jet');
-                        $status_class = 'kitchen';
-                        $status_icon = '👨‍🍳';
-                    }
-                }
+                // Get status badge using kitchen service (Phase 3: Service Integration)
+                $status_badge_html = $kitchen_service->get_kitchen_status_badge($order);
                 
-                // Order type badge
-                $type_badges = array(
-                    'dinein' => array('icon' => '🍽️', 'text' => __('Dine-in', 'orders-jet'), 'class' => 'dinein'),
-                    'takeaway' => array('icon' => '📦', 'text' => __('Takeaway', 'orders-jet'), 'class' => 'takeaway'),
-                    'delivery' => array('icon' => '🚚', 'text' => __('Delivery', 'orders-jet'), 'class' => 'delivery')
-                );
-                $type_badge = $type_badges[$method] ?? $type_badges['takeaway']; // Default to takeaway if method not found
+                // Extract status data for template compatibility
+                preg_match('/class="[^"]*oj-status-badge\s+([^"]*)"[^>]*>([^<]*)\s*([^<]*)</', $status_badge_html, $status_matches);
+                $status_class = $status_matches[1] ?? 'kitchen';
+                $status_icon = trim($status_matches[2] ?? '👨‍🍳');
+                $status_text = trim($status_matches[3] ?? __('Kitchen', 'orders-jet'));
                 
-                // Kitchen type badge
-                $kitchen_badges = array(
-                    'food' => array('icon' => '🍕', 'text' => __('Food', 'orders-jet'), 'class' => 'food'),
-                    'beverages' => array('icon' => '🥤', 'text' => __('Beverages', 'orders-jet'), 'class' => 'beverages'),
-                    'mixed' => array('icon' => '🍽️', 'text' => __('Mixed', 'orders-jet'), 'class' => 'mixed')
+                // Get order method badge using service (Phase 3: Service Integration)
+                $type_badge_html = $order_method_service->get_order_method_badge($order);
+                
+                // Get kitchen type badge using service (Phase 3: Service Integration)
+                $kitchen_badge_html = $kitchen_service->get_kitchen_type_badge($order);
+                
+                // Extract badge data for template compatibility
+                preg_match('/class="[^"]*oj-type-badge\s+([^"]*)"[^>]*>([^<]*)\s*([^<]*)</', $type_badge_html, $type_matches);
+                $type_badge = array(
+                    'class' => $type_matches[1] ?? $method,
+                    'icon' => trim($type_matches[2] ?? '📦'),
+                    'text' => trim($type_matches[3] ?? ucfirst($method))
                 );
-                $kitchen_badge = $kitchen_badges[$kitchen_type] ?? $kitchen_badges['food'];
+                
+                preg_match('/class="[^"]*oj-kitchen-badge\s+([^"]*)"[^>]*>([^<]*)\s*([^<]*)</', $kitchen_badge_html, $kitchen_matches);
+                $kitchen_badge = array(
+                    'class' => $kitchen_matches[1] ?? $kitchen_type,
+                    'icon' => trim($kitchen_matches[2] ?? '🍕'),
+                    'text' => trim($kitchen_matches[3] ?? ucfirst($kitchen_type))
+                );
                 ?>
                 
                 <div class="oj-order-card" 

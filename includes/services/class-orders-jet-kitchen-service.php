@@ -70,8 +70,8 @@ class Orders_Jet_Kitchen_Service {
         $order_status = $order->get_status();
         
         // Get readiness flags
-        $food_ready = $order->get_meta('_oj_food_ready') === 'yes';
-        $beverage_ready = $order->get_meta('_oj_beverage_ready') === 'yes';
+        $food_ready = $order->get_meta('_oj_food_kitchen_ready') === 'yes';
+        $beverage_ready = $order->get_meta('_oj_beverage_kitchen_ready') === 'yes';
         
         $status = array(
             'kitchen_type' => $kitchen_type,
@@ -206,9 +206,9 @@ class Orders_Jet_Kitchen_Service {
             return false;
         }
         
-        $meta_key = '_oj_' . $kitchen_type . '_ready';
+        $meta_key = '_oj_' . $kitchen_type . '_kitchen_ready';
         $order->update_meta_data($meta_key, 'yes');
-        $order->update_meta_data('_oj_' . $kitchen_type . '_ready_time', current_time('mysql'));
+        $order->update_meta_data('_oj_' . $kitchen_type . '_kitchen_ready_time', current_time('mysql'));
         
         // Check if entire order is ready
         $status = $this->get_kitchen_readiness_status($order);
