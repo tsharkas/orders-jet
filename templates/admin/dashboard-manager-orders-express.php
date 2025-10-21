@@ -88,6 +88,110 @@ function oj_express_prepare_order_data($order, $kitchen_service, $order_method_s
 }
 
 /**
+ * Helper function: Process badge data from services (Phase 4B: Code Structure)
+ */
+function oj_express_process_badge_data($order, $kitchen_service, $order_method_service) {
+    // Get badge HTML from services
+    $status_badge_html = $kitchen_service->get_kitchen_status_badge($order);
+    $type_badge_html = $order_method_service->get_order_method_badge($order);
+    $kitchen_badge_html = $kitchen_service->get_kitchen_type_badge($order);
+    
+    // Extract status data
+    preg_match('/class="[^"]*oj-status-badge\s+([^"]*)"[^>]*>([^<]*)\s*([^<]*)</', $status_badge_html, $status_matches);
+    $status_data = array(
+        'class' => $status_matches[1] ?? 'kitchen',
+        'icon' => trim($status_matches[2] ?? '👨‍🍳'),
+        'text' => trim($status_matches[3] ?? __('Kitchen', 'orders-jet'))
+    );
+    
+    // Extract type badge data
+    preg_match('/class="[^"]*oj-type-badge\s+([^"]*)"[^>]*>([^<]*)\s*([^<]*)</', $type_badge_html, $type_matches);
+    $type_data = array(
+        'class' => $type_matches[1] ?? $order->get_meta('exwf_odmethod') ?: 'takeaway',
+        'icon' => trim($type_matches[2] ?? '📦'),
+        'text' => trim($type_matches[3] ?? 'Takeaway')
+    );
+    
+    // Extract kitchen badge data
+    preg_match('/class="[^"]*oj-kitchen-badge\s+([^"]*)"[^>]*>([^<]*)\s*([^<]*)</', $kitchen_badge_html, $kitchen_matches);
+    $kitchen_data = array(
+        'class' => $kitchen_matches[1] ?? 'food',
+        'icon' => trim($kitchen_matches[2] ?? '🍕'),
+        'text' => trim($kitchen_matches[3] ?? 'Food')
+    );
+    
+    return array(
+        'status' => $status_data,
+        'type' => $type_data,
+        'kitchen' => $kitchen_data
+    );
+}
+
+/**
+ * Helper function: Generate action buttons HTML (Phase 4B: Code Structure)
+ */
+function oj_express_get_action_buttons($order_data, $kitchen_status) {
+    $order_id = $order_data['id'];
+    $status = $order_data['status'];
+    $kitchen_type = $order_data['kitchen_type'];
+    $table_number = $order_data['table'];
+    
+    $buttons = '';
+    
+    if ($status === 'processing') {
+        if ($kitchen_type === 'mixed') {
+            // Mixed kitchen - show individual buttons for unready kitchens
+            if (!$kitchen_status['food_ready']) {
+                $buttons .= sprintf(
+                    '<button class="oj-action-btn primary oj-mark-ready-food" data-order-id="%s" data-kitchen="food">🍕 %s</button>',
+                    esc_attr($order_id),
+                    __('Food Ready', 'orders-jet')
+                );
+            }
+            if (!$kitchen_status['beverage_ready']) {
+                $buttons .= sprintf(
+                    '<button class="oj-action-btn primary oj-mark-ready-beverage" data-order-id="%s" data-kitchen="beverages">🥤 %s</button>',
+                    esc_attr($order_id),
+                    __('Bev. Ready', 'orders-jet')
+                );
+            }
+        } else {
+            // Single kitchen - show appropriate button
+            $icon = $kitchen_type === 'food' ? '🍕' : ($kitchen_type === 'beverages' ? '🥤' : '🔥');
+            $text = $kitchen_type === 'food' ? __('Food Ready', 'orders-jet') : 
+                   ($kitchen_type === 'beverages' ? __('Bev. Ready', 'orders-jet') : __('Mark Ready', 'orders-jet'));
+            
+            $buttons .= sprintf(
+                '<button class="oj-action-btn primary oj-mark-ready" data-order-id="%s" data-kitchen="%s">%s %s</button>',
+                esc_attr($order_id),
+                esc_attr($kitchen_type),
+                $icon,
+                $text
+            );
+        }
+    } elseif ($status === 'pending') {
+        if (!empty($table_number)) {
+            // Table order - show close table button
+            $buttons .= sprintf(
+                '<button class="oj-action-btn primary oj-close-table" data-order-id="%s" data-table-number="%s">🍽️ %s</button>',
+                esc_attr($order_id),
+                esc_attr($table_number),
+                __('Close Table', 'orders-jet')
+            );
+        } else {
+            // Individual order - show complete button
+            $buttons .= sprintf(
+                '<button class="oj-action-btn primary oj-complete-order" data-order-id="%s">✅ %s</button>',
+                esc_attr($order_id),
+                __('Complete', 'orders-jet')
+            );
+        }
+    }
+    
+    return $buttons;
+}
+
+/**
  * Helper function: Update filter counts (unchanged logic)
  */
 function oj_express_update_filter_counts(&$counts, $order_data) {
@@ -148,8 +252,7 @@ $filter_counts = array(
     'takeaway' => 0,
     'delivery' => 0,
     'food_kitchen' => 0,
-    'beverage_kitchen' => 0,
-    'mixed_kitchen' => 0
+    'beverage_kitchen' => 0
 );
 
 foreach ($active_orders as $order) {

@@ -36,35 +36,16 @@ $item_count = count($items);
 // Get the WooCommerce order object for service calls (Fix: Badge scope issue)
 $order = wc_get_order($order_id);
 
-// Get status badge using kitchen service (Phase 3: Service Integration)
-$status_badge_html = $kitchen_service->get_kitchen_status_badge($order);
+// Process badge data using helper function (Phase 4B: Code Structure)
+$badge_data = oj_express_process_badge_data($order, $kitchen_service, $order_method_service);
+$status_class = $badge_data['status']['class'];
+$status_icon = $badge_data['status']['icon'];
+$status_text = $badge_data['status']['text'];
+$type_badge = $badge_data['type'];
+$kitchen_badge = $badge_data['kitchen'];
 
-// Extract status data for template compatibility
-preg_match('/class="[^"]*oj-status-badge\s+([^"]*)"[^>]*>([^<]*)\s*([^<]*)</', $status_badge_html, $status_matches);
-$status_class = $status_matches[1] ?? 'kitchen';
-$status_icon = trim($status_matches[2] ?? '👨‍🍳');
-$status_text = trim($status_matches[3] ?? __('Kitchen', 'orders-jet'));
-
-// Get order method badge using service (Phase 3: Service Integration)
-$type_badge_html = $order_method_service->get_order_method_badge($order);
-
-// Get kitchen type badge using service (Phase 3: Service Integration)
-$kitchen_badge_html = $kitchen_service->get_kitchen_type_badge($order);
-
-// Extract badge data for template compatibility
-preg_match('/class="[^"]*oj-type-badge\s+([^"]*)"[^>]*>([^<]*)\s*([^<]*)</', $type_badge_html, $type_matches);
-$type_badge = array(
-    'class' => $type_matches[1] ?? $method,
-    'icon' => trim($type_matches[2] ?? '📦'),
-    'text' => trim($type_matches[3] ?? ucfirst($method))
-);
-
-preg_match('/class="[^"]*oj-kitchen-badge\s+([^"]*)"[^>]*>([^<]*)\s*([^<]*)</', $kitchen_badge_html, $kitchen_matches);
-$kitchen_badge = array(
-    'class' => $kitchen_matches[1] ?? $kitchen_type,
-    'icon' => trim($kitchen_matches[2] ?? '🍕'),
-    'text' => trim($kitchen_matches[3] ?? ucfirst($kitchen_type))
-);
+// Generate action buttons using helper function (Phase 4B: Code Structure)
+$action_buttons_html = oj_express_get_action_buttons($order_data, $kitchen_status);
 ?>
 
 <div class="oj-order-card" 
@@ -131,39 +112,6 @@ $kitchen_badge = array(
     
     <!-- Card Actions -->
     <div class="oj-card-actions">
-        <?php if ($status === 'processing') : ?>
-            <?php if ($kitchen_type === 'mixed') : ?>
-                <?php if (!$kitchen_status['food_ready']) : ?>
-                    <button class="oj-action-btn primary oj-mark-ready-food" data-order-id="<?php echo esc_attr($order_id); ?>" data-kitchen="food">
-                        🍕 <?php _e('Food Ready', 'orders-jet'); ?>
-                    </button>
-                <?php endif; ?>
-                <?php if (!$kitchen_status['beverage_ready']) : ?>
-                    <button class="oj-action-btn primary oj-mark-ready-beverage" data-order-id="<?php echo esc_attr($order_id); ?>" data-kitchen="beverages">
-                        🥤 <?php _e('Bev. Ready', 'orders-jet'); ?>
-                    </button>
-                <?php endif; ?>
-            <?php else : ?>
-                <button class="oj-action-btn primary oj-mark-ready" data-order-id="<?php echo esc_attr($order_id); ?>" data-kitchen="<?php echo esc_attr($kitchen_type); ?>">
-                    <?php if ($kitchen_type === 'food') : ?>
-                        🍕 <?php _e('Food Ready', 'orders-jet'); ?>
-                    <?php elseif ($kitchen_type === 'beverages') : ?>
-                        🥤 <?php _e('Bev. Ready', 'orders-jet'); ?>
-                    <?php else : ?>
-                        🔥 <?php _e('Mark Ready', 'orders-jet'); ?>
-                    <?php endif; ?>
-                </button>
-            <?php endif; ?>
-        <?php elseif ($status === 'pending') : ?>
-            <?php if (!empty($table_number)) : ?>
-                <button class="oj-action-btn primary oj-close-table" data-order-id="<?php echo esc_attr($order_id); ?>" data-table-number="<?php echo esc_attr($table_number); ?>">
-                    🍽️ <?php _e('Close Table', 'orders-jet'); ?>
-                </button>
-            <?php else : ?>
-                <button class="oj-action-btn primary oj-complete-order" data-order-id="<?php echo esc_attr($order_id); ?>">
-                    ✅ <?php _e('Complete', 'orders-jet'); ?>
-                </button>
-            <?php endif; ?>
-        <?php endif; ?>
+        <?php echo $action_buttons_html; ?>
     </div>
 </div>
