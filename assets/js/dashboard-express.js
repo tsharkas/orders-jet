@@ -77,13 +77,44 @@ jQuery(document).ready(function($) {
     
     // Mark Ready - Change processing → pending
     // Mark Order Ready - Enhanced with dual kitchen support
-    $document.on('click', '.oj-mark-ready, .oj-mark-ready-food, .oj-mark-ready-beverage', function() {
+    $document.on('click', '.oj-mark-ready, .oj-mark-ready-food, .oj-mark-ready-beverage', function(e) {
+        // Prevent this handler from running on Complete buttons
+        if ($(this).hasClass('oj-complete-order')) {
+            console.log('Mark Ready handler skipped - Complete button detected');
+            return;
+        }
+        
+        console.log('Mark Ready handler triggered');
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        
+        // Additional safety check - ensure this is actually a mark ready button
+        if (!$(this).hasClass('oj-mark-ready') && !$(this).hasClass('oj-mark-ready-food') && !$(this).hasClass('oj-mark-ready-beverage')) {
+            console.log('Mark Ready handler skipped - Not a mark ready button');
+            return;
+        }
+        
         const orderId = $(this).data('order-id');
         const kitchenType = $(this).data('kitchen') || 'food';
         const $btn = $(this);
         const $card = $btn.closest('.oj-order-card');
         
+        console.log('Mark Ready - Button data:', {
+            orderId: orderId,
+            kitchenType: kitchenType,
+            buttonText: $btn.text(),
+            buttonClasses: this.className
+        });
+        
         $btn.prop('disabled', true).html('⏳ Marking...');
+        
+        console.log('Sending Mark Ready AJAX request:', {
+            action: 'oj_mark_order_ready',
+            order_id: orderId,
+            kitchen_type: kitchenType,
+            nonce: ojExpressData.nonces.dashboard
+        });
         
         $.ajax({
             url: ojExpressData.ajaxUrl,
@@ -142,6 +173,12 @@ jQuery(document).ready(function($) {
                         // Replace all kitchen buttons with completion button
                         $card.find('.oj-card-actions').html(newButton);
                         
+                        // Prevent immediate re-triggering of click events on new button
+                        $card.find('.oj-complete-order').prop('disabled', true);
+                        setTimeout(() => {
+                            $card.find('.oj-complete-order').prop('disabled', false);
+                        }, 500);
+                        
                         showExpressNotification('✅ Order fully ready!', 'success');
                     }
                     
@@ -181,14 +218,44 @@ jQuery(document).ready(function($) {
     });
     
     // Complete Order - Individual orders workflow
-    $(document).on('click', '.oj-complete-order', function() {
+    $(document).on('click', '.oj-complete-order', function(e) {
+        // Ensure this only runs on actual Complete buttons
+        if (!$(this).hasClass('oj-complete-order')) {
+            console.log('Complete Order handler skipped - Not a complete button');
+            return;
+        }
+        
+        // Prevent this handler from running on Mark Ready buttons
+        if ($(this).hasClass('oj-mark-ready') || $(this).hasClass('oj-mark-ready-food') || $(this).hasClass('oj-mark-ready-beverage')) {
+            console.log('Complete Order handler skipped - Mark Ready button detected');
+            return;
+        }
+        
+        console.log('Complete Order handler triggered');
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        
         const orderId = $(this).data('order-id');
         const $btn = $(this);
         const $card = $btn.closest('.oj-order-card');
         
+        console.log('Complete Order - Button data:', {
+            orderId: orderId,
+            buttonText: $btn.text(),
+            buttonClasses: this.className
+        });
+        
         // Show payment method modal
         showExpressPaymentModal(orderId, function(paymentMethod) {
             $btn.prop('disabled', true).html('⏳ Completing...');
+            
+            console.log('Sending Complete Order AJAX request:', {
+                action: 'oj_complete_individual_order',
+                order_id: orderId,
+                payment_method: paymentMethod,
+                nonce: ojExpressData.nonces.dashboard
+            });
             
             $.ajax({
                 url: ojExpressData.ajaxUrl,
@@ -308,12 +375,13 @@ jQuery(document).ready(function($) {
         });
     });
     
-    // Close Table - Table orders workflow
+    // Close Table - New simplified workflow: Close Table → Print Invoice → Paid?
     $(document).on('click', '.oj-close-table', function() {
         const orderId = $(this).data('order-id');
         const tableNumber = $(this).data('table-number');
         const $btn = $(this);
         const $card = $btn.closest('.oj-order-card');
+        const isGuestRequest = $btn.hasClass('guest-request');
         
         // Show payment method modal for table
         showExpressPaymentModal(orderId, function(paymentMethod) {
@@ -329,21 +397,33 @@ jQuery(document).ready(function($) {
                     nonce: ojExpressData.nonces.table_order
                 },
                 success: function(response) {
+                    console.log('Close table response:', response);
                     if (response.success && response.data.combined_order) {
-                        // Remove all child order cards for this table
-                        $(`.oj-order-card[data-table-number="${tableNumber}"]`).addClass('oj-card-removing');
+                        // Clear guest invoice request flag
+                        if (isGuestRequest) {
+                            clearGuestInvoiceRequest(tableNumber);
+                        }
+                        
+                        console.log('Removing cards for table:', tableNumber);
+                        // Find and log all cards for this table
+                        const cardsToRemove = $(`.oj-order-card[data-table-number="${tableNumber}"]`);
+                        console.log('Found cards to remove:', cardsToRemove.length, cardsToRemove);
+                        
+                        // Remove all individual table order cards
+                        cardsToRemove.addClass('oj-card-removing');
                         
                         setTimeout(() => {
                             $(`.oj-order-card[data-table-number="${tableNumber}"]`).remove();
                             
-                            // Add combined order card
+                            // Create new combined order card with "Print Invoice" button
                             const combinedOrder = response.data.combined_order;
+                            console.log('Creating combined card with data:', combinedOrder);
                             const combinedCard = createExpressCombinedOrderCard(combinedOrder);
                             $('.oj-orders-grid').prepend(combinedCard);
                             
-                            showExpressNotification('✅ ' + ojExpressData.i18n.tableClosed, 'success');
+                            showExpressNotification('✅ Table processed - Ready to print invoice', 'success');
                             
-                            // Update filter counts after table closure
+                            // Update filter counts
                             updateExpressFilterCounts();
                         }, 500);
                     } else if (response.data && response.data.show_confirmation) {
@@ -933,4 +1013,93 @@ jQuery(document).ready(function($) {
             </div>
         `);
     }
+    
+    // Print Invoice - Second step of new workflow
+    $(document).on('click', '.oj-print-invoice', function(e) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        
+        const $btn = $(this);
+        const $card = $btn.closest('.oj-order-card');
+        const orderId = $btn.data('combined-order-id') || $btn.data('order-id');
+        
+        // Generate thermal invoice URL for printing
+        const thermalInvoiceUrl = ojExpressData.ajaxUrl + 
+            '?action=oj_get_order_invoice' +
+            '&order_id=' + orderId +
+            '&print=1' +
+            '&nonce=' + ojExpressData.nonces.invoice;
+        
+        // Open invoice for printing (staff can keep it open for reference)
+        window.open(thermalInvoiceUrl, '_blank');
+        
+        // Update button to "Paid?" state
+        $btn.removeClass('oj-print-invoice')
+            .addClass('oj-mark-paid')
+            .html('💰 Paid?')
+            .data('order-id', orderId);
+        
+        showExpressNotification('📄 Invoice opened - Mark as paid when payment received', 'info');
+    });
+    
+    // Mark Paid - Final step of new workflow
+    $(document).on('click', '.oj-mark-paid', function() {
+        const $btn = $(this);
+        const $card = $btn.closest('.oj-order-card');
+        const orderId = $btn.data('order-id');
+        
+        // Confirm payment received
+        if (confirm('Confirm that payment has been received from the guest?')) {
+            $btn.prop('disabled', true).html('⏳ Processing...');
+            
+            $.ajax({
+                url: ojExpressData.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'oj_confirm_payment_received',
+                    order_id: orderId,
+                    nonce: ojExpressData.nonces.dashboard
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Remove the card with animation
+                        $card.addClass('oj-card-removing');
+                        setTimeout(() => {
+                            $card.remove();
+                            updateExpressFilterCounts();
+                        }, 500);
+                        
+                        showExpressNotification('✅ Payment confirmed - Order completed', 'success');
+                    } else {
+                        $btn.prop('disabled', false).html('💰 Paid?');
+                        showExpressNotification('❌ Failed to confirm payment', 'error');
+                    }
+                },
+                error: function() {
+                    $btn.prop('disabled', false).html('💰 Paid?');
+                    showExpressNotification('❌ Connection error', 'error');
+                }
+            });
+        }
+    });
+    
+    // Helper function to clear guest invoice request
+    function clearGuestInvoiceRequest(tableNumber) {
+        $.ajax({
+            url: ojExpressData.ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'oj_clear_guest_invoice_request',
+                table_number: tableNumber,
+                nonce: ojExpressData.nonces.dashboard
+            },
+            success: function(response) {
+                console.log('Guest invoice request cleared for table:', tableNumber);
+            },
+            error: function() {
+                console.log('Failed to clear guest invoice request for table:', tableNumber);
+            }
+        });
+    }
+    
 });

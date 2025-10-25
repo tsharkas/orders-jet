@@ -71,14 +71,20 @@ class Orders_Jet_Table_Query_Handler {
      * Fetch table orders using multiple methods for reliability
      */
     private function fetch_table_orders($table_number) {
+        // Use transient caching for performance (30 second cache)
+        $cache_key = 'oj_table_orders_' . sanitize_key($table_number);
+        $cached_orders = get_transient($cache_key);
+        
+        if ($cached_orders !== false) {
+            return $cached_orders;
+        }
+        
         // For guest order history, only show pending/processing orders (exclude completed)
         // This prevents guests from seeing completed orders from previous sessions
         $post_statuses = array(
             'wc-pending',
             'wc-processing'
         );
-        
-        error_log('Orders Jet: Showing only pending/processing orders for guest privacy');
         
         // Primary method: get_posts
         $args = array(
@@ -91,21 +97,15 @@ class Orders_Jet_Table_Query_Handler {
                     'compare' => '='
                 )
             ),
-            'posts_per_page' => -1,
+            'posts_per_page' => 20, // Limit to last 20 orders for performance
             'orderby' => 'date',
             'order' => 'DESC'
         );
         
-        error_log('Orders Jet: Query args: ' . print_r($args, true));
-        
         $orders = get_posts($args);
         
-        error_log('Orders Jet: Main query found ' . count($orders) . ' orders for table ' . $table_number);
-        
-        // Fallback method: WooCommerce native wc_get_orders
+        // Fallback method: WooCommerce native wc_get_orders (only if no results)
         if (count($orders) == 0 && function_exists('wc_get_orders')) {
-            error_log('Orders Jet: Trying WooCommerce native wc_get_orders method...');
-            
             // Convert post statuses to WooCommerce statuses for fallback query
             $wc_statuses = array();
             foreach ($post_statuses as $status) {
@@ -116,12 +116,10 @@ class Orders_Jet_Table_Query_Handler {
                 'status' => $wc_statuses,
                 'meta_key' => '_oj_table_number',
                 'meta_value' => $table_number,
-                'limit' => -1,
+                'limit' => 20, // Limit fallback query too
                 'orderby' => 'date',
                 'order' => 'DESC'
             ));
-            
-            error_log('Orders Jet: WooCommerce native method found ' . count($wc_orders) . ' orders');
             
             if (count($wc_orders) > 0) {
                 // Convert WC_Order objects to post objects for consistency
@@ -132,9 +130,11 @@ class Orders_Jet_Table_Query_Handler {
                         $orders[] = $post;
                     }
                 }
-                error_log('Orders Jet: Converted ' . count($orders) . ' WooCommerce orders to post objects');
             }
         }
+        
+        // Cache the results for 30 seconds
+        set_transient($cache_key, $orders, 30);
         
         return $orders;
     }

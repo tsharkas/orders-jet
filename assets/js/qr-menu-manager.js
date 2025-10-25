@@ -69,6 +69,7 @@
         
         // Floating Cart
         floatingCart: document.getElementById('floating-cart'),
+        floatingCartItems: document.getElementById('floating-cart-items'),
         floatingCartTotal: document.getElementById('floating-cart-total'),
         
         // Modals
@@ -246,7 +247,7 @@
             body: new URLSearchParams({
                 action: 'oj_get_product_details',
                 product_id: productId,
-                nonce: config.nonce
+                nonce: config.nonces.product_details
             })
         })
         .then(response => response.json())
@@ -400,12 +401,29 @@
         }
         
         // Update floating cart
+        if (elements.floatingCartItems) {
+            elements.floatingCartItems.textContent = cartCount + (cartCount === 1 ? ' item' : ' items');
+        }
+        
         if (elements.floatingCartTotal) {
             elements.floatingCartTotal.textContent = formatPrice(cartTotal);
         }
         
         if (elements.floatingCart) {
-            elements.floatingCart.style.display = cartCount > 0 && state.currentTab !== 'cart' ? 'block' : 'none';
+            // Show sticky cart only when there are items and not on cart tab
+            const shouldShow = cartCount > 0 && state.currentTab !== 'cart';
+            if (shouldShow) {
+                elements.floatingCart.style.display = 'block';
+                elements.floatingCart.classList.remove('hidden');
+            } else {
+                elements.floatingCart.classList.add('hidden');
+                // Keep display block for smooth transition, hide after animation
+                setTimeout(() => {
+                    if (elements.floatingCart.classList.contains('hidden')) {
+                        elements.floatingCart.style.display = 'none';
+                    }
+                }, 300);
+            }
         }
         
         // Update cart content
@@ -517,7 +535,7 @@
             body: new URLSearchParams({
                 action: 'oj_submit_table_order',
                 order_data: JSON.stringify(orderData),
-                nonce: config.nonce
+                nonce: config.nonces.table_order
             })
         })
         .then(response => response.json())
@@ -560,7 +578,7 @@
             body: new URLSearchParams({
                 action: 'oj_get_table_orders',
                 table_number: config.tableNumber,
-                nonce: config.nonce
+                nonce: config.nonces.table_nonce
             })
         })
         .then(response => response.json())

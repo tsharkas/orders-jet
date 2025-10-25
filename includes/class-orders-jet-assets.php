@@ -25,7 +25,7 @@ class Orders_Jet_Assets {
             return;
         }
         
-        // Enqueue QR menu styles
+        // Enqueue QR Menu CSS
         wp_enqueue_style(
             'orders-jet-qr-menu',
             ORDERS_JET_PLUGIN_URL . 'assets/css/qr-menu.css',
@@ -33,7 +33,7 @@ class Orders_Jet_Assets {
             ORDERS_JET_VERSION
         );
         
-        // Enqueue QR menu JavaScript
+        // Enqueue QR Menu JavaScript
         wp_enqueue_script(
             'orders-jet-qr-menu',
             ORDERS_JET_PLUGIN_URL . 'assets/js/qr-menu.js',
@@ -45,8 +45,15 @@ class Orders_Jet_Assets {
         // Localize script with AJAX data
         wp_localize_script('orders-jet-qr-menu', 'OrdersJetQRMenu', array(
             'ajaxUrl' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('oj_table_nonce'),
+            'nonces' => array(
+                'table_nonce' => wp_create_nonce('oj_table_nonce'),
+                'table_order' => wp_create_nonce('oj_table_order'),
+                'product_details' => wp_create_nonce('oj_product_details'),
+                'guest_pdf' => wp_create_nonce('oj_guest_pdf')
+            ),
             'tableNumber' => sanitize_text_field($_GET['table']),
+            'currencySymbol' => get_woocommerce_currency_symbol(),
+            'pluginUrl' => ORDERS_JET_PLUGIN_URL,
             'strings' => array(
                 'loading' => __('Loading...', 'orders-jet'),
                 'error' => __('An error occurred', 'orders-jet'),
@@ -61,23 +68,6 @@ class Orders_Jet_Assets {
                 'orderFailed' => __('Failed to place order. Please try again.', 'orders-jet')
             )
         ));
-        
-        // Add inline script to ensure initialization
-        wp_add_inline_script('orders-jet-qr-menu', '
-            jQuery(document).ready(function($) {
-                if (typeof OrdersJetQRMenu !== "undefined") {
-                    // Initialize with table data
-                    var tableNumber = "' . sanitize_text_field($_GET['table']) . '";
-                    var tableId = null; // Will be set by template
-                    OrdersJetQRMenu.init({
-                        tableNumber: tableNumber,
-                        tableId: tableId,
-                        ajaxUrl: "' . admin_url('admin-ajax.php') . '",
-                        nonce: "' . wp_create_nonce('oj_table_nonce') . '"
-                    });
-                }
-            });
-        ');
     }
     
     /**

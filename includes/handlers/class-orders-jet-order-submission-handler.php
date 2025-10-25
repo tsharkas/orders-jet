@@ -66,6 +66,10 @@ class Orders_Jet_Order_Submission_Handler {
         
         error_log('Orders Jet: ========== ORDER SUBMISSION COMPLETE ==========');
         
+        // Clear order history cache for this table to ensure fresh data
+        $cache_key = 'oj_table_orders_' . sanitize_key($table_number);
+        delete_transient($cache_key);
+        
         return array(
             'message' => __('Order placed successfully', 'orders-jet'),
             'order_id' => $order->get_id(),

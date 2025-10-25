@@ -48,7 +48,8 @@ wp_localize_script('oj-dashboard-express', 'ojExpressData', array(
     'adminUrl' => admin_url('post.php'),
     'nonces' => array(
         'dashboard' => wp_create_nonce('oj_dashboard_nonce'),
-        'table_order' => wp_create_nonce('oj_table_order')
+        'table_order' => wp_create_nonce('oj_table_order'),
+        'invoice' => wp_create_nonce('oj_get_invoice')
     ),
     'i18n' => array(
         'confirming' => __('Confirming...', 'orders-jet'),
@@ -96,12 +97,39 @@ function oj_express_prepare_order_data($order, $kitchen_service, $order_method_s
     }
     $items_display = implode(' ', $items_text);
     
+    // Check for guest invoice request (simplified approach)
+    $table_number = $order->get_meta('_oj_table_number');
+    $guest_invoice_requested = false;
+    $invoice_request_time = '';
+    
+    if (!empty($table_number)) {
+        // Get the table post to check for invoice request
+        $table_posts = get_posts(array(
+            'post_type' => 'oj_table',
+            'meta_query' => array(
+                array(
+                    'key' => '_oj_table_number',
+                    'value' => $table_number,
+                    'compare' => '='
+                )
+            ),
+            'posts_per_page' => 1
+        ));
+        
+        if (!empty($table_posts)) {
+            $table_id = $table_posts[0]->ID;
+            $invoice_request_status = get_post_meta($table_id, '_oj_invoice_request_status', true);
+            $guest_invoice_requested = ($invoice_request_status === 'pending');
+            $invoice_request_time = get_post_meta($table_id, '_oj_guest_invoice_requested', true);
+        }
+    }
+
     return array(
         'id' => $order->get_id(),
         'number' => $order->get_order_number(),
         'status' => $order->get_status(),
         'method' => $order_method_service->get_order_method($order),
-        'table' => $order->get_meta('_oj_table_number'),
+        'table' => $table_number,
         'total' => $order->get_total(),
         'date' => $order->get_date_created(),
         'customer' => trim($order->get_billing_first_name() . ' ' . $order->get_billing_last_name()) ?: $order->get_billing_email() ?: __('Guest', 'orders-jet'),
@@ -110,6 +138,8 @@ function oj_express_prepare_order_data($order, $kitchen_service, $order_method_s
         'item_count' => count($items),     // Pre-calculated for performance
         'kitchen_type' => $kitchen_status['kitchen_type'],
         'kitchen_status' => $kitchen_status,
+        'guest_invoice_requested' => $guest_invoice_requested,
+        'invoice_request_time' => $invoice_request_time,
         'order_object' => $order          // Pass order object to avoid re-querying (Phase 4A)
     );
 }
@@ -193,8 +223,29 @@ function oj_express_get_action_buttons($order_data, $kitchen_status) {
     $status = $order_data['status'];
     $kitchen_type = $order_data['kitchen_type'];
     $table_number = $order_data['table'];
+    $guest_invoice_requested = $order_data['guest_invoice_requested'] ?? false;
     
     $buttons = '';
+    
+    // Check if this order has a guest invoice request
+    if ($guest_invoice_requested && !empty($table_number)) {
+        // Guest has requested invoice - show special workflow
+        $buttons .= sprintf(
+            '<div class="oj-guest-invoice-notice">🔔 Guest requested invoice</div>'
+        );
+        
+        if ($status === 'pending') {
+            // Show "Close Table" button with special styling for guest requests
+            $buttons .= sprintf(
+                '<button class="oj-action-btn primary oj-close-table guest-request" data-order-id="%s" data-table-number="%s">🍽️ %s</button>',
+                esc_attr($order_id),
+                esc_attr($table_number),
+                __('Close Table', 'orders-jet')
+            );
+        }
+        
+        return $buttons;
+    }
     
     if ($status === 'processing') {
         if ($kitchen_type === 'mixed') {

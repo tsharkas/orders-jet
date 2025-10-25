@@ -117,6 +117,9 @@ class Orders_Jet_Integration {
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/services/class-orders-jet-notification-service.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/services/class-orders-jet-order-method-service.php';
         
+        // QR Menu services (refactored modular architecture)
+        include_once ORDERS_JET_PLUGIN_DIR . 'includes/services/class-orders-jet-menu-service.php';
+        
         // Handler classes (Phase 3, 4 & 5 refactoring)
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/handlers/class-orders-jet-order-submission-handler.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/handlers/class-orders-jet-table-closure-handler.php';
@@ -127,6 +130,8 @@ class Orders_Jet_Integration {
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/handlers/class-orders-jet-kitchen-management-handler.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/handlers/class-orders-jet-invoice-generation-handler.php';
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/handlers/class-orders-jet-handler-factory.php';
+        
+        // QR Menu uses the working template with extracted assets - no separate handlers needed
         
         // Core classes - only include what's actually used
         include_once ORDERS_JET_PLUGIN_DIR . 'includes/class-orders-jet-delivery-time-manager.php';
@@ -270,7 +275,7 @@ class Orders_Jet_Integration {
                 return sprintf(__('Table %s Menu', 'orders-jet'), $table_number) . ' - ' . get_bloginfo('name');
             });
             
-            // Include the QR menu template
+            // Include the original working template
             include ORDERS_JET_PLUGIN_DIR . 'templates/qr-menu.php';
         } catch (Exception $e) {
             if (defined('WP_DEBUG') && WP_DEBUG) {
@@ -401,60 +406,11 @@ class Orders_Jet_Integration {
         // Enqueue jQuery
         wp_enqueue_script('jquery');
         
-        // Enqueue QR menu styles
-        wp_enqueue_style(
-            'orders-jet-qr-menu',
-            ORDERS_JET_PLUGIN_URL . 'assets/css/qr-menu.css',
-            array(),
-            ORDERS_JET_VERSION
-        );
+        // QR menu styles handled by Orders_Jet_Assets class
         
-        // Enqueue QR menu JavaScript
-        wp_enqueue_script(
-            'orders-jet-qr-menu',
-            ORDERS_JET_PLUGIN_URL . 'assets/js/qr-menu.js',
-            array('jquery'),
-            ORDERS_JET_VERSION,
-            true
-        );
+        // QR menu JavaScript handled by Orders_Jet_Assets class
         
-        // Localize script with AJAX data
-        wp_localize_script('orders-jet-qr-menu', 'OrdersJetQRMenu', array(
-            'ajaxUrl' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('oj_table_nonce'),
-            'tableNumber' => $table_number,
-            'strings' => array(
-                'loading' => __('Loading...', 'orders-jet'),
-                'error' => __('An error occurred', 'orders-jet'),
-                'success' => __('Success!', 'orders-jet'),
-                'confirm' => __('Are you sure?', 'orders-jet'),
-                'addToCart' => __('Add to Cart', 'orders-jet'),
-                'removeFromCart' => __('Remove from Cart', 'orders-jet'),
-                'updateCart' => __('Update Cart', 'orders-jet'),
-                'checkout' => __('Checkout', 'orders-jet'),
-                'placeOrder' => __('Place Order', 'orders-jet'),
-                'orderPlaced' => __('Order placed successfully!', 'orders-jet'),
-                'orderFailed' => __('Failed to place order. Please try again.', 'orders-jet')
-            )
-        ));
-        
-        // Add inline script to ensure initialization
-        wp_add_inline_script('orders-jet-qr-menu', '
-            jQuery(document).ready(function($) {
-                console.log("Orders Jet: Scripts loaded via rewrite rule");
-                if (typeof OrdersJetQRMenu !== "undefined") {
-                    console.log("Orders Jet: OrdersJetQRMenu found, initializing...");
-                    OrdersJetQRMenu.init({
-                        tableNumber: "' . esc_js($table_number) . '",
-                        tableId: null,
-                        ajaxUrl: "' . admin_url('admin-ajax.php') . '",
-                        nonce: "' . wp_create_nonce('oj_table_nonce') . '"
-                    });
-                } else {
-                    console.error("Orders Jet: OrdersJetQRMenu not found!");
-                }
-            });
-        ');
+        // Script localization and initialization handled by Orders_Jet_Assets class
     }
     
     /**

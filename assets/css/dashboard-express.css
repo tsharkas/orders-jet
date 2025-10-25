@@ -346,6 +346,49 @@
     }
 }
 
+/* Guest Invoice Request Styles */
+.oj-guest-invoice-notice {
+    background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+    color: #856404;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    border: 1px solid #ffeaa7;
+    text-align: center;
+    animation: pulse-notice 2s infinite;
+}
+
+.oj-action-btn.guest-request {
+    background: linear-gradient(135deg, #28a745, #20c997) !important;
+    border: 2px solid #20c997 !important;
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3) !important;
+    animation: pulse-guest-button 2s infinite;
+}
+
+.oj-action-btn.guest-request:hover {
+    background: linear-gradient(135deg, #218838, #1ea085) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4) !important;
+}
+
+@keyframes pulse-notice {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.8; }
+}
+
+@keyframes pulse-guest-button {
+    0%, 100% { 
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        transform: scale(1);
+    }
+    50% { 
+        box-shadow: 0 6px 25px rgba(40, 167, 69, 0.5);
+        transform: scale(1.02);
+    }
+}
+
 /* Order Details Popup Styles */
 .oj-order-details-overlay {
     position: fixed;
