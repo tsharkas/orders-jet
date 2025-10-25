@@ -350,7 +350,7 @@ class Orders_Jet_AJAX_Handlers {
                 'order_number' => $order->get_order_number(),
                 'total' => $order->get_total(),
                 'items' => $order_items,
-                'date' => $order->get_date_created()->format('Y-m-d H:i:s'),
+                'date' => get_date_from_gmt($order->get_date_created()->format('Y-m-d H:i:s'), 'Y-m-d H:i:s'),
                 'payment_method' => $order->get_meta('_oj_payment_method') ?: 'cash'
             );
             
@@ -1323,7 +1323,7 @@ class Orders_Jet_AJAX_Handlers {
             <tr><td>Order ID:</td><td class="thermal-right">#' . $order->get_id() . '</td></tr>
             <tr><td>Type:</td><td class="thermal-right">' . $order_type . '</td></tr>
             ' . (!empty($table_number) ? '<tr><td>Table:</td><td class="thermal-right">' . $table_number . '</td></tr>' : '') . '
-            <tr><td>Date:</td><td class="thermal-right">' . $order->get_date_created()->format('Y-m-d H:i') . '</td></tr>
+            <tr><td>Date:</td><td class="thermal-right">' . get_date_from_gmt($order->get_date_created()->format('Y-m-d H:i:s'), 'Y-m-d H:i') . '</td></tr>
             <tr><td>Status:</td><td class="thermal-right">' . ucfirst($order->get_status()) . '</td></tr>
         </table>
         
@@ -1585,21 +1585,27 @@ class Orders_Jet_AJAX_Handlers {
                 $product = $item->get_product();
                 $quantity = $item->get_quantity();
                 
-                // Calculate base item pricing
-                $item_total = $item->get_total();
-                $item_subtotal = $item->get_subtotal();
-                $unit_price = $quantity > 0 ? ($item_subtotal / $quantity) : 0;
-                
+                // Use the same logic as the frontend orders history (table-query-handler)
                 $item_data = array(
                     'name' => $item->get_name(),
                     'quantity' => $quantity,
-                    'unit_price' => wc_price($unit_price),
-                    'subtotal' => wc_price($item_subtotal),
-                    'total' => wc_price($item_total),
-                    'variation' => '',
+                    'total' => wc_price($item->get_total()),
+                    'unit_price' => wc_price($item->get_total() / $quantity),
+                    'base_price' => 0, // Will be calculated below
+                    'variations' => array(),
                     'addons' => array(),
                     'notes' => ''
                 );
+                
+                // Process add-ons first (same as table-query-handler)
+                $this->process_item_addons_for_details($item, $item_data);
+                
+                // Calculate base price using the same method as frontend
+                $this->calculate_base_price_for_details($item, $item_data);
+                
+                // Set the correct unit_price and subtotal based on base_price
+                $item_data['unit_price'] = wc_price($item_data['base_price']);
+                $item_data['subtotal'] = wc_price($item_data['base_price'] * $quantity);
                 
                 // Get variation details
                 if ($product && $product->is_type('variation')) {
@@ -1614,51 +1620,6 @@ class Orders_Jet_AJAX_Handlers {
                     }
                 }
                 
-                // Get add-ons with detailed pricing (WooCommerce Product Add-ons)
-                $addon_data = $item->get_meta('_wc_pao_addon_value');
-                if ($addon_data && is_array($addon_data)) {
-                    foreach ($addon_data as $addon) {
-                        if (isset($addon['name']) && isset($addon['value'])) {
-                            $addon_price = isset($addon['price']) ? floatval($addon['price']) : 0;
-                            $addon_total = $addon_price * $quantity;
-                            
-                            $item_data['addons'][] = array(
-                                'name' => $addon['name'] . ': ' . $addon['value'],
-                                'unit_price' => wc_price($addon_price),
-                                'subtotal' => wc_price($addon_total)
-                            );
-                        }
-                    }
-                }
-                
-                // Fallback for other add-on formats
-                if (empty($item_data['addons'])) {
-                    $addons_meta = $item->get_meta('_oj_item_addons');
-                    if ($addons_meta) {
-                        if (is_array($addons_meta)) {
-                            foreach ($addons_meta as $addon) {
-                                $item_data['addons'][] = array(
-                                    'name' => is_array($addon) ? $addon['name'] : $addon,
-                                    'unit_price' => wc_price(0),
-                                    'subtotal' => wc_price(0)
-                                );
-                            }
-                        } else {
-                            $item_data['addons'][] = array(
-                                'name' => $addons_meta,
-                                'unit_price' => wc_price(0),
-                                'subtotal' => wc_price(0)
-                            );
-                        }
-                    }
-                }
-                
-                // Get item notes
-                $notes = $item->get_meta('_oj_item_notes') ?: $item->get_meta('_wc_pao_addon_notes');
-                if ($notes) {
-                    $item_data['notes'] = $notes;
-                }
-                
                 $items[] = $item_data;
             }
             
@@ -1668,11 +1629,17 @@ class Orders_Jet_AJAX_Handlers {
             $type_data = $this->get_type_display_data($order_method);
             $kitchen_data = $this->get_kitchen_display_data($kitchen_status);
             
-            // Calculate elapsed time
+            // Calculate elapsed time using local timestamps
             $created_timestamp = $order->get_date_created()->getTimestamp();
             $current_timestamp = current_time('timestamp');
             $elapsed_seconds = $current_timestamp - $created_timestamp;
             $time_elapsed = $this->format_duration($elapsed_seconds);
+            
+            // current_time('timestamp') gives us correct LOCAL time
+            // So we need to convert the UTC created_timestamp to local time
+            // The offset is: current_time('timestamp') - time() 
+            $timezone_offset = $current_timestamp - time();
+            $local_created_timestamp = $created_timestamp + $timezone_offset;
             
             // Prepare response data
             $order_data = array(
@@ -1688,7 +1655,7 @@ class Orders_Jet_AJAX_Handlers {
                 'kitchen_class' => $kitchen_data['class'],
                 'kitchen_icon' => $kitchen_data['icon'],
                 'kitchen_text' => $kitchen_data['text'],
-                'date_created' => $order->get_date_created()->format('M j, Y g:i A'),
+                'date_created' => date('M j, Y g:i A', $local_created_timestamp),
                 'created_timestamp' => $created_timestamp,
                 'time_elapsed' => $time_elapsed,
                 'delivery_time' => $delivery_time,
@@ -1785,5 +1752,152 @@ class Orders_Jet_AJAX_Handlers {
         } else {
             return sprintf('%dm', $minutes);
         }
+    }
+    
+    /**
+     * Process item add-ons for order details (handles both QR menu and WooCommerce formats)
+     */
+    private function process_item_addons_for_details($item, &$item_data) {
+        // First try QR menu format (_oj_addons_data) - structured array
+        $oj_addons_data = $item->get_meta('_oj_addons_data');
+        if ($oj_addons_data && is_array($oj_addons_data)) {
+            foreach ($oj_addons_data as $addon) {
+                $addon_name = sanitize_text_field($addon['name'] ?? 'Add-on');
+                $addon_price = floatval($addon['price'] ?? 0);
+                $addon_quantity = intval($addon['quantity'] ?? 1);
+                
+                // The add-on price should be multiplied by item quantity for total calculation
+                // But the unit price shown should be the individual add-on price
+                $addon_total_per_item = $addon_price * $addon_quantity;
+                $addon_total_for_all_items = $addon_total_per_item * $item_data['quantity'];
+                $has_price = $addon_price > 0;
+                
+                // Don't include price in name - frontend will handle price display
+                $display_name = $addon_name;
+                
+                $item_data['addons'][] = array(
+                    'name' => $display_name,
+                    'unit_price' => wc_price($addon_total_per_item), // Per item add-on cost
+                    'subtotal' => wc_price($addon_total_for_all_items), // Total for all items
+                    'has_price' => $has_price,
+                    'price_value' => $addon_total_per_item // Use for calculation
+                );
+            }
+        }
+        // Fallback to WooCommerce Product Add-ons format
+        elseif ($addon_data = $item->get_meta('_wc_pao_addon_value')) {
+            if (is_array($addon_data)) {
+                foreach ($addon_data as $addon) {
+                    if (isset($addon['name']) && isset($addon['value'])) {
+                        $addon_price = isset($addon['price']) ? floatval($addon['price']) : 0;
+                        $addon_total = $addon_price * $item_data['quantity'];
+                        $has_price = $addon_price > 0;
+                        
+                        $addon_name = $addon['name'];
+                        
+                        $item_data['addons'][] = array(
+                            'name' => $addon_name,
+                            'unit_price' => wc_price($addon_price),
+                            'subtotal' => wc_price($addon_total),
+                            'has_price' => $has_price,
+                            'price_value' => $addon_price
+                        );
+                    }
+                }
+            }
+        }
+        // Final fallback to string format (_oj_item_addons)
+        elseif ($addons_string = $item->get_meta('_oj_item_addons')) {
+            // Parse string like "Combo Plus (+90.00 EGP), Soft Drink (+0.00 EGP), Frise (+0.00 EGP)"
+            $addon_parts = explode(', ', $addons_string);
+            foreach ($addon_parts as $addon_part) {
+                // Extract name and price from format like "Combo Plus (+90.00 EGP)"
+                if (preg_match('/^(.+?)\s*\(\+([0-9.,]+)\s*EGP\)$/', trim($addon_part), $matches)) {
+                    $addon_name = trim($matches[1]);
+                    $addon_price = floatval(str_replace(',', '.', $matches[2]));
+                    $has_price = $addon_price > 0;
+                    
+                    $display_name = $addon_name;
+                    
+                    $addon_total = $addon_price * $item_data['quantity'];
+                    
+                    $item_data['addons'][] = array(
+                        'name' => $display_name,
+                        'unit_price' => wc_price($addon_price),
+                        'subtotal' => wc_price($addon_total),
+                        'has_price' => $has_price,
+                        'price_value' => $addon_price
+                    );
+                } else {
+                    // No price format, just name
+                    $item_data['addons'][] = array(
+                        'name' => trim($addon_part),
+                        'unit_price' => wc_price(0),
+                        'subtotal' => wc_price(0),
+                        'has_price' => false,
+                        'price_value' => 0
+                    );
+                }
+            }
+        }
+        
+        // Get item notes
+        $notes = $item->get_meta('_oj_item_notes') ?: $item->get_meta('_wc_pao_addon_notes');
+        if ($notes) {
+            $item_data['notes'] = $notes;
+        }
+    }
+    
+    /**
+     * Calculate base price for item (same logic as table-query-handler)
+     */
+    private function calculate_base_price_for_details($item, &$item_data) {
+        $base_price_found = false;
+        
+        // Check if we stored the original variant price in meta data
+        $stored_base_price = $item->get_meta('_oj_base_price');
+        if ($stored_base_price) {
+            $item_data['base_price'] = floatval($stored_base_price);
+            $base_price_found = true;
+        }
+        
+        // If no stored price, try to calculate from current data
+        if (!$base_price_found) {
+            $product = $item->get_product();
+            
+            if ($product && $product->is_type('variation')) {
+                // For variation products, try to get the variant price
+                $variant_price = $product->get_price();
+                if ($variant_price) {
+                    $item_data['base_price'] = floatval($variant_price);
+                    $base_price_found = true;
+                }
+            } else {
+                // For non-variation products, calculate base price by subtracting add-ons
+                $addon_total = $this->calculate_addon_total_for_details($item_data['addons'], $item->get_quantity());
+                
+                $item_total = $item->get_total();
+                $base_price = ($item_total - $addon_total) / $item->get_quantity();
+                $item_data['base_price'] = $base_price;
+                $base_price_found = true;
+            }
+        }
+    }
+    
+    /**
+     * Calculate total add-on cost (handles QR menu format)
+     */
+    private function calculate_addon_total_for_details($addons, $quantity) {
+        $addon_total = 0;
+        if (!empty($addons)) {
+            foreach ($addons as $addon) {
+                if (isset($addon['price_value'])) {
+                    // The price_value already includes the per-item add-on cost
+                    // We need to multiply by item quantity for total cost
+                    $addon_total += $addon['price_value'] * $quantity;
+                }
+            }
+        }
+        return $addon_total;
     }
 }

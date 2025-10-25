@@ -381,6 +381,7 @@
     justify-content: space-between;
     align-items: center;
     background: #f8f9fa;
+    position: relative;
 }
 
 .oj-modal-header h3 {
@@ -391,31 +392,33 @@
 }
 
 .oj-modal-close {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    font-size: 20px;
+    background: #dc3545;
+    border: 1px solid #dc3545;
+    font-size: 18px;
     cursor: pointer;
-    color: #666;
-    padding: 8px 10px;
+    color: white;
+    padding: 8px;
     line-height: 1;
-    border-radius: 6px;
+    border-radius: 50%;
     transition: all 0.2s;
-    min-width: 36px;
-    height: 36px;
+    min-width: 32px;
+    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
+    font-weight: bold;
+    z-index: 10001;
 }
 
 .oj-modal-close:hover {
-    background: #e9ecef;
-    border-color: #adb5bd;
-    color: #333;
-    transform: scale(1.05);
+    background: #c82333;
+    border-color: #bd2130;
+    color: white;
+    transform: scale(1.1);
 }
 
 .oj-modal-close:active {
-    transform: scale(0.95);
+    transform: scale(0.9);
 }
 
 .oj-modal-body {
@@ -641,24 +644,21 @@
     border-bottom: none;
 }
 
-/* Item Header - Main item with pricing */
-.oj-item-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 8px;
+/* Item Main Line - Item name and variation */
+.oj-item-main-line {
+    margin-bottom: 4px;
 }
 
-.oj-item-main {
-    flex: 1;
+.oj-item-name-section {
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .oj-item-name {
     font-weight: 600;
     color: #333;
     font-size: 15px;
-    display: block;
-    margin-bottom: 2px;
 }
 
 .oj-item-variation {
@@ -667,72 +667,26 @@
     font-style: italic;
 }
 
-.oj-item-pricing {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+/* Item Price Line - Base pricing */
+.oj-item-price-line {
+    margin-bottom: 4px;
+}
+
+.oj-base-price {
+    color: #dc3545;
     font-size: 14px;
-    color: #333;
-}
-
-.oj-item-unit-price {
-    font-weight: 500;
-    color: #007cba;
-}
-
-.oj-item-multiplier {
-    color: #666;
-}
-
-.oj-item-subtotal {
-    font-weight: 600;
-    color: #333;
-}
-
-/* Add-on Rows */
-.oj-addon-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 4px 0 4px 20px;
-    font-size: 13px;
-}
-
-.oj-addon-info {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.oj-addon-prefix {
-    color: #28a745;
-    font-weight: 600;
-}
-
-.oj-addon-name {
-    color: #666;
-}
-
-.oj-addon-pricing {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-}
-
-.oj-addon-unit-price {
-    color: #28a745;
     font-weight: 500;
 }
 
-.oj-addon-multiplier {
-    color: #666;
+/* Add-on Lines */
+.oj-addon-line {
+    margin-bottom: 2px;
+    padding-left: 0;
 }
 
-.oj-addon-subtotal {
+.oj-addon-text {
     color: #28a745;
-    font-weight: 600;
+    font-size: 14px;
 }
 
 /* Item Notes */
@@ -834,23 +788,14 @@
         grid-template-columns: 1fr;
     }
     
-    .oj-item-header {
-        flex-direction: column;
-        gap: 8px;
-    }
-    
-    .oj-item-pricing {
-        justify-content: flex-start;
-    }
-    
-    .oj-addon-row {
+    .oj-item-name-section {
         flex-direction: column;
         align-items: flex-start;
-        gap: 4px;
-        padding-left: 16px;
+        gap: 2px;
     }
     
-    .oj-addon-pricing {
-        justify-content: flex-start;
+    .oj-base-price,
+    .oj-addon-text {
+        font-size: 13px;
     }
 }

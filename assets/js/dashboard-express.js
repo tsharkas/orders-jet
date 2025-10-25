@@ -492,7 +492,7 @@ jQuery(document).ready(function($) {
                     </div>
                     <div class="oj-modal-footer">
                         <button class="oj-btn secondary oj-edit-order" data-order-id="${orderData.id}" type="button">
-                            ✏️ Edit in WordPress
+                            ✏️ Edit
                         </button>
                         <button class="oj-btn primary oj-modal-close" type="button">
                             Close
@@ -552,41 +552,6 @@ jQuery(document).ready(function($) {
                 </div>
             </div>
             
-            <div class="oj-timing-section">
-                <h4>⏱️ Timing Information</h4>
-                <div class="oj-timing-grid">
-                    <div class="oj-timing-item">
-                        <label>Order Placed</label>
-                        <span>${orderData.date_created}</span>
-                    </div>
-                    <div class="oj-timing-item">
-                        <label>Time Elapsed</label>
-                        <span class="oj-duration-elapsed" data-start-time="${orderData.created_timestamp}">
-                            ${orderData.time_elapsed}
-                        </span>
-                    </div>
-        `;
-        
-        if (orderData.delivery_time) {
-            content += `
-                    <div class="oj-timing-item">
-                        <label>${orderData.delivery_label}</label>
-                        <span>${orderData.delivery_time.formatted}</span>
-                    </div>
-                    <div class="oj-timing-item">
-                        <label>Time Remaining</label>
-                        <span class="oj-duration-remaining ${orderData.delivery_time.status_class}" 
-                              data-target-time="${orderData.delivery_time.timestamp}">
-                            ${orderData.delivery_time.remaining_text}
-                        </span>
-                    </div>
-            `;
-        }
-        
-        content += `
-                </div>
-            </div>
-            
             <div class="oj-customer-section">
                 <h4>👤 Customer Information</h4>
                 <div class="oj-customer-grid">
@@ -605,14 +570,15 @@ jQuery(document).ready(function($) {
             `;
         }
         
-        if (orderData.customer_phone) {
-            content += `
+        // Always show time elapsed instead of phone
+        content += `
                     <div class="oj-customer-item">
-                        <label>Phone</label>
-                        <span>${orderData.customer_phone}</span>
+                        <label>Time Elapsed</label>
+                        <span class="oj-duration-elapsed" data-start-time="${orderData.created_timestamp}">
+                            ${orderData.time_elapsed}
+                        </span>
                     </div>
-            `;
-        }
+        `;
         
         if (orderData.delivery_address) {
             content += `
@@ -635,35 +601,32 @@ jQuery(document).ready(function($) {
         orderData.items.forEach(item => {
             content += `
                     <div class="oj-item-container">
-                        <div class="oj-item-header">
-                            <div class="oj-item-main">
-                                <span class="oj-item-name">${item.name}</span>
-                                ${item.variation ? `<span class="oj-item-variation">(${item.variation})</span>` : ''}
-                            </div>
-                            <div class="oj-item-pricing">
-                                <span class="oj-item-unit-price">${item.unit_price}</span>
-                                <span class="oj-item-multiplier">× ${item.quantity}</span>
-                                <span class="oj-item-subtotal">(${item.subtotal})</span>
-                            </div>
+                        <div class="oj-item-main-line">
+                            <span class="oj-item-name">${item.name}</span>
+                        </div>
+                        
+                        <div class="oj-item-price-line">
+                            <span class="oj-base-price">${item.unit_price} × ${item.quantity} = ${item.subtotal}</span>
                         </div>
             `;
             
-            // Add detailed breakdown for add-ons
+            // Add detailed breakdown for add-ons - each on separate line
             if (item.addons && item.addons.length > 0) {
                 item.addons.forEach(addon => {
-                    content += `
-                        <div class="oj-addon-row">
-                            <div class="oj-addon-info">
-                                <span class="oj-addon-prefix">+</span>
-                                <span class="oj-addon-name">${addon.name}</span>
+                    // Only show add-ons with price > 0, or show without price if 0
+                    if (addon.has_price && parseFloat(addon.price_value) > 0) {
+                        content += `
+                            <div class="oj-addon-line">
+                                <span class="oj-addon-text">+ ${addon.name}: ${addon.unit_price} × ${item.quantity} = ${addon.subtotal}</span>
                             </div>
-                            <div class="oj-addon-pricing">
-                                <span class="oj-addon-unit-price">${addon.unit_price}</span>
-                                <span class="oj-addon-multiplier">× ${item.quantity}</span>
-                                <span class="oj-addon-subtotal">(${addon.subtotal})</span>
+                        `;
+                    } else {
+                        content += `
+                            <div class="oj-addon-line">
+                                <span class="oj-addon-text">+ ${addon.name}</span>
                             </div>
-                        </div>
-                    `;
+                        `;
+                    }
                 });
             }
             
@@ -671,7 +634,7 @@ jQuery(document).ready(function($) {
             if (item.notes) {
                 content += `
                         <div class="oj-item-notes">
-                            <em>${item.notes}</em>
+                            ${item.notes}
                         </div>
                 `;
             }
