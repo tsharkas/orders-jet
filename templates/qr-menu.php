@@ -3678,7 +3678,7 @@ if (class_exists('Orders_Jet_Menu_Integration')) {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
                 body: new URLSearchParams({
-                    action: 'oj_close_table',
+                    action: 'oj_close_table_group',
                     table_number: '<?php echo esc_js($table_number); ?>',
                     payment_method: paymentMethod,
                     nonce: '<?php echo wp_create_nonce('oj_table_order'); ?>'
