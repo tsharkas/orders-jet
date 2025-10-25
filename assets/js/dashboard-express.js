@@ -418,6 +418,9 @@ jQuery(document).ready(function($) {
     // ========================================================================
     
     function showExpressPaymentModal(orderId, callback) {
+        // Remove any existing modals first
+        $('.oj-success-modal-overlay').remove();
+        
         const modal = $(`
             <div class="oj-success-modal-overlay">
                 <div class="oj-success-modal">
@@ -441,20 +444,26 @@ jQuery(document).ready(function($) {
         
         $body.append(modal);
         
-        // Use event delegation for modal events
-        $(document).on('click', '.oj-payment-modal .oj-payment-btn', function() {
+        // Use direct event binding for this specific modal instance
+        modal.find('.oj-payment-btn').on('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
             const method = $(this).data('method');
-            $(this).closest('.oj-payment-modal').remove();
-            callback(method);
+            modal.remove();
+            if (typeof callback === 'function') {
+                callback(method);
+            }
         });
         
-        $(document).on('click', '.oj-payment-modal .oj-modal-close', function() {
-            $(this).closest('.oj-payment-modal').remove();
+        modal.find('.oj-modal-close').on('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            modal.remove();
         });
         
-        $(document).on('click', '.oj-payment-modal', function(e) {
-            if (e.target === this) {
-                $(this).remove();
+        modal.on('click', function(e) {
+            if (e.target === this[0]) {
+                modal.remove();
             }
         });
     }
@@ -469,9 +478,9 @@ jQuery(document).ready(function($) {
         
         $body.append(notification);
         
-        // Use event delegation for notification close
-        $(document).on('click', '.oj-success-notification .oj-notification-close', function() {
-            $(this).closest('.oj-success-notification').remove();
+        // Use direct event binding for this specific notification
+        notification.find('.oj-notification-close').on('click', function() {
+            notification.remove();
         });
         
         setTimeout(() => notification.remove(), 5000);

@@ -151,6 +151,7 @@ class Orders_Jet_Admin_Dashboard {
         $manager_pages = array(
             'toplevel_page_manager-overview',
             'manager-overview_page_manager-orders',
+            'manager-overview_page_manager-orders-express',
             'manager-overview_page_manager-tables',
             'manager-overview_page_manager-staff',
             'manager-overview_page_manager-reports',
