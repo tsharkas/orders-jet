@@ -485,16 +485,16 @@ jQuery(document).ready(function($) {
                 <div class="oj-order-details-modal">
                     <div class="oj-modal-header">
                         <h3>Order #${orderData.order_number} Details</h3>
-                        <button class="oj-modal-close">✕</button>
+                        <button class="oj-modal-close" type="button">✕</button>
                     </div>
                     <div class="oj-modal-body">
                         ${generateOrderDetailsContent(orderData)}
                     </div>
                     <div class="oj-modal-footer">
-                        <button class="oj-btn secondary oj-edit-order" data-order-id="${orderData.id}">
+                        <button class="oj-btn secondary oj-edit-order" data-order-id="${orderData.id}" type="button">
                             ✏️ Edit in WordPress
                         </button>
-                        <button class="oj-btn primary oj-modal-close">
+                        <button class="oj-btn primary oj-modal-close" type="button">
                             Close
                         </button>
                     </div>
@@ -634,15 +634,53 @@ jQuery(document).ready(function($) {
         
         orderData.items.forEach(item => {
             content += `
-                    <div class="oj-item-row">
-                        <div class="oj-item-info">
-                            <span class="oj-item-name">${item.name}</span>
-                            ${item.variation ? `<span class="oj-item-variation">${item.variation}</span>` : ''}
-                            ${item.addons ? `<span class="oj-item-addons">${item.addons}</span>` : ''}
-                            ${item.notes ? `<span class="oj-item-notes">Note: ${item.notes}</span>` : ''}
+                    <div class="oj-item-container">
+                        <div class="oj-item-header">
+                            <div class="oj-item-main">
+                                <span class="oj-item-name">${item.name}</span>
+                                ${item.variation ? `<span class="oj-item-variation">(${item.variation})</span>` : ''}
+                            </div>
+                            <div class="oj-item-pricing">
+                                <span class="oj-item-unit-price">${item.unit_price}</span>
+                                <span class="oj-item-multiplier">× ${item.quantity}</span>
+                                <span class="oj-item-subtotal">(${item.subtotal})</span>
+                            </div>
                         </div>
-                        <div class="oj-item-quantity">×${item.quantity}</div>
-                        <div class="oj-item-price">${item.price}</div>
+            `;
+            
+            // Add detailed breakdown for add-ons
+            if (item.addons && item.addons.length > 0) {
+                item.addons.forEach(addon => {
+                    content += `
+                        <div class="oj-addon-row">
+                            <div class="oj-addon-info">
+                                <span class="oj-addon-prefix">+</span>
+                                <span class="oj-addon-name">${addon.name}</span>
+                            </div>
+                            <div class="oj-addon-pricing">
+                                <span class="oj-addon-unit-price">${addon.unit_price}</span>
+                                <span class="oj-addon-multiplier">× ${item.quantity}</span>
+                                <span class="oj-addon-subtotal">(${addon.subtotal})</span>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            
+            // Add notes if present
+            if (item.notes) {
+                content += `
+                        <div class="oj-item-notes">
+                            <em>${item.notes}</em>
+                        </div>
+                `;
+            }
+            
+            content += `
+                        <div class="oj-item-total">
+                            <span class="oj-total-label">Total:</span>
+                            <span class="oj-total-amount">${item.total}</span>
+                        </div>
                     </div>
             `;
         });

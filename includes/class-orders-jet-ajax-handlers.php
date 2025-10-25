@@ -1579,16 +1579,25 @@ class Orders_Jet_AJAX_Handlers {
                                   $order->get_formatted_shipping_address();
             }
             
-            // Get order items with details
+            // Get order items with detailed breakdown
             $items = array();
             foreach ($order->get_items() as $item) {
                 $product = $item->get_product();
+                $quantity = $item->get_quantity();
+                
+                // Calculate base item pricing
+                $item_total = $item->get_total();
+                $item_subtotal = $item->get_subtotal();
+                $unit_price = $quantity > 0 ? ($item_subtotal / $quantity) : 0;
+                
                 $item_data = array(
                     'name' => $item->get_name(),
-                    'quantity' => $item->get_quantity(),
-                    'price' => wc_price($item->get_total()),
+                    'quantity' => $quantity,
+                    'unit_price' => wc_price($unit_price),
+                    'subtotal' => wc_price($item_subtotal),
+                    'total' => wc_price($item_total),
                     'variation' => '',
-                    'addons' => '',
+                    'addons' => array(),
                     'notes' => ''
                 );
                 
@@ -1598,16 +1607,50 @@ class Orders_Jet_AJAX_Handlers {
                     if (!empty($variation_attributes)) {
                         $variation_parts = array();
                         foreach ($variation_attributes as $name => $value) {
-                            $variation_parts[] = ucfirst(str_replace('pa_', '', $name)) . ': ' . $value;
+                            $attribute_name = ucfirst(str_replace('pa_', '', $name));
+                            $variation_parts[] = $attribute_name . ': ' . $value;
                         }
                         $item_data['variation'] = implode(', ', $variation_parts);
                     }
                 }
                 
-                // Get add-ons (from various plugins)
-                $addons = $item->get_meta('_oj_item_addons') ?: $item->get_meta('_wc_pao_addon_value');
-                if ($addons) {
-                    $item_data['addons'] = is_array($addons) ? implode(', ', $addons) : $addons;
+                // Get add-ons with detailed pricing (WooCommerce Product Add-ons)
+                $addon_data = $item->get_meta('_wc_pao_addon_value');
+                if ($addon_data && is_array($addon_data)) {
+                    foreach ($addon_data as $addon) {
+                        if (isset($addon['name']) && isset($addon['value'])) {
+                            $addon_price = isset($addon['price']) ? floatval($addon['price']) : 0;
+                            $addon_total = $addon_price * $quantity;
+                            
+                            $item_data['addons'][] = array(
+                                'name' => $addon['name'] . ': ' . $addon['value'],
+                                'unit_price' => wc_price($addon_price),
+                                'subtotal' => wc_price($addon_total)
+                            );
+                        }
+                    }
+                }
+                
+                // Fallback for other add-on formats
+                if (empty($item_data['addons'])) {
+                    $addons_meta = $item->get_meta('_oj_item_addons');
+                    if ($addons_meta) {
+                        if (is_array($addons_meta)) {
+                            foreach ($addons_meta as $addon) {
+                                $item_data['addons'][] = array(
+                                    'name' => is_array($addon) ? $addon['name'] : $addon,
+                                    'unit_price' => wc_price(0),
+                                    'subtotal' => wc_price(0)
+                                );
+                            }
+                        } else {
+                            $item_data['addons'][] = array(
+                                'name' => $addons_meta,
+                                'unit_price' => wc_price(0),
+                                'subtotal' => wc_price(0)
+                            );
+                        }
+                    }
                 }
                 
                 // Get item notes

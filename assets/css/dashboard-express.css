@@ -391,20 +391,31 @@
 }
 
 .oj-modal-close {
-    background: none;
-    border: none;
-    font-size: 24px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    font-size: 20px;
     cursor: pointer;
     color: #666;
-    padding: 4px;
+    padding: 8px 10px;
     line-height: 1;
-    border-radius: 4px;
+    border-radius: 6px;
     transition: all 0.2s;
+    min-width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .oj-modal-close:hover {
     background: #e9ecef;
+    border-color: #adb5bd;
     color: #333;
+    transform: scale(1.05);
+}
+
+.oj-modal-close:active {
+    transform: scale(0.95);
 }
 
 .oj-modal-body {
@@ -619,57 +630,142 @@
     overflow: hidden;
 }
 
-.oj-item-row {
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    gap: 12px;
-    padding: 12px 16px;
+/* Item Container - Each complete item */
+.oj-item-container {
+    padding: 16px;
     border-bottom: 1px solid #e0e0e0;
-    align-items: start;
+    background: #fff;
 }
 
-.oj-item-row:last-child {
+.oj-item-container:last-child {
     border-bottom: none;
 }
 
-.oj-item-info {
+/* Item Header - Main item with pricing */
+.oj-item-header {
     display: flex;
-    flex-direction: column;
-    gap: 4px;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+}
+
+.oj-item-main {
+    flex: 1;
 }
 
 .oj-item-name {
     font-weight: 600;
     color: #333;
-    font-size: 14px;
+    font-size: 15px;
+    display: block;
+    margin-bottom: 2px;
 }
 
-.oj-item-variation,
-.oj-item-addons {
-    font-size: 12px;
+.oj-item-variation {
+    font-size: 13px;
     color: #666;
-}
-
-.oj-item-notes {
-    font-size: 12px;
-    color: #007cba;
     font-style: italic;
 }
 
-.oj-item-quantity {
-    font-weight: 600;
-    color: #666;
+.oj-item-pricing {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-size: 14px;
-    text-align: center;
-    min-width: 40px;
+    color: #333;
 }
 
-.oj-item-price {
+.oj-item-unit-price {
+    font-weight: 500;
+    color: #007cba;
+}
+
+.oj-item-multiplier {
+    color: #666;
+}
+
+.oj-item-subtotal {
     font-weight: 600;
     color: #333;
+}
+
+/* Add-on Rows */
+.oj-addon-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0 4px 20px;
+    font-size: 13px;
+}
+
+.oj-addon-info {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.oj-addon-prefix {
+    color: #28a745;
+    font-weight: 600;
+}
+
+.oj-addon-name {
+    color: #666;
+}
+
+.oj-addon-pricing {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.oj-addon-unit-price {
+    color: #28a745;
+    font-weight: 500;
+}
+
+.oj-addon-multiplier {
+    color: #666;
+}
+
+.oj-addon-subtotal {
+    color: #28a745;
+    font-weight: 600;
+}
+
+/* Item Notes */
+.oj-item-notes {
+    margin: 8px 0;
+    padding: 8px 12px;
+    background: #fff3cd;
+    border-left: 3px solid #ffc107;
+    font-size: 13px;
+    color: #856404;
+    font-style: italic;
+}
+
+/* Item Total */
+.oj-item-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid #f0f0f0;
+    font-weight: 600;
+}
+
+.oj-item-total .oj-total-label {
+    color: #666;
     font-size: 14px;
-    text-align: right;
-    min-width: 80px;
+}
+
+.oj-item-total .oj-total-amount {
+    color: #dc3545;
+    font-size: 15px;
+    font-weight: 700;
 }
 
 /* Totals Section */
@@ -738,13 +834,23 @@
         grid-template-columns: 1fr;
     }
     
-    .oj-item-row {
-        grid-template-columns: 1fr;
+    .oj-item-header {
+        flex-direction: column;
         gap: 8px;
     }
     
-    .oj-item-quantity,
-    .oj-item-price {
-        text-align: left;
+    .oj-item-pricing {
+        justify-content: flex-start;
+    }
+    
+    .oj-addon-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+        padding-left: 16px;
+    }
+    
+    .oj-addon-pricing {
+        justify-content: flex-start;
     }
 }
