@@ -406,16 +406,342 @@ jQuery(document).ready(function($) {
         });
     });
     
-    // View Order Details
+    // View Order Details - Enhanced with popup
     $(document).on('click', '.oj-view-order', function() {
         const orderId = $(this).data('order-id');
-        const url = ojExpressData.adminUrl + '?post=' + orderId + '&action=edit';
-        window.open(url, '_blank');
+        showOrderDetailsPopup(orderId);
     });
     
     // ========================================================================
     // HELPER FUNCTIONS
     // ========================================================================
+    
+    function showOrderDetailsPopup(orderId) {
+        // Remove any existing popups first
+        $('.oj-order-details-overlay').remove();
+        
+        // Show loading state
+        const loadingModal = $(`
+            <div class="oj-order-details-overlay">
+                <div class="oj-order-details-modal">
+                    <div class="oj-modal-header">
+                        <h3>Loading Order Details...</h3>
+                        <button class="oj-modal-close">✕</button>
+                    </div>
+                    <div class="oj-modal-body">
+                        <div class="oj-loading-spinner">⏳ Loading...</div>
+                    </div>
+                </div>
+            </div>
+        `);
+        
+        $body.append(loadingModal);
+        
+        // Bind close event
+        loadingModal.find('.oj-modal-close').on('click', function() {
+            loadingModal.remove();
+        });
+        
+        loadingModal.on('click', function(e) {
+            if (e.target === this) {
+                loadingModal.remove();
+            }
+        });
+        
+        // Fetch order details via AJAX
+        $.ajax({
+            url: ojExpressData.ajaxUrl,
+            type: 'POST',
+            data: {
+                action: 'oj_get_order_details',
+                order_id: orderId,
+                nonce: ojExpressData.nonces.dashboard
+            },
+            success: function(response) {
+                if (response.success && response.data) {
+                    loadingModal.remove();
+                    displayOrderDetailsModal(response.data);
+                } else {
+                    loadingModal.find('.oj-modal-body').html(`
+                        <div class="oj-error-message">
+                            ❌ Failed to load order details: ${response.data ? response.data.message : 'Unknown error'}
+                        </div>
+                    `);
+                }
+            },
+            error: function() {
+                loadingModal.find('.oj-modal-body').html(`
+                    <div class="oj-error-message">
+                        ❌ Connection error. Please try again.
+                    </div>
+                `);
+            }
+        });
+    }
+    
+    function displayOrderDetailsModal(orderData) {
+        const modal = $(`
+            <div class="oj-order-details-overlay">
+                <div class="oj-order-details-modal">
+                    <div class="oj-modal-header">
+                        <h3>Order #${orderData.order_number} Details</h3>
+                        <button class="oj-modal-close">✕</button>
+                    </div>
+                    <div class="oj-modal-body">
+                        ${generateOrderDetailsContent(orderData)}
+                    </div>
+                    <div class="oj-modal-footer">
+                        <button class="oj-btn secondary oj-edit-order" data-order-id="${orderData.id}">
+                            ✏️ Edit in WordPress
+                        </button>
+                        <button class="oj-btn primary oj-modal-close">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `);
+        
+        $body.append(modal);
+        
+        // Bind events
+        modal.find('.oj-modal-close').on('click', function() {
+            modal.remove();
+        });
+        
+        modal.find('.oj-edit-order').on('click', function() {
+            const orderId = $(this).data('order-id');
+            const url = ojExpressData.adminUrl + '?post=' + orderId + '&action=edit';
+            window.open(url, '_blank');
+        });
+        
+        modal.on('click', function(e) {
+            if (e.target === this) {
+                modal.remove();
+            }
+        });
+        
+        // Start duration updates if order is active
+        if (orderData.is_active) {
+            startDurationUpdates(modal, orderData);
+        }
+    }
+    
+    function generateOrderDetailsContent(orderData) {
+        let content = `
+            <div class="oj-order-overview">
+                <div class="oj-overview-row">
+                    <div class="oj-overview-item">
+                        <label>Status</label>
+                        <span class="oj-status-badge ${orderData.status_class}">
+                            ${orderData.status_icon} ${orderData.status_text}
+                        </span>
+                    </div>
+                    <div class="oj-overview-item">
+                        <label>Order Type</label>
+                        <span class="oj-type-badge ${orderData.type_class}">
+                            ${orderData.type_icon} ${orderData.type_text}
+                        </span>
+                    </div>
+                    <div class="oj-overview-item">
+                        <label>Kitchen</label>
+                        <span class="oj-kitchen-badge ${orderData.kitchen_class}">
+                            ${orderData.kitchen_icon} ${orderData.kitchen_text}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="oj-timing-section">
+                <h4>⏱️ Timing Information</h4>
+                <div class="oj-timing-grid">
+                    <div class="oj-timing-item">
+                        <label>Order Placed</label>
+                        <span>${orderData.date_created}</span>
+                    </div>
+                    <div class="oj-timing-item">
+                        <label>Time Elapsed</label>
+                        <span class="oj-duration-elapsed" data-start-time="${orderData.created_timestamp}">
+                            ${orderData.time_elapsed}
+                        </span>
+                    </div>
+        `;
+        
+        if (orderData.delivery_time) {
+            content += `
+                    <div class="oj-timing-item">
+                        <label>${orderData.delivery_label}</label>
+                        <span>${orderData.delivery_time.formatted}</span>
+                    </div>
+                    <div class="oj-timing-item">
+                        <label>Time Remaining</label>
+                        <span class="oj-duration-remaining ${orderData.delivery_time.status_class}" 
+                              data-target-time="${orderData.delivery_time.timestamp}">
+                            ${orderData.delivery_time.remaining_text}
+                        </span>
+                    </div>
+            `;
+        }
+        
+        content += `
+                </div>
+            </div>
+            
+            <div class="oj-customer-section">
+                <h4>👤 Customer Information</h4>
+                <div class="oj-customer-grid">
+                    <div class="oj-customer-item">
+                        <label>Name</label>
+                        <span>${orderData.customer_name}</span>
+                    </div>
+        `;
+        
+        if (orderData.table_number) {
+            content += `
+                    <div class="oj-customer-item">
+                        <label>Table</label>
+                        <span>${orderData.table_number}</span>
+                    </div>
+            `;
+        }
+        
+        if (orderData.customer_phone) {
+            content += `
+                    <div class="oj-customer-item">
+                        <label>Phone</label>
+                        <span>${orderData.customer_phone}</span>
+                    </div>
+            `;
+        }
+        
+        if (orderData.delivery_address) {
+            content += `
+                    <div class="oj-customer-item">
+                        <label>Address</label>
+                        <span>${orderData.delivery_address}</span>
+                    </div>
+            `;
+        }
+        
+        content += `
+                </div>
+            </div>
+            
+            <div class="oj-items-section">
+                <h4>🍽️ Order Items (${orderData.item_count})</h4>
+                <div class="oj-items-list">
+        `;
+        
+        orderData.items.forEach(item => {
+            content += `
+                    <div class="oj-item-row">
+                        <div class="oj-item-info">
+                            <span class="oj-item-name">${item.name}</span>
+                            ${item.variation ? `<span class="oj-item-variation">${item.variation}</span>` : ''}
+                            ${item.addons ? `<span class="oj-item-addons">${item.addons}</span>` : ''}
+                            ${item.notes ? `<span class="oj-item-notes">Note: ${item.notes}</span>` : ''}
+                        </div>
+                        <div class="oj-item-quantity">×${item.quantity}</div>
+                        <div class="oj-item-price">${item.price}</div>
+                    </div>
+            `;
+        });
+        
+        content += `
+                </div>
+            </div>
+            
+            <div class="oj-totals-section">
+                <div class="oj-total-row">
+                    <span class="oj-total-label">Total</span>
+                    <span class="oj-total-amount">${orderData.total_formatted}</span>
+                </div>
+            </div>
+        `;
+        
+        if (orderData.special_instructions) {
+            content += `
+                <div class="oj-notes-section">
+                    <h4>📝 Special Instructions</h4>
+                    <div class="oj-notes-content">${orderData.special_instructions}</div>
+                </div>
+            `;
+        }
+        
+        return content;
+    }
+    
+    function startDurationUpdates(modal, orderData) {
+        const updateInterval = setInterval(function() {
+            // Update elapsed time
+            const elapsedElement = modal.find('.oj-duration-elapsed');
+            if (elapsedElement.length) {
+                const startTime = parseInt(elapsedElement.data('start-time'));
+                const currentTime = Math.floor(Date.now() / 1000);
+                const elapsedSeconds = currentTime - startTime;
+                elapsedElement.text(formatDuration(elapsedSeconds));
+            }
+            
+            // Update remaining time for delivery orders
+            const remainingElement = modal.find('.oj-duration-remaining');
+            if (remainingElement.length) {
+                const targetTime = parseInt(remainingElement.data('target-time'));
+                const currentTime = Math.floor(Date.now() / 1000);
+                const remainingSeconds = targetTime - currentTime;
+                
+                const { text, className } = formatRemainingTime(remainingSeconds);
+                remainingElement.text(text);
+                remainingElement.removeClass('oj-countdown-upcoming oj-countdown-soon oj-countdown-urgent oj-countdown-overdue');
+                remainingElement.addClass(className);
+            }
+        }, 1000); // Update every second
+        
+        // Clear interval when modal is closed
+        modal.on('remove', function() {
+            clearInterval(updateInterval);
+        });
+    }
+    
+    function formatDuration(seconds) {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        
+        if (hours > 0) {
+            return `${hours}h ${minutes}m`;
+        } else {
+            return `${minutes}m`;
+        }
+    }
+    
+    function formatRemainingTime(seconds) {
+        const absSeconds = Math.abs(seconds);
+        const hours = Math.floor(absSeconds / 3600);
+        const minutes = Math.floor((absSeconds % 3600) / 60);
+        
+        let text;
+        let className;
+        
+        if (seconds < 0) {
+            // Overdue
+            if (hours > 0) {
+                text = `OVERDUE ${hours}h ${minutes}m`;
+            } else {
+                text = `OVERDUE ${minutes}m`;
+            }
+            className = 'oj-countdown-overdue';
+        } else if (seconds < 1800) { // Less than 30 minutes
+            text = `${minutes}m`;
+            className = 'oj-countdown-urgent';
+        } else if (seconds < 3600) { // Less than 1 hour
+            text = `${minutes}m`;
+            className = 'oj-countdown-soon';
+        } else {
+            text = `${hours}h ${minutes}m`;
+            className = 'oj-countdown-upcoming';
+        }
+        
+        return { text, className };
+    }
     
     function showExpressPaymentModal(orderId, callback) {
         // Remove any existing modals first

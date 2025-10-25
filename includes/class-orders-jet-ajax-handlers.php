@@ -51,6 +51,7 @@ class Orders_Jet_AJAX_Handlers {
         add_action('wp_ajax_oj_get_filter_counts', array($this, 'get_filter_counts'));
         add_action('wp_ajax_oj_confirm_payment_received', array($this, 'confirm_payment_received'));
         add_action('wp_ajax_oj_refresh_dashboard', array($this, 'refresh_dashboard_ajax'));
+        add_action('wp_ajax_oj_get_order_details', array($this, 'get_order_details'));
         
         // NOTE: Phase 1, 2, 3, 4 & 5 refactoring complete:
         // - Phase 1: Removed obsolete functions (4,470 → 3,483 lines)
@@ -1510,5 +1511,236 @@ class Orders_Jet_AJAX_Handlers {
             'message' => __('Dashboard refreshed', 'orders-jet'),
             'timestamp' => current_time('mysql')
         ));
+    }
+    
+    /**
+     * Get detailed order information for popup display
+     */
+    public function get_order_details() {
+        check_ajax_referer('oj_dashboard_nonce', 'nonce');
+        
+        $order_id = intval($_POST['order_id']);
+        if (!$order_id) {
+            wp_send_json_error(array('message' => __('Invalid order ID', 'orders-jet')));
+        }
+        
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            wp_send_json_error(array('message' => __('Order not found', 'orders-jet')));
+        }
+        
+        try {
+            // Get order method and kitchen information
+            $order_method_service = new Orders_Jet_Order_Method_Service();
+            $order_method = $order_method_service->get_order_method($order);
+            
+            $kitchen_status = $this->kitchen_service->get_kitchen_readiness_status($order);
+            
+            // Get delivery time information
+            $delivery_time = null;
+            $delivery_label = '';
+            if (class_exists('OJ_Delivery_Time_Manager')) {
+                $delivery_info = OJ_Delivery_Time_Manager::get_delivery_time($order);
+                if ($delivery_info) {
+                    $remaining_info = OJ_Delivery_Time_Manager::get_time_remaining($order);
+                    $delivery_time = array(
+                        'formatted' => $delivery_info['formatted'],
+                        'timestamp' => $delivery_info['timestamp'],
+                        'remaining_text' => $remaining_info ? $remaining_info['text'] : '',
+                        'status_class' => $remaining_info ? $remaining_info['class'] : ''
+                    );
+                    
+                    // Set appropriate label based on order type
+                    switch ($order_method) {
+                        case 'delivery':
+                            $delivery_label = __('Delivery Time', 'orders-jet');
+                            break;
+                        case 'takeaway':
+                            $delivery_label = __('Pickup Time', 'orders-jet');
+                            break;
+                        default:
+                            $delivery_label = __('Expected Time', 'orders-jet');
+                            break;
+                    }
+                }
+            }
+            
+            // Get customer information
+            $customer_name = trim($order->get_billing_first_name() . ' ' . $order->get_billing_last_name());
+            if (empty($customer_name)) {
+                $customer_name = $order->get_billing_email() ?: __('Guest', 'orders-jet');
+            }
+            
+            $customer_phone = $order->get_billing_phone();
+            $delivery_address = '';
+            if ($order_method === 'delivery') {
+                $delivery_address = $order->get_meta('_oj_delivery_address') ?: 
+                                  $order->get_meta('_exwf_delivery_address') ?: 
+                                  $order->get_formatted_shipping_address();
+            }
+            
+            // Get order items with details
+            $items = array();
+            foreach ($order->get_items() as $item) {
+                $product = $item->get_product();
+                $item_data = array(
+                    'name' => $item->get_name(),
+                    'quantity' => $item->get_quantity(),
+                    'price' => wc_price($item->get_total()),
+                    'variation' => '',
+                    'addons' => '',
+                    'notes' => ''
+                );
+                
+                // Get variation details
+                if ($product && $product->is_type('variation')) {
+                    $variation_attributes = $product->get_variation_attributes();
+                    if (!empty($variation_attributes)) {
+                        $variation_parts = array();
+                        foreach ($variation_attributes as $name => $value) {
+                            $variation_parts[] = ucfirst(str_replace('pa_', '', $name)) . ': ' . $value;
+                        }
+                        $item_data['variation'] = implode(', ', $variation_parts);
+                    }
+                }
+                
+                // Get add-ons (from various plugins)
+                $addons = $item->get_meta('_oj_item_addons') ?: $item->get_meta('_wc_pao_addon_value');
+                if ($addons) {
+                    $item_data['addons'] = is_array($addons) ? implode(', ', $addons) : $addons;
+                }
+                
+                // Get item notes
+                $notes = $item->get_meta('_oj_item_notes') ?: $item->get_meta('_wc_pao_addon_notes');
+                if ($notes) {
+                    $item_data['notes'] = $notes;
+                }
+                
+                $items[] = $item_data;
+            }
+            
+            // Get status information
+            $status = $order->get_status();
+            $status_data = $this->get_status_display_data($order, $kitchen_status);
+            $type_data = $this->get_type_display_data($order_method);
+            $kitchen_data = $this->get_kitchen_display_data($kitchen_status);
+            
+            // Calculate elapsed time
+            $created_timestamp = $order->get_date_created()->getTimestamp();
+            $current_timestamp = current_time('timestamp');
+            $elapsed_seconds = $current_timestamp - $created_timestamp;
+            $time_elapsed = $this->format_duration($elapsed_seconds);
+            
+            // Prepare response data
+            $order_data = array(
+                'id' => $order->get_id(),
+                'order_number' => $order->get_order_number(),
+                'status' => $status,
+                'status_class' => $status_data['class'],
+                'status_icon' => $status_data['icon'],
+                'status_text' => $status_data['text'],
+                'type_class' => $type_data['class'],
+                'type_icon' => $type_data['icon'],
+                'type_text' => $type_data['text'],
+                'kitchen_class' => $kitchen_data['class'],
+                'kitchen_icon' => $kitchen_data['icon'],
+                'kitchen_text' => $kitchen_data['text'],
+                'date_created' => $order->get_date_created()->format('M j, Y g:i A'),
+                'created_timestamp' => $created_timestamp,
+                'time_elapsed' => $time_elapsed,
+                'delivery_time' => $delivery_time,
+                'delivery_label' => $delivery_label,
+                'customer_name' => $customer_name,
+                'customer_phone' => $customer_phone,
+                'delivery_address' => $delivery_address,
+                'table_number' => $order->get_meta('_oj_table_number'),
+                'items' => $items,
+                'item_count' => count($items),
+                'total_formatted' => wc_price($order->get_total()),
+                'special_instructions' => $order->get_customer_note(),
+                'is_active' => in_array($status, array('processing', 'pending'))
+            );
+            
+            wp_send_json_success($order_data);
+            
+        } catch (Exception $e) {
+            error_log('Orders Jet: Error getting order details: ' . $e->getMessage());
+            wp_send_json_error(array('message' => __('Failed to load order details', 'orders-jet')));
+        }
+    }
+    
+    /**
+     * Helper method to get status display data
+     */
+    private function get_status_display_data($order, $kitchen_status) {
+        $status = $order->get_status();
+        
+        if ($status === 'pending') {
+            return array(
+                'class' => 'ready',
+                'icon' => '✅',
+                'text' => __('Ready', 'orders-jet')
+            );
+        } elseif ($status === 'processing') {
+            if ($kitchen_status['kitchen_type'] === 'mixed') {
+                if ($kitchen_status['food_ready'] && !$kitchen_status['beverage_ready']) {
+                    return array('class' => 'partial', 'icon' => '🍕✅ 🥤⏳', 'text' => __('Waiting for Beverages', 'orders-jet'));
+                } elseif (!$kitchen_status['food_ready'] && $kitchen_status['beverage_ready']) {
+                    return array('class' => 'partial', 'icon' => '🍕⏳ 🥤✅', 'text' => __('Waiting for Food', 'orders-jet'));
+                } else {
+                    return array('class' => 'kitchen', 'icon' => '👨‍🍳', 'text' => __('In Kitchen', 'orders-jet'));
+                }
+            } else {
+                return array('class' => 'kitchen', 'icon' => '👨‍🍳', 'text' => __('In Kitchen', 'orders-jet'));
+            }
+        } else {
+            return array('class' => 'completed', 'icon' => '✅', 'text' => ucfirst($status));
+        }
+    }
+    
+    /**
+     * Helper method to get type display data
+     */
+    private function get_type_display_data($order_method) {
+        switch ($order_method) {
+            case 'dinein':
+                return array('class' => 'dinein', 'icon' => '🍽️', 'text' => __('Dine-in', 'orders-jet'));
+            case 'takeaway':
+                return array('class' => 'takeaway', 'icon' => '📦', 'text' => __('Takeaway', 'orders-jet'));
+            case 'delivery':
+                return array('class' => 'delivery', 'icon' => '🚚', 'text' => __('Delivery', 'orders-jet'));
+            default:
+                return array('class' => 'unknown', 'icon' => '❓', 'text' => __('Unknown', 'orders-jet'));
+        }
+    }
+    
+    /**
+     * Helper method to get kitchen display data
+     */
+    private function get_kitchen_display_data($kitchen_status) {
+        switch ($kitchen_status['kitchen_type']) {
+            case 'food':
+                return array('class' => 'food', 'icon' => '🍕', 'text' => __('Food', 'orders-jet'));
+            case 'beverages':
+                return array('class' => 'beverages', 'icon' => '🥤', 'text' => __('Beverages', 'orders-jet'));
+            case 'mixed':
+                return array('class' => 'mixed', 'icon' => '🍕🥤', 'text' => __('Mixed', 'orders-jet'));
+            default:
+                return array('class' => 'unknown', 'icon' => '❓', 'text' => __('Unknown', 'orders-jet'));
+        }
+    }
+    
+    /**
+     * Helper method to format duration
+     */
+    private function format_duration($seconds) {
+        $hours = floor($seconds / 3600);
+        $minutes = floor(($seconds % 3600) / 60);
+        
+        if ($hours > 0) {
+            return sprintf('%dh %dm', $hours, $minutes);
+        } else {
+            return sprintf('%dm', $minutes);
+        }
     }
 }
